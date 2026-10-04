@@ -1,7 +1,14 @@
-# Model-TG
+# Model-TG VA Edition
 
 **Unofficial firmware additions for the Elektron Model:Cycles (OS 1.13):
-a full Sampler machine, resampling, beat-repeat with master FX, and more.**
+a full Sampler machine, a two-oscillator VA synth machine, resampling,
+beat-repeat with master FX, and more.**
+
+This is a fork of [TinyGregAudio/Model-TG](https://github.com/TinyGregAudio/Model-TG)
+that adds one machine, **VA** (machine 8 on the machine page, index 7),
+and keeps everything else Model-TG does. See **[docs/VA.md](docs/VA.md)** for
+how it works and what has been verified. **The VA machine has not yet been
+tested on hardware**: back up first.
 
 Model-TG is built on your computer from your own copy of the stock OS. It
 patches new code into the firmware, so everything the Cycles already does
@@ -14,6 +21,10 @@ keeps working.
 
 ## What it adds
 
+- **A VA machine** (this fork), the eighth: two band-limited oscillators
+  (saw, square, triangle each), OSC 2 tuning and a mix, with gentle
+  analogue drift, through the same Attack, Amp Decay, Filter and Resonance
+  as the stock machines. All four parameters p-lock and take LFOs.
 - **A Sampler machine**, the seventh machine on any track. It plays samples
   from the Cycles' internal storage, a different sample per pattern, with
   p-lockable per-step sample locks.
@@ -39,20 +50,23 @@ The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md
 
 ## Getting it
 
-The easiest way is the **[web flasher](https://tinygregaudio.github.io/Model-TG/)**:
-pick your stock OS 1.13 file and it builds Model-TG right there in your
-browser. Your file never leaves your computer. Install the result like an
+The easiest way is the web flasher in [`flasher/`](flasher/), published on
+this fork's GitHub Pages (see [docs/FLASHER.md](docs/FLASHER.md)): pick your
+stock OS 1.13 file and it builds Model-TG VA Edition right there in your
+browser. (Upstream's [web flasher](https://tinygregaudio.github.io/Model-TG/)
+builds plain Model-TG, without the VA.) Your file never leaves your computer. Install the result like an
 official OS update.
 
 Or build it yourself:
 
 ```sh
-git clone https://github.com/TinyGregAudio/Model-TG
-cd Model-TG
+git clone https://github.com/drusanow/model-tg-va-edition
+cd model-tg-va-edition
 python3 build.py --stock path/to/model-cycles_OS1.13.syx
 ```
 
-Then install `Model-TG.syx` like an official OS update. The tools you need,
+Then install `Model-TG.syx` like an official OS update (choose another name
+with `--out`). The tools you need,
 and how to go back to stock, are in **[docs/BUILD.md](docs/BUILD.md)**.
 
 
@@ -64,6 +78,9 @@ Pull requests for new behaviour are welcome. See
 what is already known about it.
 
 ## Credits
+
+- [Model-TG](https://github.com/TinyGregAudio/Model-TG) by TinyGregAudio, which
+  this fork extends.
 
 - [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)
   unpacks and repacks the OS.

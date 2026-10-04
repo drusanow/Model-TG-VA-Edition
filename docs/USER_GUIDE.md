@@ -21,6 +21,7 @@ The twelve parameter knobs are numbered 1 to 12.
 - [Resampling](#resampling)
 - [Stereo](#stereo)
 - [Retrig and master FX](#retrig-and-master-fx)
+- [The VA machine](#the-va-machine)
 - [Additions for every machine](#additions-for-every-machine)
 - [Slide trigs](#slide-trigs)
 - [Scale Lock](#scale-lock)
@@ -235,6 +236,42 @@ Each is off at 0, and the bottom line shows a knob's value as you turn it.
 
 The master FX stay on after you close the page, and through pattern changes.
 **SETTINGS** + return from anywhere turns them all off (*Master FX off*).
+
+## The VA machine
+
+*VA Edition only.* An eighth machine, **VA**, after the Sampler: a small
+two-oscillator analogue-style synth. Choose it for any track the way you
+choose any machine; it needs no sample. It plays the note of each trig, pad
+and MIDI note, like Tone or Chord. On the machine page the position markers
+start a little further left so that eight fit.
+
+| knob | label | what it does |
+|---|---|---|
+| **Pitch** | (stock) | as on every machine |
+| **Decay** | (stock) | Amp Decay, as on every machine |
+| **Color** | OSC1 | oscillator 1's waveform: 0-42 saw, 43-85 square, 86-127 triangle |
+| **Shape** | OSC2 | oscillator 2's waveform, the same ranges |
+| **Sweep** | DTUN | oscillator 2's tuning against oscillator 1: 64 is unison; small steps either side of 64 detune by cents (65 is +2 cents, 68 about +8, 80 about half a semitone), the ends reach an octave down (0) or up (127) |
+| **Contour** | MIX | the balance: 0 is oscillator 1 alone, 64 both equally, 127 oscillator 2 alone |
+
+- A track switched to VA starts at OSC1 saw, OSC2 saw, DTUN 68 (a slight
+  detune) and MIX 64.
+- **Attack, Filter and Resonance** work as on the stock machines (see
+  [Additions for every machine](#additions-for-every-machine)): hold
+  **PRESET** and turn **Decay** (Attack), **Sweep** (Filter) or **Contour**
+  (Resonance).
+- All four VA parameters can be p-locked, slid with slide trigs, and chosen
+  as LFO destinations, and are saved with the project. An LFO on OSC1 or
+  OSC2 steps through the waveforms.
+- Each note restarts both oscillators near the same point of their cycle
+  (oscillator 2 a little differently every note), and both drift by about
+  a cent, slowly and independently, for an analogue feel.
+- The saw and square are band-limited (PolyBLEP) and everything is rendered
+  at twice the sample rate, so high notes stay clean.
+- MIX at 0 or 127 switches the unheard oscillator off, which saves CPU.
+
+Projects using the VA machine need the VA Edition: on stock Model-TG or the
+stock OS those tracks will not play correctly.
 
 ## Additions for every machine
 

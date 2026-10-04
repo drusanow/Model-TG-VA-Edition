@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Model-TG Flasher</title>
+<title>Model-TG VA Edition Flasher</title>
 <link rel="icon" type="image/png" href="favicon.png">
-<meta name="description" content="Build Model-TG for the Elektron Model:Cycles from your own stock OS, in your browser.">
+<meta name="description" content="Build Model-TG VA Edition (Model-TG plus a VA synth machine) for the Elektron Model:Cycles from your own stock OS, in your browser.">
 <style>
   :root {
     --bg: #f7f7f5; --fg: #1c1c1a; --muted: #62625d; --card: #ffffff; --line: #deded8;
@@ -67,7 +67,7 @@
   <header>
     <img src="badge.png" alt="">
     <div>
-      <h1>Model-TG Flasher</h1>
+      <h1>Model-TG VA Edition Flasher</h1>
       <p class="sub" id="ver">Loading…</p>
     </div>
   </header>
@@ -87,7 +87,7 @@
   </div>
 
   <div class="card">
-    <h2>2. Build Model-TG from it</h2>
+    <h2>2. Build Model-TG VA Edition from it</h2>
     <p>Your file never leaves your computer: this page patches it right here in your browser.</p>
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".syx">
@@ -110,9 +110,11 @@
   </div>
 
   <footer>
-    <p>The <a href="https://github.com/TinyGregAudio/Model-TG/blob/main/docs/USER_GUIDE.md">user guide</a>
-      covers everything Model-TG adds. Source and license:
-      <a href="https://github.com/TinyGregAudio/Model-TG">github.com/TinyGregAudio/Model-TG</a> (MIT).</p>
+    <p>The <a href="https://github.com/drusanow/model-tg-va-edition/blob/main/docs/USER_GUIDE.md">user guide</a>
+      covers everything Model-TG adds, and <a href="https://github.com/drusanow/model-tg-va-edition/blob/main/docs/VA.md">VA.md</a>
+      the VA machine. Source and license:
+      <a href="https://github.com/drusanow/model-tg-va-edition">github.com/drusanow/model-tg-va-edition</a> (MIT),
+      a fork of <a href="https://github.com/TinyGregAudio/Model-TG">TinyGregAudio/Model-TG</a> (MIT).</p>
     <p>Opens and repacks the OS with a port of
       <a href="https://github.com/mischa85/elektron-firmware-tool">elektron-firmware-tool</a> (MIT).
       Includes tweaks from <a href="https://github.com/drumkilla/elektron-model-tweaks">elektron-model-tweaks</a> (MIT).
@@ -143,7 +145,7 @@
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (p) {
       patch = p;
-      $('ver').textContent = 'Model-TG ' + p.version + ' for ' + p.device + ' OS ' + p.os;
+      $('ver').textContent = (p.name || 'Model-TG') + ' ' + p.version + ' for ' + p.device + ' OS ' + p.os;
     })
     .catch(function () {
       $('ver').textContent = 'Could not load the release patch. Reload the page to try again.';
@@ -153,7 +155,7 @@
     busy = false;
     if (url) URL.revokeObjectURL(url);
     url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-    var name = 'Model-TG-' + patch.version + '.syx';
+    var name = 'Model-TG-VA-' + patch.version + '.syx';
     $('save').href = url; $('save').download = name;
     $('save').textContent = 'Save ' + name;
     $('hash').textContent = patch.result_sha256;

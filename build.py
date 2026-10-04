@@ -109,6 +109,10 @@ print(f"  one blob: {len(_real):,} B at 0x{BLOB:08x}, reserved_end 0x{RES_END:08
 # enough to catch "allocate 48, free 40", which silently leaks the audio stack.
 import re as _re
 _txt=open(f"{proto}/{src}").read()
+# va_synth.inc is .included by model_tg.s: append it so every source check
+# below covers the VA as well (appended, so the index-based checks, which
+# look for model_tg.s's own labels, are unaffected)
+_txt+="\n"+open(f"{proto}/va_synth.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
 _pos={int(m) for m in _re.findall(r'lea\.l\s+%sp@\((\d+)\),%sp', _txt)}
 _bad=sorted(_neg - _pos)
@@ -127,10 +131,11 @@ print(f"  stack frames balanced ({sorted(_neg)})")
 # engines themselves - lofi/tape/vinyl_apply, gran_fill, pluck_fill, wave_fill
 # - take it from fx_buf / gf_dst / pk_dst / wf_dst, which start at +32). Every
 # reference in any register is counted, so none can slip past at +0.
+# The VA's va_fill writes the same window, the tenth.
 _bufs=_re.findall(r'lea\.l\s+sampler_buf(\+32)?,%a[0-7]', _txt)
-if _bufs.count('') or len(_bufs)!=9:
-    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected nine '+32')")
-print(f"  sampler_buf: fill, filter, granular, pluck, wavetable, lo-fi, tape and vinyl all at +32")
+if _bufs.count('') or len(_bufs)!=10:
+    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected ten '+32')")
+print(f"  sampler_buf: fill, filter, granular, pluck, wavetable, lo-fi, tape, vinyl and VA all at +32")
 # Everything that renders a voice must reach the amp stage through amp_hook, or
 # it silently loses its attack. The six stock call sites are retargeted in the
 # image; our own render has to say amp_hook in the source. It said 0x400a967a
@@ -175,7 +180,8 @@ _dis=subprocess.run([CROSS+"objdump","-d",elf],capture_output=True,text=True,che
 # Tables of .long data inside the code (objdump decodes them as instructions)
 # are skipped by the label that holds them.
 _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
-              'rs_items','rs_desc'}   # pointer tables (menu descriptors), not code
+              'rs_items','rs_desc',
+              'va_swap','va_det_tab'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -289,32 +295,56 @@ assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{R
 # replaces. Purposes per MERGE_PLAN: boot hook redirect, the FUN_400a24ca
 # render patches, the clamp-table max, the vtable render-fn redirect, the
 # FUN_4001488a clamp bytes, the FUN_4001477e write-guard byte, and the two
-# table-lookup redirects. The 05->06 / 06->07 / 18->1c bytes are the machine
-# count and machine-list size going from 6 machines to 7.
+# table-lookup redirects. The 05->07 / 18->20 bytes are the machine count and
+# machine-list size going from 6 machines to 8: the Sampler (6) and the VA (7).
+# Each site below was checked against a disassembly of stock OS 1.13
+# (docs/VA.md, "Machine-count sites"):
+#   0x400147a4  setMachine (0x4001477e): moveq #5 / cmpl d2 / bcsw out
+#   0x400148aa  0x4001488a: moveq #5 / ... / bges / moveq #5 - the clamp of
+#   0x400148b2  current + delta, both its bound and its value
+#   0x4001bbd0  ParameterPageView's machine+1 list: pea 0x18 (alloc), pea 0x18
+#   0x4001bbe2  (memcpy, from page_machine_list), addil #24 (end): 8 longs
+#   0x4001bbee
+#   0x4005a79c  machine -> LFO group, (m <= 5) ? m : -1. Its only caller,
+#               0x400618f2, bounds m by 5 itself first (0x40061902, stock),
+#               so this byte is reached by stock machines only; widened with
+#               the rest for consistency. The LFO list the UI shows takes the
+#               raw machine byte (0x40014042) - the gates in model_tg.s.
+#   0x400a25e0  the machine page: names/icons for 0..N, an error string past
+#   0x400a26a2  ...its position markers: x = 80 + 7i, as x-4..x. Eight from
+#   0x400a26e8  80 would end at x 129, off the 128-pixel screen, so they start
+#               at 76 (last at 121..125) and the count is 8
+#   0x400a7df4  the AUDIO dispatch bound stays 6: a VA voice is handed to the
+#               stock dispatch as 6 (va_pre), so no stock audio table ever
+#               sees 7 (the render tables 0x40118610/0x40118628 hold six)
+#   0x4010e5e6  param_table[0x29] (the machine selector) max: 7
 # The boot hook, the trampoline, the table lookup, the name table and the lazy
 # init all live in the linked blob now, so their targets come from the symbols
 # rather than the old fixed 0x401aa1xx..0x401aa5xx addresses.
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
+MACH_MAX=7                    # the last machine: 0-5 stock, 6 Sampler, 7 VA
+_M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),
  (0x40014073,'56ff7048d7','f9'+_p('log_trampoline')),
- (0x400147a5,'05','06'), (0x400148ab,'05','06'), (0x400148b3,'05','06'),
- (0x4001bbd3,'18','1c'), (0x4001bbe5,'18','1c'), (0x4001bbf3,'18','1c'),
+ (0x400147a5,'05',_M), (0x400148ab,'05',_M), (0x400148b3,'05',_M),
+ (0x4001bbd3,'18',_L), (0x4001bbe5,'18',_L), (0x4001bbf3,'18',_L),
  (0x4004df76,'7205202f0004','4ef9'+_p('table_lookup_b_fixed')),
- (0x4005a79d,'05','06'),  # LFO dest: machine->group bound
- (0x400a25e1,'05','06'), (0x400a2615,'1177e4',_p('sampler_name_table')[2:]),
- (0x400a26e9,'06','07'),
- (0x400a7df5,'05','06'),
+ (0x4005a79d,'05',_M),  # LFO dest: machine->group bound
+ (0x400a25e1,'05',_M), (0x400a2615,'1177e4',_p('sampler_name_table')[2:]),
+ (0x400a26a3,'50','4c'),  # machine-page markers start at x 76, not 80
+ (0x400a26e9,'06',f'{MACH_MAX+1:02x}'),
+ (0x400a7df5,'05','06'),  # audio dispatch: stays 6 (VA is handed over as 6)
  (0x400a7e0f,'912f0e2f0341f94011861022704c00','714e714e714e714e714e714e714e71'),
- (0x400a7e1f,'91','71'), (0x4010e5e6,'05','06'),
+ (0x400a7e1f,'91','71'), (0x4010e5e6,'05',_M),
  # Algorithm (0x29) is the per-track machine selector: long[1]=9, so it is
  # trackData+18 / sound object+38, the byte 0x40014042 reads. Stock hides it
  # from every parameter page (long[10]=32767) AND leaves its flags word at 0,
  # so the LFO destination list - which requires bit 0x200 - skipped it. Set
  # that bit so it can be modulated. The line above already widened its max
- # from 5 to 6, so the range covers the Sampler as well.
+ # from 5 to 7, so the range covers the Sampler and the VA as well.
  (0x4010e5fc,'00000000','00000200'), (0x40117931,'0a24ca',_p('sampler_lazy_init_trampoline')[2:]),
 ]
 for _a,_from,_to in PHASE1:
@@ -663,9 +693,9 @@ print(f"  param_table: stock already points at 0x{PT_NEW:08x}; nothing to reloca
 # table in place AND made the copy), so accept either state and assert the
 # result. That makes the relocation of ~30 sites pure redundancy.
 _o=PT_NEW+2310-BASE
-assert d[_o] in (0x05,0x06), f"param_table byte at +2310 is 0x{d[_o]:02x}, expected 0x05 or 0x06"
-_was=d[_o]; d[_o]=0x06
-print(f"  param_table[41]+14: 0x{_was:02x} -> 0x06 (in place, stock table)")
+assert d[_o] in (0x05,MACH_MAX), f"param_table byte at +2310 is 0x{d[_o]:02x}, expected 0x05 or 0x{MACH_MAX:02x}"
+_was=d[_o]; d[_o]=MACH_MAX
+print(f"  param_table[41]+14: 0x{_was:02x} -> 0x{MACH_MAX:02x} (in place, stock table)")
 if 'tick_hook' in sym:                     # KeyboardView slot 2: input-driven
     o=0x400ff9cc-BASE                      # fallback if led_hook ever declines
     assert struct.unpack('>I',bytes(d[o:o+4]))[0]==0x4001a0d2, bytes(d[o:o+4]).hex()
@@ -852,12 +882,14 @@ if args.modded_cycles:
         _ver="unknown"
     _at=f"0x{BASE+len(_st):08x}"
     _tail=_img[len(_st):]
-    _tw={"id":"model-tg","order":30,
-         "name":f"Model-TG {_ver}",
-         "description":["Model-TG: the Sampler machine, resampling, retrig and master FX, and more.",
-                        "Source, user guide and license: https://github.com/TinyGregAudio/Model-TG",
-                        "MIT licensed (c) TinyGregAudio. Unofficial, not affiliated with Elektron."],
-         "version":_ver,"source":"https://github.com/TinyGregAudio/Model-TG",
+    _tw={"id":"model-tg-va","order":30,
+         "name":f"Model-TG VA Edition {_ver}",
+         "description":["Model-TG VA Edition: Model-TG (the Sampler machine, resampling, retrig and",
+                        "master FX, and more) plus a two-oscillator VA synth machine.",
+                        "Source, user guide and license: https://github.com/drusanow/model-tg-va-edition",
+                        "A fork of https://github.com/TinyGregAudio/Model-TG.",
+                        "MIT licensed (c) TinyGregAudio and contributors. Unofficial, not affiliated with Elektron."],
+         "version":_ver,"source":"https://github.com/drusanow/model-tg-va-edition",
          "device":"Model:Cycles","os":"1.13","section":3,
          "result_sha256":RESULT_SHA256,
          "conflicts":["latching-mute","trig-preview","browser-scroll"],
@@ -925,9 +957,9 @@ if args.flasher:
                              capture_output=True,text=True,check=True).stdout.strip()
     except Exception:
         _fver="unknown"
-    _fl={"format":1,"name":"Model-TG","version":_fver,
-         "source":"https://github.com/TinyGregAudio/Model-TG",
-         "license":"MIT (c) TinyGregAudio; tweaks MIT (c) drumkilla",
+    _fl={"format":1,"name":"Model-TG VA Edition","version":_fver,
+         "source":"https://github.com/drusanow/model-tg-va-edition",
+         "license":"MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) drumkilla",
          "device":"Model:Cycles","device_id":0x11,"os":"1.13","section":3,
          "stock_sha256":STOCK_SHA256,"stock_len":len(_st),
          "result_sha256":RESULT_SHA256,"result_len":len(_img),

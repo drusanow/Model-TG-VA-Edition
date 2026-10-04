@@ -86,7 +86,7 @@ sampler_lazy_init_trampoline:
     movea.l 0x40fe32d0,%a1     | a1 = table A vector "end"
     movel   %a1,%d0
     subl    %a0,%d0             | d0 = end - begin (byte count of live elements)
-    cmpil   #196,%d0            | already rebuilt to 7 elements (7 * 0x1c)?
+    cmpil   #224,%d0            | already rebuilt to 8 elements (8 * 0x1c)?
     beqs    already_done
     bsr     build_sampler_icons
 already_done:
@@ -95,8 +95,12 @@ already_done:
     jmp     0x400a24ca
 
 build_sampler_icons:
+    | Eight 0x1c-byte entries now: the six stock machines, the Sampler (6)
+    | and the VA (7). The machine page (0x400a24ca) indexes both tables by
+    | the machine after its 0..7 bound (0x400a25e0, widened by build.py); the
+    | other reader (0x4001b696) still clamps to 5.
     | ---------- Table A (0x40fe32cc): 48x33 icons ----------
-    movel   #196,-(%a7)            | 7 * 0x1c
+    movel   #224,-(%a7)            | 8 * 0x1c
     jsr     0x40080064             | d0 = new heap buffer
     addql   #4,%a7
     moveal  %d0,%a2                | a2 = new buffer base (table A)
@@ -118,15 +122,24 @@ copyA_loop:
     movel   #0x4016ac78,(%a1)+     | reuse existing shared palette A
     clrl    (%a1)                  | flag byte (+ pad, all zeroed)
 
+    lea.l   196(%a2),%a1           | icon #7 slot (VA), laid out the same
+    movel   #0x401117c8,(%a1)+
+    movel   #48,(%a1)+
+    movel   #33,(%a1)+
+    movel   #2,(%a1)+
+    movel   #va_icon_a_pixels,(%a1)+
+    movel   #0x4016ac78,(%a1)+
+    clrl    (%a1)
+
     movel   %a2,%d2                | d2 = new buffer base, kept for arithmetic
     lea.l   0x40fe32cc,%a0
     movel   %d2,(%a0)+             | vector.begin = new buffer
-    lea.l   196(%a2),%a1           | new buffer + 7*0x1c
+    lea.l   224(%a2),%a1           | new buffer + 8*0x1c
     movel   %a1,(%a0)+             | vector.end
     movel   %a1,(%a0)               | vector.capacity_end
 
     | ---------- Table B (0x40fe384c): 34x34 icons ----------
-    movel   #196,-(%a7)
+    movel   #224,-(%a7)
     jsr     0x40080064
     addql   #4,%a7
     moveal  %d0,%a2                | a2 = new buffer base (table B)
@@ -148,10 +161,19 @@ copyB_loop:
     movel   #0x4017c20c,(%a1)+     | reuse existing shared palette B
     clrl    (%a1)
 
+    lea.l   196(%a2),%a1           | icon #7 slot (VA)
+    movel   #0x401117c8,(%a1)+
+    movel   #34,(%a1)+
+    movel   #34,(%a1)+
+    movel   #2,(%a1)+
+    movel   #va_icon_b_pixels,(%a1)+
+    movel   #0x4017c20c,(%a1)+
+    clrl    (%a1)
+
     movel   %a2,%d2
     lea.l   0x40fe384c,%a0
     movel   %d2,(%a0)+
-    lea.l   196(%a2),%a1
+    lea.l   224(%a2),%a1
     movel   %a1,(%a0)+
     movel   %a1,(%a0)
 
@@ -166,6 +188,7 @@ sampler_name_table:
     .long   0x40129960             | Tone
     .long   0x401300ee             | Chord
     .long   mach_nbuf              | Sampler: the track's sample name (nm_tick)
+    .long   va_name_string         | VA (machine 7)
 
 sampler_name_string:
     .ascii  "Sample"
@@ -180,6 +203,18 @@ sampler_icon_a_pixels:
     .align 2
 sampler_icon_b_pixels:
     .incbin "sampler_icons/sampler_icon_B_34x34.bin"
+
+    .align 2
+va_icon_a_pixels:                  | tools/gen_va_icons.py: a sawtooth
+    .incbin "va_icons/va_icon_A_48x33.bin"
+
+    .align 2
+va_icon_b_pixels:
+    .incbin "va_icons/va_icon_B_34x34.bin"
+
+va_name_string:
+    .asciz  "VA"
+    .align 2
 
 | ---------------------------------------------------------------
 | Fix for FUN_4004df5c / FUN_4004df76 (the per-machine-type info
@@ -200,7 +235,10 @@ sampler_icon_b_pixels:
 table_lookup_a_fixed:              | replaces FUN_4004df5c (called with machineIndex+1)
     movel   %sp@(4),%d0
     cmpil   #7,%d0
-    bnes    a_not_seven
+    beqs    a_alias
+    cmpil   #8,%d0                  | the VA (machine 7): the same alias, used only
+    bnes    a_not_seven             | until descr_hook's own descriptor is built
+a_alias:
     moveq   #1,%d0                  | alias -> slot 1 (Kick), same slot machineIndex 0 uses
 a_not_seven:
     moveq   #6,%d1
@@ -216,7 +254,10 @@ a_domul:
 table_lookup_b_fixed:              | replaces FUN_4004df76 (called with raw machineIndex)
     movel   %sp@(4),%d0
     cmpil   #6,%d0
+    beqs    b_alias
+    cmpil   #7,%d0                  | the VA as well
     bnes    b_not_six
+b_alias:
     moveq   #0,%d0                  | alias -> raw index 0 (Kick)
 b_not_six:
     moveq   #5,%d1

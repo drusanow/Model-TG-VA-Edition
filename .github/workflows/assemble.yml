@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # tests/test_regression.py assembles upstream Model-TG from history
       - name: ColdFire binutils
         run: sudo apt-get update && sudo apt-get install -y binutils-m68k-linux-gnu
       - name: Assemble and self-check
@@ -19,4 +21,10 @@ jobs:
       - name: Generated tables are up to date
         run: |
           python3 tools/gen_granular_tables.py
-          git diff --exit-code src/granular_tables.inc
+          python3 tools/gen_va_tables.py
+          python3 tools/gen_va_icons.py
+          git diff --exit-code src/granular_tables.inc src/va_tables.inc src/va_icons
+      - name: Host tests (the blob on Unicorn's ColdFire V4e)
+        run: |
+          pip install unicorn numpy
+          python3 -m unittest discover -s tests -v

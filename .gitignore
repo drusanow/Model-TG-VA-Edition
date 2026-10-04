@@ -4,6 +4,7 @@ build/
 *.syx
 *.bin
 !src/sampler_icons/*.bin
+!src/va_icons/*.bin
 *.o
 *.elf
 __pycache__/

@@ -48,6 +48,14 @@ Options:
 The build also checks that your stock OS really is the unmodified OS 1.13
 before changing anything.
 
+To run the host tests (they need no stock OS; with `MODEL_CYCLES_STOCK` set
+to your stock `.syx` they also run a full build):
+
+```sh
+pip install unicorn numpy
+python3 -m unittest discover -s tests -v
+```
+
 Every build prints the **MAIN OS sha256** of the result. Each
 [release](https://github.com/TinyGregAudio/Model-TG/releases) lists that hash
 in its notes, so you can check that your build matches.
@@ -87,8 +95,8 @@ starts at CYC.
 
 Install the unmodified `model-cycles_OS1.13.syx` the same way, with Transfer
 and with the identity set to CYC. Projects that
-use the Sampler machine rely on Model-TG and won't play those tracks on stock
-firmware.
+use the Sampler or VA machine rely on Model-TG (the VA on this edition) and
+won't play those tracks on stock firmware.
 
 ## Disclaimer
 

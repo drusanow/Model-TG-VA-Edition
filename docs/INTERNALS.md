@@ -17,6 +17,10 @@ image.
   vendored tweaks, and repacks.
 - `src/model_tg.s` is the bulk: the Sampler machine, its modes, pages, effects,
   resampling, retrig, master FX and the stock-machine optimisations.
+- `src/va_synth.inc` (VA Edition), included by `model_tg.s`: the VA machine
+  (index 7). It reuses the Wave mode's phases and the Sampler's render tail;
+  see [VA.md](VA.md), which also lists every place that knows the machine
+  count.
 - `src/phase1.s` holds the boot hook (it clears BSS around our blob and sets up
   the caches), the machine catalogue lookups and the trampoline that
   `src/track_table.s` continues.
@@ -87,6 +91,10 @@ These were each verified on hardware; they save a lot of rediscovery.
 
 ## What each part does, and how
 
+- VA machine (index 7, VA Edition): two oscillators in place of the sample
+  fill, then the Sampler's tail and the stock machines' Filter/Resonance. The
+  audio dispatch is handed 6 for it, as for the Sampler; `trk_mach` tells
+  them apart. Everything else: [VA.md](VA.md)
 - Sampler machine (index 6), assignable to any track
 - Samples per pattern: each pattern's Sampler tracks play the samples that
   pattern names (the "SMP" token in its sound name). On a pattern change a
@@ -436,7 +444,8 @@ It refuses to produce an image if any of these fail:
 - every stock patch site still contain the exact stock bytes
 - every base->blob reference resolve against the ELF
 - stack frames balance; the render step fraction survives the fill loop
-- the fill loop and the filter address the same `sampler_buf` window
+- the fill loop, the filter and the VA address the same `sampler_buf` window
+  (the source checks include `va_synth.inc`)
 - the six machine-page parameter ids map to distinct, non-dial-bound slots
 - `reserved_end` is 16-byte aligned and the blob fits the reserved cache block
 
