@@ -91,6 +91,11 @@ These were each verified on hardware; they save a lot of rediscovery.
 
 ## What each part does, and how
 
+- LFO 2 (VA Edition): parameter words 28..32, the stock LFO engine run twice
+  with its state swapped, slotOf remapped while the LFO menu shows LFO 2, and
+  pattern lock rows given slots for words 23..32 (which also fixes
+  Attack/Filter/Resonance locks across a pattern save). Everything else:
+  [LFO2.md](LFO2.md)
 - VA machine (index 7, VA Edition): two oscillators in place of the sample
   fill, then the Sampler's tail and the stock machines' Filter/Resonance. The
   audio dispatch is handed 6 for it, as for the Sampler; `trk_mach` tells

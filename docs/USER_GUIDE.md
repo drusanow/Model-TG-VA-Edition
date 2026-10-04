@@ -273,6 +273,22 @@ start a little further left so that eight fit.
 Projects using the VA machine need the VA Edition: on stock Model-TG or the
 stock OS those tracks will not play correctly.
 
+## LFO 2
+
+*VA Edition only.* A second LFO on every track. Press **LFO** to open the
+LFO menu as usual (LFO 1); press **LFO** again for LFO 2 (a **2** shows
+under *LFO*); a third press closes the menu. On LFO 2 the menu and the
+**LFO SPEED** knob edit LFO 2's Waveform, Multiplier, Destination, Depth
+and Speed, which p-lock and are saved like LFO 1's.
+
+- The two LFOs never share a destination: scrolling DEST skips the one the
+  other LFO uses (*None* excepted).
+- LFO Setup (**FUNC** + **LFO**: Trig Mode, Fade, Start Phase) is shared by
+  both LFOs; the Cycles has no room for a second set.
+- **Clear LFO** resets LFO 1 only.
+
+Details and limits: [LFO2.md](LFO2.md).
+
 ## Additions for every machine
 
 - **Attack:** hold **PRESET** and turn **Decay**. From instant up to ~2 s.
@@ -364,6 +380,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + **RETRIG** | retrig page and master FX |
 | anywhere | **SETTINGS** + return | master FX off |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
+| LFO menu | **LFO** (again) | LFO 2; once more closes the menu |
 | grid | **SETTINGS** + trig key | slide trig on / off |
 | browser | pick a sample file | load it onto the Sampler track |
 | step held | **PRESET**, pick a sample | sample lock |

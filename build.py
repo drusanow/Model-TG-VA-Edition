@@ -113,6 +113,7 @@ _txt=open(f"{proto}/{src}").read()
 # below covers the VA as well (appended, so the index-based checks, which
 # look for model_tg.s's own labels, are unaffected)
 _txt+="\n"+open(f"{proto}/va_synth.inc").read()
+_txt+="\n"+open(f"{proto}/lfo2.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
 _pos={int(m) for m in _re.findall(r'lea\.l\s+%sp@\((\d+)\),%sp', _txt)}
 _bad=sorted(_neg - _pos)
@@ -181,7 +182,8 @@ _dis=subprocess.run([CROSS+"objdump","-d",elf],capture_output=True,text=True,che
 # are skipped by the label that holds them.
 _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'rs_items','rs_desc',
-              'va_swap','va_det_tab'}   # pointer tables (menu descriptors), not code
+              'va_swap','va_det_tab',
+              'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -500,6 +502,36 @@ for _id,_k,_dflt,_sort,_ln,_sn in ((0x0c,24,32512,36,'str_gfilter','str_gflt'),
 assert bytes(d[0x4005a6d0-BASE:0x4005a6d0-BASE+12])==bytes.fromhex("41f940a793942030ac006020"), \
     bytes(d[0x4005a6d0-BASE:0x4005a6d0-BASE+12]).hex()
 jmp(0x4005a6d0, sym['sampler_com_gate'])
+# ---- LFO 2 (src/lfo2.inc, docs/LFO2.md) ------------------------------------
+# Each site was read in the stock disassembly; each asserts its stock bytes.
+for _a,_old,_new,_what in (
+    # the block's LFO call: jsr 0x40091ab2 -> lfo_run (LFO 2, then LFO 1)
+    (0x400597c6,'4eb940091ab2','4eb9'+_p('lfo_run'),'LFO engine call'),
+    # slotOf(id) -> param_table[id].long[1]: moveq #76,d1 ; movel sp@(4),d0
+    (0x4005a4e8,'724c202f0004','4ef9'+_p('lfo_slot'),'slotOf'),
+    # ParameterPageView's LFO key: jsr LFOMenuView's constructor
+    (0x4001c3dc,'4eb940025798','4eb9'+_p('lfo_menu_new'),'LFO menu constructor call'),
+    # LFOMenuView's destructor (every path, thunks included, ends here):
+    # movel a2,-(sp) ; movel #0x401016dc,d0
+    (0x400d979a,'2f0a203c401016dc','4ef9'+_p('lfo_menu_dtor')+'4e71','LFO menu destructor'),
+    # LFOMenuView's View vtable (0x401016dc): slot +8 the key handler
+    # (thunk to 0x40024e0c, which closes the menu on the LFO key's release),
+    # slot +0x10 the draw (thunk to MenuView 0x400423e4)
+    (0x401016e4,'40024e86',_p('lfo_key_hook'),'LFO menu key handler'),
+    (0x401016ec,'400426fa',_p('lfo_render_hook'),'LFO menu draw'),
+    # the sound default fill: lea sp@(-36),sp ; moveml d2-d3/a2-a5,sp@
+    (0x40061866,'4fefffdc48d73c0c','4ef9'+_p('lfo_init_hook')+'4e71','default fill'),
+    # pattern save, a lock row's slot and track:
+    # moveb a5@(3,d4:l),a3@ ; moveb d2,a3@(1)
+    (0x4005b9c6,'16b548031742 0001'.replace(' ',''),'4eb9'+_p('lk_slot_save')+'4e71','lock-row slot (save)'),
+    # pattern load, slot -> word: movel d2,sp@- ; moveq #6,d2 ; movel sp@(8),d1
+    (0x4005aa1a,'2f027406222f0008','4ef9'+_p('lk_slot_load')+'4e71','lock-row slot (load)'),
+    ):
+    _o=_a-BASE; _ob=bytes.fromhex(_old); _nb=bytes.fromhex(_new)
+    assert len(_ob)==len(_nb), (_what, len(_ob), len(_nb))
+    assert bytes(d[_o:_o+len(_ob)])==_ob, (_what, hex(_a), bytes(d[_o:_o+len(_ob)]).hex())
+    d[_o:_o+len(_nb)]=_nb
+print("  LFO 2: engine call, slotOf, LFO menu (new/key/draw/delete), default fill, lock rows")
 # Start/End waveform: slot 0x90 of the parameter view's vtable, the value popup
 # 0x4001d818, goes through wf_popup (stock for everything but Sampler Start/End).
 assert struct.unpack('>I',bytes(d[0x401005bc-BASE:0x401005c0-BASE]))[0]==0x4001d818, \

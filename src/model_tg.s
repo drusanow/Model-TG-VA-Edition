@@ -9641,6 +9641,10 @@ fd_ones:
 |   args: sp@(4) this, sp@(8) id, sp@(12) current, sp@(16) delta
 fine_hook:
     movel   %sp@(8),%d0
+    cmpil   #0x20,%d0             | LFO Destination: never the other LFO's
+    bnes    fh_nlfo               | (lfo2.inc)
+    jmp     lfo_dest_step
+fh_nlfo:
     cmpil   #0x2e,%d0
     beqs    fh_ours
     cmpil   #0x3e,%d0
@@ -11743,6 +11747,7 @@ snd_save_post:
     moveb   %d0,%a0@(83)
     movel   %a1@(72),%d1          | the Sample machine's packed state (k=26/27,
     movel   %d1,%a0@(84)          | see state_store) -> slots 28 and 29
+    jsr     lfo2_pack             | LFO 2 (k=28..32) -> slots 30/31 (lfo2.inc)
     movel   %sp@,%d0
     addql   #8,%sp
     rts
@@ -11795,6 +11800,7 @@ lp_d2:
 lp_done:
     movel   %a0@(84),%d1          | packed state; zero in older records, which
     movel   %d1,%a1@(72)          | then fall back to the name token
+    jsr     lfo2_unpack           | LFO 2, or its defaults (lfo2.inc)
     movel   %sp@,%d0
     addql   #8,%sp
     rts
@@ -20759,6 +20765,10 @@ msg_buf:    .space 64
 | ---- the VA machine (machine 7): its code, tables and state -----------------
     .align 2
     .include "va_synth.inc"
+
+| ---- LFO 2: a second LFO on every track -------------------------------------
+    .align 2
+    .include "lfo2.inc"
 
 | ---- the DSP scratch buffer, deliberately LAST in the blob ----
 | 0x400a9f58 writes 8 longs of history at +0..31 (which is why our fill starts

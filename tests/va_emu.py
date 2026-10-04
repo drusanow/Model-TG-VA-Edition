@@ -179,6 +179,8 @@ class Emu:
                 raise
         finally:
             self.uc.hook_del(h)
+        if not hit and RET in stops:
+            return RET                    # emu_start stops at RET before any hook
         if not hit:
             raise RuntimeError("returned without reaching any exit")
         return hit[0]
