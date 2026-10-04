@@ -41,6 +41,16 @@ node tools/test_flasher.js path/to/model-cycles_OS1.13.syx
 
 It takes about 15 s in a browser, almost all of it compressing.
 
+**Note (VA Edition):** with elektron-firmware-tool at a5bce9a (its tip in
+October 2026) the two `.syx` files are no longer byte-identical - for
+upstream Model-TG v1.1.0 as for this edition - because the native tool now
+compresses differently from the port. Both unpack to the same MAIN OS
+section (the sha256 `build.py` prints) with valid checksums; compare that
+instead: `elektron-firmware-tool -i file.syx -d 3 -o dir`.
+
+This fork's `flasher/model-tg.json` is built from this repository and
+includes the VA machine; upstream's web flasher builds plain Model-TG.
+
 ## What the patch file holds, and the checks on it
 
 The patch file holds no stock bytes. Unlike the Modded-Cycles format
