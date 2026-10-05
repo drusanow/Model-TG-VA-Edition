@@ -114,6 +114,7 @@ _txt=open(f"{proto}/{src}").read()
 # look for model_tg.s's own labels, are unaffected)
 _txt+="\n"+open(f"{proto}/va_synth.inc").read()
 _txt+="\n"+open(f"{proto}/lfo2.inc").read()
+_txt+="\n"+open(f"{proto}/gen.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
 _pos={int(m) for m in _re.findall(r'lea\.l\s+%sp@\((\d+)\),%sp', _txt)}
 _bad=sorted(_neg - _pos)
@@ -183,7 +184,9 @@ _dis=subprocess.run([CROSS+"objdump","-d",elf],capture_output=True,text=True,che
 _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'rs_items','rs_desc',
               'va_swap','va_det_tab',
-              'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word'}   # pointer tables (menu descriptors), not code
+              'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
+              'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
+              'gen_n_num','gen_n_go'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)

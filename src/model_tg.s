@@ -4713,6 +4713,10 @@ kso_eat:
     | Key 9 measured on hardware with samplerFG's probe. Press and release are
     | swallowed as the options chord's are, once the menu is up.
 kh_rs:
+    cmpil   #KEY_TRACK,%d0        | Settings + Track: the trig generator (gen.inc)
+    bnes    kh_rs_nt
+    jmp     kh_gen
+kh_rs_nt:
     cmpil   #KEY_RETRIG,%d0
     beqw    kh_rt
     cmpil   #MM_KEY_RETURN,%d0
@@ -20769,6 +20773,8 @@ msg_buf:    .space 64
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2
     .include "lfo2.inc"
+    .align 2
+    .include "gen.inc"
 
 | ---- the DSP scratch buffer, deliberately LAST in the blob ----
 | 0x400a9f58 writes 8 longs of history at +0..31 (which is why our fill starts

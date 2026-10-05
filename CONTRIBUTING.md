@@ -34,6 +34,7 @@ replaces.
 |---|---|
 | `src/model_tg.s` | nearly everything: the Sampler, modes, pages, effects |
 | `src/va_synth.inc` | the VA machine (index 7), included by `model_tg.s`; [docs/VA.md](docs/VA.md) |
+| `src/gen.inc` | the trig generator (Settings + Track), included by `model_tg.s`; [docs/GEN.md](docs/GEN.md) |
 | `src/lfo2.inc` | LFO 2, the second LFO per track, included by `model_tg.s`; [docs/LFO2.md](docs/LFO2.md) |
 | `tests/` | host tests on Unicorn: `python3 -m unittest discover -s tests` |
 | `src/phase1.s`, `src/track_table.s` | boot hook, machine catalogue, trampoline |

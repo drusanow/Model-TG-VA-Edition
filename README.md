@@ -6,10 +6,11 @@ beat-repeat with master FX, and more.**
 
 This is a fork of [TinyGregAudio/Model-TG](https://github.com/TinyGregAudio/Model-TG)
 that adds one machine, **VA** (machine 8 on the machine page, index 7),
-and a **second LFO** on every track, and keeps everything else Model-TG
+a **second LFO** on every track and a **trig generator**, and keeps everything else Model-TG
 does. See **[docs/VA.md](docs/VA.md)** and **[docs/LFO2.md](docs/LFO2.md)**
-for how they work and what has been verified. **LFO 2 has not yet been
-tested on hardware**: back up first.
+and **[docs/GEN.md](docs/GEN.md)** (the trig generator) for how they work
+and what has been verified. **LFO 2 and the trig generator have not yet
+been tested on hardware**: back up first.
 
 Model-TG is built on your computer from your own copy of the stock OS. It
 patches new code into the firmware, so everything the Cycles already does
@@ -26,6 +27,10 @@ keeps working.
   (saw, square, triangle each), OSC 2 tuning and a mix, with gentle
   analogue drift, through the same Attack, Amp Decay, Filter and Resonance
   as the stock machines. All four parameters p-lock and take LFOs.
+- **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
+  selected track with random trigs at a chosen density, or a Euclidean
+  rhythm (hits and rotation), optionally with random notes in a key, scale
+  and octave range.
 - **A second LFO** (this fork) on every track: press **LFO** twice. Same
   waves, sync and destinations as the stock LFO, never on the same
   destination as LFO 1; it shares LFO 1's Setup (Trig Mode, Fade, Phase).

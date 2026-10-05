@@ -273,6 +273,20 @@ start a little further left so that eight fit.
 Projects using the VA machine need the VA Edition: on stock Model-TG or the
 stock OS those tracks will not play correctly.
 
+## Generating trigs
+
+*VA Edition only.* Hold **SETTINGS** + **TRACK** for the *Generate* menu.
+It writes trigs on the selected track: **RND** (each step a trig with
+chance **DNS** %) or **EUC** (a Euclidean rhythm of **HIT** trigs, shifted
+**ROT** steps). With **NOT** on, each trig also gets a random note from
+**SCL** in **KEY**, from octave **OCT** over **RNG** octaves (OCT 4 + C is
+the track's normal pitch). Select **GEN** and press **DATA** to generate;
+press again for another result.
+
+GEN **replaces the track's trigs** over its length (no undo; p-locks are kept).
+The menu's settings are shared by all tracks and not saved. Details and
+examples: [GEN.md](GEN.md).
+
 ## LFO 2
 
 *VA Edition only.* A second LFO on every track. Press **LFO** to open the
@@ -378,6 +392,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + **PUNCH** | the mode's options |
 | anywhere | **SETTINGS** + **RECORD** | Resample menu |
 | anywhere | **SETTINGS** + **RETRIG** | retrig page and master FX |
+| anywhere | **SETTINGS** + **TRACK** | trig generator (Generate menu) |
 | anywhere | **SETTINGS** + return | master FX off |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
 | LFO menu | **LFO** (again) | LFO 2; once more closes the menu |
