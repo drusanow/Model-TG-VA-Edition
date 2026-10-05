@@ -344,8 +344,10 @@ the stock OS replaced by `rts` stubs (`tests/va_emu.py`):
 Nothing above is HARDWARE VERIFIED. To check on a Model:Cycles:
 
 1. Boot; every stock machine and the Sampler play as before (all modes).
-2. The machine page scrolls to VA: name, icon, eight markers, none off
-   screen; scroll back and forth across all eight; no freeze.
+2. The machine page scrolls to VA: name, its card under the name (CLASS
+   SYNTH, STYLE ANALOG, STR/DEX/MAG) and its sawtooth icon, the markers
+   (eight on the top line, the drums below), none off screen; scroll back
+   and forth across all of them; no freeze.
 3. A VA track plays from sequencer trigs, pads and MIDI notes, at the right
    pitch, and Amp Decay, Attack, Filter and Resonance (PRESET + Decay /
    Sweep / Contour) work.

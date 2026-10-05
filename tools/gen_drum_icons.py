@@ -165,18 +165,23 @@ def pack(px, w, h):
     return b
 
 
-icons = {}
-for name, fn, cls, style, ratings in (('kick', kick, 'PERC', 'BASS', (5, 2, 2)),
-                                      ('snare', snare, 'PERC', 'SNARE', (4, 4, 2)),
-                                      ('hihat', hihat, 'PERC', 'METAL', (2, 5, 3))):
-    icons[f'{name}_icon_A_48x33.bin'] = (48, 33, card(cls, style, ratings))
-    icons[f'{name}_icon_B_34x34.bin'] = (34, 34, fn())
-os.makedirs(d, exist_ok=True)
-for name, (w, h, px) in icons.items():
-    data = pack(px, w, h)
-    assert len(data) == w * 8
-    open(os.path.join(d, name), 'wb').write(data)
-    print(f"wrote src/va_icons/{name} ({len(data)} B)")
-    if '--show' in sys.argv:
-        for row in px:
-            print(''.join('#' if v else '.' for v in row))
+def main():
+    icons = {}
+    for name, fn, cls, style, ratings in (('kick', kick, 'PERC', 'BASS', (5, 2, 2)),
+                                          ('snare', snare, 'PERC', 'SNARE', (4, 4, 2)),
+                                          ('hihat', hihat, 'PERC', 'METAL', (2, 5, 3))):
+        icons[f'{name}_icon_A_48x33.bin'] = (48, 33, card(cls, style, ratings))
+        icons[f'{name}_icon_B_34x34.bin'] = (34, 34, fn())
+    os.makedirs(d, exist_ok=True)
+    for name, (w, h, px) in icons.items():
+        data = pack(px, w, h)
+        assert len(data) == w * 8
+        open(os.path.join(d, name), 'wb').write(data)
+        print(f"wrote src/va_icons/{name} ({len(data)} B)")
+        if '--show' in sys.argv:
+            for row in px:
+                print(''.join('#' if v else '.' for v in row))
+
+
+if __name__ == '__main__':
+    main()

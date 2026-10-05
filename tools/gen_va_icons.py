@@ -2,11 +2,16 @@
 """Writes the VA machine's two machine-page icons, src/va_icons/*.bin, in the
 layout the Sampler's (src/sampler_icons/) use: column-major, two big-endian
 longs per column (ceil(h/32) words), bit n of the first long = row n, lit
-pixels set. The picture is a sawtooth in the Sampler icons' 3-pixel strokes:
-two ramps with their vertical resets. Rerun after changing it; CI checks
-that the files are up to date. --show prints them as text.
+pixels set. A (48x33, the left panel under the name) is the stock machines'
+card - CLASS SYNTH, STYLE ANALOG, STR/DEX/MAG - drawn by gen_drum_icons.card;
+B (34x34) is a sawtooth in the Sampler icons' 3-pixel strokes: two ramps
+with their vertical resets. Rerun after changing it; CI checks that the
+files are up to date. --show prints them as text.
 """
 import os, struct, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gen_drum_icons import card  # noqa: E402
 
 d = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'va_icons')
 
@@ -45,8 +50,9 @@ def pack(px, w, h):
 
 
 icons = {
-    # 48x33 like sampler_icon_A: the Sampler's bars span rows 0..30
-    'va_icon_A_48x33.bin': (48, 33, saw(48, 33, 3, 27, 4, 20, 2)),
+    # 48x33, the left panel under the name: the stock machines' card, as the
+    # drums' (gen_drum_icons.card)
+    'va_icon_A_48x33.bin': (48, 33, card('SYNTH', 'ANALOG', (3, 4, 4))),
     # 34x34 like sampler_icon_B: its bars span rows 0..30
     'va_icon_B_34x34.bin': (34, 34, saw(34, 34, 3, 27, 3, 14, 2)),
 }
