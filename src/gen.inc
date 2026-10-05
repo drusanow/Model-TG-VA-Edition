@@ -10,6 +10,7 @@
 | and, with NOT on, gives every new trig a random note of the scale SCL in
 | the key KEY, from OCT for RNG octaves (OCT 4, KEY C = note 60, the track's
 | default note). With NOT off the trigs play the track's default note.
+| With VEL on each new trig gets a random velocity from VMN to VMX.
 |
 | Pattern edits go through the stock routines the grid uses, on the track's
 | pattern object (0x4000cfcc(0x4000f208(ui), track)), so the pattern's
@@ -18,6 +19,7 @@
 |   0x40017b48(obj, step, on)    a trig on (bit 0) or off; clears the
 |                                trigless / note-trig overrides as the grid does
 |   0x40016642(obj, step, note)  the trig's note, -1 for the track's default
+|   0x400166c2(obj, step, vel)   the trig's velocity, -1 for the track's
 | P-locks are left as they are. The settings are shared by every track and
 | kept until power-off (like Resample's).
 | ============================================================================
@@ -123,6 +125,15 @@ gen_lab_oct:
 gen_lab_rng:
     lea.l   gen_s_rng,%a1
     jmp     gm_lab
+gen_lab_vel:
+    lea.l   gen_s_vel,%a1
+    jmp     gm_lab
+gen_lab_vmn:
+    lea.l   gen_s_vmn,%a1
+    jmp     gm_lab
+gen_lab_vmx:
+    lea.l   gen_s_vmx,%a1
+    jmp     gm_lab
 gen_lab_gen:
     lea.l   gen_s_gen,%a1
     jmp     gm_lab
@@ -144,6 +155,10 @@ gen_val_scl:
     lea.l   gen_c_scl,%a0
     lea.l   gen_n_scl,%a1
     jmp     gm_val
+gen_val_vel:
+    lea.l   gen_c_vel,%a0
+    lea.l   gm_n_frz,%a1          | OFF / ON
+    jmp     gm_val
 gen_val_gen:
     lea.l   gen_zero,%a0
     lea.l   gen_n_go,%a1
@@ -160,6 +175,14 @@ gen_val_rot:
     bras    gen_vnum
 gen_val_oct:
     movel   gen_c_oct,%d0
+    bras    gen_vnum
+gen_val_vmn:
+    movel   gen_c_vmn,%d0
+    addql   #1,%d0                | 1..127
+    bras    gen_vnum
+gen_val_vmx:
+    movel   gen_c_vmx,%d0
+    addql   #1,%d0
     bras    gen_vnum
 gen_val_rng:
     movel   gen_c_rng,%d0
@@ -212,6 +235,18 @@ gen_rot_scl:
 gen_rot_oct:
     lea.l   gen_c_oct,%a1
     moveq   #9,%d1                | 0..8
+    bras    gen_rot
+gen_rot_vel:
+    lea.l   gen_c_vel,%a1
+    moveq   #2,%d1
+    bras    gen_rot
+gen_rot_vmn:
+    lea.l   gen_c_vmn,%a1
+    moveq   #127,%d1              | velocity 1..127, kept as 0..126
+    bras    gen_rot
+gen_rot_vmx:
+    lea.l   gen_c_vmx,%a1
+    moveq   #127,%d1
     bras    gen_rot
 gen_rot_rng:
     lea.l   gen_c_rng,%a1
@@ -284,6 +319,18 @@ gg_note:
     movel   %d2,%sp@-
     movel   %a2,%sp@-
     jsr     0x40016642
+    lea.l   %sp@(12),%sp
+    moveq   #-1,%d0               | the track's default velocity...
+    tstl    %d4
+    beqs    gg_vel
+    tstl    gen_c_vel
+    beqs    gg_vel
+    bsr     gen_velo              | ...or one between VMN and VMX
+gg_vel:
+    movel   %d0,%sp@-
+    movel   %d2,%sp@-
+    movel   %a2,%sp@-
+    jsr     0x400166c2            | the trig's velocity, -1 = the track's
     lea.l   %sp@(12),%sp
     addql   #1,%d2
     cmpl    %d3,%d2
@@ -438,10 +485,34 @@ gen_pick:
     mvzb    %a0@(0,%d0:l),%d0
     rts
 
+| -> d0 = a velocity from VMN to VMX (either way round), uniformly.
+| Clobbers d1.
+gen_velo:
+    movel   %d2,%sp@-
+    bsr     gen_rand
+    swap    %d0
+    andil   #0xffff,%d0
+    movel   gen_c_vmn,%d1         | d1 = the lower, d2 = the upper
+    movel   gen_c_vmx,%d2
+    cmpl    %d2,%d1
+    blss    gv_ord
+    movel   %d1,%d2               | VMN above VMX: the other way round
+    movel   gen_c_vmx,%d1
+gv_ord:
+    subl    %d1,%d2
+    addql   #1,%d2                | how many velocities
+    mulu.w  %d2,%d0
+    clrw    %d0
+    swap    %d0
+    addl    %d1,%d0
+    addql   #1,%d0                | kept as 0..126: 1..127
+    movel   %sp@+,%d2
+    rts
+
 | ---- the menu and its settings -----------------------------------------------
 GEN_NSCL = 13
     .align 4
-gen_desc:     .long gen_title, gen_vname, 10, gen_items
+gen_desc:     .long gen_title, gen_vname, 13, gen_items
 gen_items:    .long gen_lab_mod, gen_val_mod, gen_rot_mod, new_slot2_invoker
               .long gen_lab_dns, gen_val_dns, gen_rot_dns, new_slot2_invoker
               .long gen_lab_hit, gen_val_hit, gen_rot_hit, new_slot2_invoker
@@ -451,6 +522,9 @@ gen_items:    .long gen_lab_mod, gen_val_mod, gen_rot_mod, new_slot2_invoker
               .long gen_lab_scl, gen_val_scl, gen_rot_scl, new_slot2_invoker
               .long gen_lab_oct, gen_val_oct, gen_rot_oct, new_slot2_invoker
               .long gen_lab_rng, gen_val_rng, gen_rot_rng, new_slot2_invoker
+              .long gen_lab_vel, gen_val_vel, gen_rot_vel, new_slot2_invoker
+              .long gen_lab_vmn, gen_val_vmn, gen_rot_vmn, new_slot2_invoker
+              .long gen_lab_vmx, gen_val_vmx, gen_rot_vmx, new_slot2_invoker
               .long gen_lab_gen, gen_val_gen, rs_rot_none, gen_go
 gen_n_mod:    .long gen_s_rnd, gen_s_euc
 gen_n_key:    .long gen_k_c, gen_k_cs, gen_k_d, gen_k_ds, gen_k_e, gen_k_f
@@ -473,6 +547,9 @@ gen_c_key:    .long 0          | C
 gen_c_scl:    .long 0          | MAJ
 gen_c_oct:    .long 4          | from note 60, the track's default
 gen_c_rng:    .long 0          | 1 octave
+gen_c_vel:    .long 0          | OFF: the track's velocity
+gen_c_vmn:    .long 63         | 64 (kept as velocity - 1)
+gen_c_vmx:    .long 126        | 127
 gen_seed:     .long 0x2545f491
 gen_ncand:    .long 0
 gen_args:     .long 0,0,0,0
@@ -494,6 +571,9 @@ gen_s_scl:    .asciz "SCL"
 gen_s_oct:    .asciz "OCT"
 gen_s_rng:    .asciz "RNG"
 gen_s_gen:    .asciz "GEN"
+gen_s_vel:    .asciz "VEL"
+gen_s_vmn:    .asciz "VMN"
+gen_s_vmx:    .asciz "VMX"
 gen_s_go:     .asciz "GO"
 gen_s_rnd:    .asciz "RND"
 gen_s_euc:    .asciz "EUC"

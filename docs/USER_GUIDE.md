@@ -280,7 +280,8 @@ It writes trigs on the selected track: **RND** (each step a trig with
 chance **DNS** %) or **EUC** (a Euclidean rhythm of **HIT** trigs, shifted
 **ROT** steps). With **NOT** on, each trig also gets a random note from
 **SCL** in **KEY**, from octave **OCT** over **RNG** octaves (OCT 4 + C is
-the track's normal pitch). Select **GEN** and press **DATA** to generate;
+the track's normal pitch). With **VEL** on, each trig also gets a random
+velocity from **VMN** to **VMX**. Select **GEN** and press **DATA** to generate;
 press again for another result.
 
 GEN **replaces the track's trigs** over its length (no undo; p-locks are kept).

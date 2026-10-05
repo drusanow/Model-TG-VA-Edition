@@ -155,8 +155,9 @@ class TGo(unittest.TestCase):
         h = e.uc.hook_add(UC_HOOK_CODE, hook, begin=0x4000cfcc, end=0x4000cfcc)
         h2 = e.uc.hook_add(UC_HOOK_CODE, hook, begin=0x40017b48, end=0x40017b48)
         h3 = e.uc.hook_add(UC_HOOK_CODE, hook, begin=0x40016642, end=0x40016642)
+        h4 = e.uc.hook_add(UC_HOOK_CODE, hook, begin=0x400166c2, end=0x400166c2)
         args = e.run('gen_go', stack=[0, 0])
-        for x in (h, h2, h3):
+        for x in (h, h2, h3, h4):
             e.uc.hook_del(x)
         self.assertEqual(e.sp(), args)                          # balanced
         return calls
@@ -183,6 +184,41 @@ class TGo(unittest.TestCase):
             else:
                 self.assertEqual(n[3], -1)                      # cleared step: default
         self.assertEqual(e.r32(e.sym['gen_args']), 5)           # "Trigs: 5"
+        vel = [c for c in calls if c[0] == 0x400166c2]
+        self.assertEqual([(c[1], c[2]) for c in vel], [(OBJ, i) for i in range(16)])
+        self.assertTrue(all(c[3] == -1 for c in vel))           # VEL OFF: the track's
+
+    def test_random_velocity(self):
+        e = emu()
+        for name, v in (('gen_c_mod', 1), ('gen_c_hit', 63), ('gen_c_vel', 1),
+                        ('gen_c_vmn', 99), ('gen_c_vmx', 39)):  # 100 / 40: either way round
+            setv(e, name, v)
+        calls = self.run_go(e, 64)
+        vel = [c[3] for c in calls if c[0] == 0x400166c2]
+        self.assertEqual(len(vel), 64)
+        self.assertTrue(all(40 <= v <= 100 for v in vel), vel)
+        self.assertGreater(len(set(vel)), 20)
+        # empty steps go back to the track's velocity
+        setv(e, 'gen_c_mod', 0); setv(e, 'gen_c_dns', 30)
+        calls = self.run_go(e, 64)
+        trig = [c[3] for c in calls if c[0] == 0x40017b48]
+        vel = [c[3] for c in calls if c[0] == 0x400166c2]
+        for t, v in zip(trig, vel):
+            self.assertTrue(40 <= v <= 100 if t else v == -1)
+
+    def test_velocity_bounds(self):
+        e = emu()
+        seen = set()
+        for lo, hi in ((0, 0), (126, 126), (0, 126), (126, 0)):
+            setv(e, 'gen_c_vmn', lo); setv(e, 'gen_c_vmx', hi)
+            for _ in range(400):
+                e.run('gen_velo')
+                v = e.d(0)
+                self.assertTrue(min(lo, hi) + 1 <= v <= max(lo, hi) + 1, (lo, hi, v))
+                if (lo, hi) == (0, 126):
+                    seen.add(v)
+            self.assertEqual(e.d(2), 0)                         # d2 kept
+        self.assertGreater(len(seen), 100)
 
     def test_random_without_notes(self):
         e = emu()
@@ -212,7 +248,9 @@ class TMenu(unittest.TestCase):
         e = emu()
         for lab, name, top in (('gen_rot_dns', 'gen_c_dns', 100), ('gen_rot_hit', 'gen_c_hit', 63),
                                ('gen_rot_scl', 'gen_c_scl', 12), ('gen_rot_oct', 'gen_c_oct', 8),
-                               ('gen_rot_rng', 'gen_c_rng', 3), ('gen_rot_mod', 'gen_c_mod', 1)):
+                               ('gen_rot_rng', 'gen_c_rng', 3), ('gen_rot_mod', 'gen_c_mod', 1),
+                               ('gen_rot_vel', 'gen_c_vel', 1), ('gen_rot_vmn', 'gen_c_vmn', 126),
+                               ('gen_rot_vmx', 'gen_c_vmx', 126)):
             setv(e, name, 0)
             e.run(lab, stack=[0, 0, 5])
             self.assertEqual(e.r32(e.sym[name]), min(5, top))
@@ -224,12 +262,12 @@ class TMenu(unittest.TestCase):
     def test_descriptor(self):
         e = emu()
         d = e.sym['gen_desc']
-        self.assertEqual(e.r32(d + 8), 10)
+        self.assertEqual(e.r32(d + 8), 13)
         items = e.r32(d + 12)
-        for r in range(10):
+        for r in range(13):
             for c in range(4):
                 self.assertNotEqual(e.r32(items + 16 * r + 4 * c), 0)
-        self.assertEqual(e.r32(items + 16 * 9 + 12), e.sym['gen_go'])
+        self.assertEqual(e.r32(items + 16 * 12 + 12), e.sym['gen_go'])
 
     def test_settings_track_reaches_the_menu(self):
         """SETTINGS held + a fresh TRACK press goes to the menu opener; with no
@@ -308,6 +346,7 @@ class TRealPattern(unittest.TestCase):
         for st in range(64):                            # an old pattern: all trigs,
             blk[2 * st:2 * st + 2] = b'\x08\x01'       # note-trig override, notes
             blk[580 + st] = 30
+            blk[128 + st] = 50
         blk[713:715] = struct.pack('>h', 24)            # 24 steps
         uc.mem_write(BLK, bytes(blk))
         # the track lookup: our object
@@ -316,7 +355,7 @@ class TRealPattern(unittest.TestCase):
         uc.mem_write(0x4000cfcc, bytes.fromhex('203c' + f'{OBJ:08x}' + '4e75'))
         for n, v in (('gen_c_mod', 1), ('gen_c_hit', 6), ('gen_c_rot', 0), ('gen_c_not', 1),
                      ('gen_c_scl', 0), ('gen_c_key', 0), ('gen_c_oct', 4), ('gen_c_rng', 0),
-                     ('gm_track', 2)):
+                     ('gen_c_vel', 1), ('gen_c_vmn', 19), ('gen_c_vmx', 29), ('gm_track', 2)):
             W(sym[n], v)
         sp = 0x4fe00000
         for v in (0, 0, RET):
@@ -338,6 +377,10 @@ class TRealPattern(unittest.TestCase):
             else:
                 self.assertEqual(notes[i], -1)
         self.assertEqual(notes[24:], [30] * 40)
+        vels = [struct.unpack('b', out[128 + i:129 + i])[0] for i in range(64)]
+        for i in range(24):
+            self.assertTrue(20 <= vels[i] <= 30 if want[i] else vels[i] == -1, (i, vels[i]))
+        self.assertEqual(vels[24:], [50] * 40)
 
 
 if __name__ == '__main__':

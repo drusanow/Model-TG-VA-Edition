@@ -26,6 +26,9 @@ closes the menu.
 | **SCL** | MAJ MIN DOR PHR LYD MIX LOC HMI MMI PMA PMI BLU CHR | the scale |
 | **OCT** | 0-8 | the lowest octave. **OCT 4 with KEY C starts at note 60, the track's default note** (the pitch the track plays with no note set) |
 | **RNG** | 1-4 | how many octaves the notes span, the top root included |
+| **VEL** | OFF, ON | ON: each new trig gets a random velocity |
+| **VMN** | 1-127 | the lowest random velocity (default 64) |
+| **VMX** | 1-127 | the highest random velocity (default 127); VMN and VMX may be either way round |
 | **GEN** | GO | press: generate |
 
 Scales: major, natural minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian,
@@ -49,7 +52,10 @@ Examples:
   step left empty, the trig note is reset to the track's default note.
 - **P-locks are not touched.** A lock on a step that ends up with a trig
   plays again on that step.
-- Velocity and length stay at the track's defaults.
+- With **VEL ON**, each trig gets a velocity between VMN and VMX. With
+  **VEL OFF**, and on every step left empty, the trig velocity is reset to
+  the track's default.
+- Trig length stays at the track's default.
 - The settings are shared by every track and kept until power-off. They are
   not saved with the project.
 - Each GEN gives a new result, even with the same settings.
@@ -64,7 +70,7 @@ The code is in `src/gen.inc`.
   are swallowed, so TRACK's own action does not run. TRACK alone, and
   TRACK + trig key (track select), are untouched.
 - **The menu** is the firmware's own list menu, built by `lm_build` from a
-  descriptor (`gen_desc`) of ten rows {label, value, turn, press}, like
+  descriptor (`gen_desc`) of thirteen rows {label, value, turn, press}, like
   Resample's. GEN's press is `gen_go`.
 - **The pattern.** `gen_go` takes the menu's track pattern object
   (`0x4000cfcc(0x4000f208(ui), track)`), reads its length (`0x40016402`), and
@@ -74,6 +80,8 @@ The code is in `src/gen.inc`.
     does.
   - `0x40016642(obj, step, note)`: the trig note. -1 means the track's
     default (+712, 60 on a new pattern).
+  - `0x400166c2(obj, step, velocity)`: the trig velocity (+128). -1 means
+    the track's default (+708).
 
   These routines notify the pattern's observers, so the grid lights, the
   sequencer and saving all see the change as an ordinary edit.
@@ -85,6 +93,7 @@ The code is in `src/gen.inc`.
 - **Notes:** the candidates are every scale note from `12 × (OCT + 1) + KEY`
   up to RNG octaves higher, top root included, capped at 127. Each trig picks
   one at random.
+- **Velocity:** uniform from VMN to VMX inclusive.
 
 Cost: nothing while idle. A press runs once, in the UI task.
 
@@ -101,6 +110,9 @@ Host verified (`tests/test_gen.py`, Unicorn ColdFire V4e):
 - **Notes:** the candidate notes are right for all 13 scales across several
   keys, octaves and ranges. OCT 4 + C starts at 60. Picks cover every
   candidate, roughly evenly.
+- **Velocity:** values always fall between VMN and VMX, in either order and at
+  the extremes 1 and 127, and spread across the range. Empty steps and VEL
+  OFF write -1.
 - **GEN's press:** it uses the menu's track and visits each step once in
   order. Trigs, notes and -1 resets are as expected. It does nothing with no
   track or zero length, and the stack is balanced.
@@ -110,8 +122,8 @@ Host verified (`tests/test_gen.py`, Unicorn ColdFire V4e):
 - **On the real stock routines** (with `MODEL_CYCLES_STOCK` set): GEN, run
   through the stock trig and note setters on a stand-in pattern object,
   sets bit 0 on exactly the Euclidean steps. It clears the note-trig
-  override, writes scale notes or -1, and leaves the steps past the length
-  untouched.
+  override, and writes scale notes or -1 and velocities in range or -1
+  (through the stock velocity setter). Steps past the length are untouched.
 
 Needs hardware:
 
@@ -125,3 +137,5 @@ Needs hardware:
 6. Save and reload the project: the generated trigs and notes are kept.
 7. Track lengths other than 16 (per-track scale): only that many steps
    are written.
+8. VEL ON, VMN 20, VMX 127: hits vary in loudness. Hold a step: its velocity
+   shows the generated value. VEL OFF: back to the track's velocity.

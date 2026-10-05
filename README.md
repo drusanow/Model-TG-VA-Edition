@@ -30,7 +30,7 @@ keeps working.
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale
-  and octave range.
+  and octave range, and random velocities in a range.
 - **A second LFO** (this fork) on every track: press **LFO** twice. Same
   waves, sync and destinations as the stock LFO, never on the same
   destination as LFO 1; it shares LFO 1's Setup (Trig Mode, Fade, Phase).
