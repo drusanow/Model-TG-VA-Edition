@@ -64,6 +64,11 @@ kg_out:
 
 | ---- the menu: as rs_menu_open, for the selected track ----------------------
 gen_menu_open:
+    lea.l   gen_desc,%a0
+    movel   %a0,lm_want
+| lm_open_sel: open the list menu lm_want for the selected track, as
+| rs_menu_open opens Resample's. mm_opened says whether it did.
+lm_open_sel:
     linkw   %fp,#-80
     lea.l   %sp@(-28),%sp
     moveml  %d2-%d4/%a2-%a5,%sp@
@@ -90,7 +95,7 @@ gmo_new:
     bccs    gmo_done
     lea.l   gm_track,%a0
     movel   %d0,%a0@
-    lea.l   gen_desc,%a0
+    movea.l lm_want,%a0
     lea.l   gm_cur,%a1
     movel   %a0,%a1@
     jmp     lm_build              | builds, presents, and leaves through gm_done
@@ -551,6 +556,7 @@ gen_c_vel:    .long 0          | OFF: the track's velocity
 gen_c_vmn:    .long 63         | 64 (kept as velocity - 1)
 gen_c_vmx:    .long 126        | 127
 gen_seed:     .long 0x2545f491
+lm_want:      .long gen_desc     | the list menu lm_open_sel opens
 gen_ncand:    .long 0
 gen_args:     .long 0,0,0,0
 kh_eaten6:    .long 0          | a Track press swallowed by Settings + Track

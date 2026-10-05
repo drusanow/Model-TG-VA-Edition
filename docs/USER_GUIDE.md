@@ -288,18 +288,20 @@ GEN **replaces the track's trigs** over its length (no undo; p-locks are kept).
 The menu's settings are shared by all tracks and not saved. Details and
 examples: [GEN.md](GEN.md).
 
-## LFO 2
+## LFO 2, 3 and 4
 
-*VA Edition only.* A second LFO on every track. Press **LFO** to open the
+*VA Edition only.* Three more LFOs on every track. Press **LFO** to open the
 LFO menu as usual (LFO 1); press **LFO** again for LFO 2 (a **2** shows
-under *LFO*); a third press closes the menu. On LFO 2 the menu and the
-**LFO SPEED** knob edit LFO 2's Waveform, Multiplier, Destination, Depth
-and Speed, which p-lock and are saved like LFO 1's.
+under *LFO*), again for LFO 3, again for LFO 4, and once more to close. On
+LFO 2 the menu and the **LFO SPEED** knob edit LFO 2's Waveform, Multiplier,
+Destination, Depth and Speed, which p-lock and are saved like LFO 1's. LFO 3
+and 4 have their own menu, with Speed as a row (**SPD**); **they cannot be
+p-locked and are not saved** (they keep their settings until power-off).
 
-- The two LFOs never share a destination: scrolling DEST skips the one the
-  other LFO uses (*None* excepted).
+- The LFOs never share a destination: scrolling DEST skips the ones the
+  track's other LFOs use (*None* excepted).
 - LFO Setup (**FUNC** + **LFO**: Trig Mode, Fade, Start Phase) is shared by
-  both LFOs; the Cycles has no room for a second set.
+  all of them; the Cycles has no room for more sets.
 - **Clear LFO** resets LFO 1 only.
 
 Details and limits: [LFO2.md](LFO2.md).
@@ -396,7 +398,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + **TRACK** | trig generator (Generate menu) |
 | anywhere | **SETTINGS** + return | master FX off |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
-| LFO menu | **LFO** (again) | LFO 2; once more closes the menu |
+| LFO menu | **LFO** (again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | grid | **SETTINGS** + trig key | slide trig on / off |
 | browser | pick a sample file | load it onto the Sampler track |
 | step held | **PRESET**, pick a sample | sample lock |

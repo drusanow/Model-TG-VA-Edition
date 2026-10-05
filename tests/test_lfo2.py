@@ -191,7 +191,7 @@ class TKeys(unittest.TestCase):
 
 
 class TDest(unittest.TestCase):
-    """fine_hook -> lfo_dest_step: the step never lands on the other LFO's
+    """fine_hook -> lfo_dest_step: the step never lands on another LFO's
     destination. The stock step is stood in for by `current + delta`."""
     HANDLE = SCRATCH + 0xb000
     TRK = SCRATCH + 0xb100
@@ -200,6 +200,7 @@ class TDest(unittest.TestCase):
         self.e = e = emu()
         # 0x4000c264 stand-in: d0 = current + delta (sp@(12) + sp@(16)), clamped 0..32<<8
         code(e, 0x4000c264, '202f 000c d0af 0010 6c02 7000 0c80 0000 2000 6f06 203c 0000 2000 4e75')
+        code(e, 0x40012412, '7003 4e75')                    # the selected track: 3
         e.w32(self.HANDLE + 4, self.TRK)
         vt = SCRATCH + 0xb200
         e.w32(self.TRK, vt)
@@ -207,13 +208,16 @@ class TDest(unittest.TestCase):
         code(e, STUBS, '203c' + '%08x' % SND + '4e75')       # the sound
         e.w32(e.sym['lfo_live'], 1)
 
+    def l34(self, lfo, t, dest):                            # LFO 3 (0) or 4 (1)
+        self.e.w16(self.e.sym['lfo34_w'] + 60 * lfo + 10 * t + 6, dest << 8)
+
     def step(self, cur, delta):
         self.e.run('fine_hook', stack=[self.HANDLE, 0x20, cur << 8, delta << 8])
         return self.e.d(0) >> 8
 
     def test_lfo2_skips_lfo1_dest(self):
         e = self.e
-        e.w32(e.sym['lfo2_on'], 1)
+        e.w32(e.sym['lfo_page'], 1)
         e.w16(SND + 20 + 8, 5 << 8)                          # LFO 1 -> word 5
         self.assertEqual(self.step(4, 1), 6)
         self.assertEqual(self.step(6, -1), 4)
@@ -223,17 +227,38 @@ class TDest(unittest.TestCase):
 
     def test_lfo1_skips_lfo2_dest(self):
         e = self.e
-        e.w32(e.sym['lfo2_on'], 0)
+        e.w32(e.sym['lfo_page'], 0)
         e.w16(SND + 20 + 2 * (K0 + 3), 9 << 8)               # LFO 2 -> word 9
         self.assertEqual(self.step(8, 1), 10)
         e.w16(SND + 20 + 2 * (K0 + 3), 0)                    # None: no exclusion
         self.assertEqual(self.step(8, 1), 9)
 
+    def test_lfo3_skips_the_other_three(self):
+        e = self.e
+        e.w32(e.sym['lfo_page'], 2)
+        e.w16(SND + 20 + 8, 5 << 8)                          # LFO 1 -> 5
+        e.w16(SND + 20 + 2 * (K0 + 3), 6 << 8)               # LFO 2 -> 6
+        self.l34(1, 3, 7)                                    # LFO 4 -> 7 (track 3)
+        self.l34(0, 3, 8)                                    # LFO 3 itself: not "other"
+        self.assertEqual(self.step(4, 1), 8)                 # three in a row skipped
+        self.assertEqual(self.step(8, -1), 4)
+        self.l34(1, 2, 9)                                    # another track's: free
+        self.assertEqual(self.step(8, 1), 9)
+        e.w16(SND + 20 + 2 * (K0 + 3), 32 << 8)              # end of the list: stay
+        self.assertEqual(self.step(31, 1), 31)
+
+    def test_lfo1_and_2_skip_lfo3_4(self):
+        e = self.e
+        self.l34(0, 3, 10); self.l34(1, 3, 11)
+        for page, want in ((0, 12), (1, 12), (3, 11)):        # LFO 4 may take its own 11
+            e.w32(e.sym['lfo_page'], page)
+            self.assertEqual(self.step(9, 1), want, page)
+
     def test_no_menu_plain_step(self):
         e = self.e
         e.w32(e.sym['lfo_live'], 0)
         e.w16(SND + 20 + 8, 5 << 8)
-        e.w32(e.sym['lfo2_on'], 1)
+        e.w32(e.sym['lfo_page'], 1)
         self.assertEqual(self.step(4, 1), 5)
 
 
@@ -280,6 +305,174 @@ class TRunStub(unittest.TestCase):
         exp[(5, 21)] = 0
         for (t, k), v in exp.items():
             self.assertEqual(e.r16(words(t, k)), v, (t, k))
+
+
+class TRun34(unittest.TestCase):
+    """LFO 3 and 4 in lfo_run (engine as an rts): skipped with no destination,
+    else their block comes from lfo34_w and their state is swapped in."""
+    BASE = SCRATCH + 0xc000
+
+    def setup(self, e):
+        for t in range(6):
+            for k in range(33):
+                e.w16(self.BASE + 14 + 66 * t + 2 * k, 1000 + 40 * t + k)
+            e.w16(self.BASE + 14 + 66 * t + 8, 0)            # LFO 1: no destination
+            e.w16(self.BASE + 14 + 66 * t + 2 * (K0 + 3), 0)  # LFO 2: none
+
+    def test_skipped_without_destinations(self):
+        e = emu()
+        self.setup(e)
+        e.watch(0x40091ab2)
+        e.run('lfo_run', stack=[self.BASE, 0x1234, 0x3f])
+        self.assertEqual(e.visits[0x40091ab2], 2)            # LFO 2 and LFO 1 only
+
+    def test_lfo3_block_state_apply(self):
+        e = emu(); s = e.sym
+        self.setup(e)
+        W = s['lfo34_w']
+        for t in range(6):                                   # LFO 3: distinct words
+            for i in range(5):
+                e.w16(W + 10 * t + 2 * i, 300 * t + 7 * i + 1)
+        e.w16(W + 10 * 2 + 6, 17 << 8)                       # track 2 LFO 3 -> word 17
+        blk = []
+        st3 = s['lfo34_state']
+
+        def eng(uc, addr, size, ud):                         # at each engine call:
+            sp = uc.reg_read(UC_M68K_REG_A7)
+            buf = struct.unpack('>I', uc.mem_read(sp + 4, 4))[0]
+            blk.append((buf, bytes(uc.mem_read(buf + 14, 6 * 66)),
+                        bytes(uc.mem_read(0x40fde838, 192))))
+            if len(blk) == 2:                                # LFO 3's run "leaves" this
+                uc.mem_write(0x40fde838 + 32 * 2 + 16, struct.pack('>ii', 17, 1500))
+        e.uc.hook_add(UC_HOOK_CODE, eng, begin=0x40091ab2, end=0x40091ab2)
+        for i in range(48):
+            e.w32(st3 + 4 * i, 0xa0000000 + i)               # LFO 3's own state
+        e.w32(0x40fde838, 0x5555)                            # LFO 1's
+        e.run('lfo_run', stack=[self.BASE, 0x1234, 0x3f])
+        self.assertEqual(len(blk), 3)                        # LFO 2, 3, then 1
+        buf, words, state = blk[1]
+        self.assertEqual(buf, s['lfo2_buf'])
+        self.assertEqual(struct.unpack('>I', state[:4])[0], 0xa0000000)   # swapped in
+        for t in range(6):
+            k = lambda n: struct.unpack('>H', words[66 * t + 2 * n:66 * t + 2 * n + 2])[0]
+            w = lambda i: 300 * t + 7 * i + 1 if not (t == 2 and i == 3) else 17 << 8
+            self.assertEqual([k(1), k(2), k(4), k(5), k(8)], [w(0), w(1), w(3), w(2), w(4)])
+            self.assertEqual([k(3), k(6), k(7)], [1000 + 40 * t + n for n in (3, 6, 7)])
+        self.assertEqual(blk[2][0], self.BASE)               # LFO 1 on the real block
+        self.assertEqual(e.r32(0x40fde838), 0x5555)          # its state back in place
+        self.assertEqual(e.r32(st3 + 32 * 2 + 20), 1500)     # LFO 3's kept its own
+        self.assertEqual(e.r16(self.BASE + 14 + 66 * 2 + 34), 1000 + 80 + 17 + 1500)
+
+
+class TMenu34(unittest.TestCase):
+    """The LFO 3/4 menu: rows, keys, the hand-over from LFO 2."""
+    def setUp(self):
+        self.e = e = emu()
+        e.uc.reg_write(UC_M68K_REG_SR, 0x2000)
+
+    def test_rows_address_their_words(self):
+        e = self.e; s = e.sym
+        for page, lfo in ((2, 0), (3, 1)):
+            e.w32(s['lfo_page'], page)
+            for trk in range(6):
+                e.w32(s['gm_track'], trk)
+                for row, (word, pid) in enumerate(((2, 0x21), (0, 0x1d), (1, 0x1e),
+                                                   (3, 0x20), (4, 0x24))):
+                    e.run('l34_word', regs={D[0]: row})
+                    self.assertEqual(e.a(0), s['lfo34_w'] + 60 * lfo + 10 * trk + 2 * word)
+                    self.assertEqual(e.d(1), pid)
+
+    def handle_stubs(self):
+        e = self.e
+        HND, VT = SCRATCH + 0xd000, SCRATCH + 0xd100
+        rec = SCRATCH + 0xd200
+        e.w32(HND, VT)
+        # vt[0x14]: record its 4 args, return cur + delta; vt[64]: record 7 args
+        code(e, SCRATCH + 0xd300, '41f9' + '%08x' % rec + '20ef0004 20ef0008 20ef000c 20ef0010'
+             ' 202f000c d0af0010 4e75')
+        code(e, SCRATCH + 0xd400, '41f9' + '%08x' % (rec + 0x40) + '20ef0004 20ef0008 20ef000c'
+             ' 20ef0010 20ef0014 20ef0018 20ef001c 4e75')
+        e.w32(VT + 0x14, SCRATCH + 0xd300)
+        e.w32(VT + 64, SCRATCH + 0xd400)
+        code(e, 0x400097f0, '203c' + '%08x' % HND + '4e75')
+        return HND, rec
+
+    def test_turn_and_draw_through_the_handle(self):
+        e = self.e; s = e.sym
+        HND, rec = self.handle_stubs()
+        e.w32(s['lfo_page'], 3); e.w32(s['gm_track'], 4)
+        wp = s['lfo34_w'] + 60 + 40 + 8                      # LFO 4, track 4, Depth
+        e.w16(wp, 16384)
+        e.run('l34_rot_dep', stack=[0, 0, 3])
+        self.assertEqual([e.r32(rec + 4 * i) for i in range(4)], [HND, 0x24, 16384, 3 << 8])
+        self.assertEqual(e.r16(wp), 16384 + 768)
+        e.run('l34_val_dep', stack=[0, 0, 0x111, 0x22, 0x33])
+        self.assertEqual([e.r32(rec + 0x40 + 4 * i) for i in range(7)],
+                         [HND, 0x24, 16384 + 768, 0, 0x111, 0x22 + 7, 0x33])
+        e.w16(wp, (-5) & 0xffff)                             # signed, as vt[28] gives it
+        e.run('l34_val_dep', stack=[0, 0, 1, 2, 3])
+        self.assertEqual(e.rs32(rec + 0x48), -5)
+
+    def key(self, fn, kc, down, func=False, repeat=False):
+        e = self.e
+        EV, VIEW = SCRATCH + 0xa100, SCRATCH + 0xa000
+        e.w32(EV + 12, kc)
+        e.w32(EV + 16, (1 if down else 0) | (2 if func else 0) | (8 if repeat else 0))
+        st = e.run_to_any(fn, (0x4007598e, 0x40024e86, RET), stack=[VIEW, EV])
+        return 'stock' if st != RET else ('ours', e.d(0))
+
+    def test_lfo2_to_3_to_4_to_closed(self):
+        e = self.e; s = e.sym
+        code(e, 0x4007240c, KEYCODE); code(e, 0x40072490, FUNCBIT); code(e, 0x40072470, RELEASE)
+        e.watch(0x40076082, 0x40075ba6, 0x40001fba)
+        e.run_to_any('lfo_menu_new', (0x40025798,), stack=[SCRATCH])
+        self.assertEqual(self.key('lfo_key_hook', 8, True), ('ours', 1))    # LFO 2
+        self.assertEqual(self.key('lfo_key_hook', 8, False), ('ours', 1))
+        self.assertEqual(self.key('lfo_key_hook', 8, True), 'stock')        # stock closes...
+        self.assertEqual(e.r32(s['lfo34_req']), 1)                          # ...LFO 3 asked for
+        e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0})
+        self.assertEqual(e.visits[0x40001fba], 1)                           # posted
+        self.assertEqual(e.r32(s['lfo34_msg'] + 0x10), s['lfo34_run'])
+        self.assertEqual(e.r32(s['lfo34_req']), 0)
+        # the callback, with the opener answering "opened"
+        mm = s['mm_opened']
+        code(e, s['lm_open_sel'], '7001 23c0' + '%08x' % mm + '4e75')
+        e.run('lfo34_run', stack=[0, 0])
+        self.assertEqual((e.r32(s['lfo_page']), e.r32(s['lfo_live']), e.r32(s['lm_want'])),
+                         (2, 1, s['lfo34_desc']))
+        # in our menu: gm_key_th routes LFO to lfo34_key while it is LFO 3/4's
+        e.w32(s['gm_cur'], s['lfo34_desc'])
+        self.assertEqual(self.key('gm_key_th', 8, True), ('ours', 1))       # LFO 4
+        self.assertEqual(e.r32(s['lfo_page']), 3)
+        self.assertEqual(e.visits[0x40076082], 2)                           # redrawn
+        self.assertEqual(self.key('gm_key_th', 8, False), ('ours', 1))      # release eaten
+        self.assertEqual(self.key('gm_key_th', 8, True, repeat=True), ('ours', 1))
+        self.assertEqual(self.key('gm_key_th', 8, True, func=True), 'stock')
+        self.assertEqual(self.key('gm_key_th', 8, True), ('ours', 1))       # closed
+        self.assertEqual(e.visits[0x40075ba6], 1)
+        self.assertEqual(e.r32(s['lfo_live']), 0)
+        e.w32(s['gm_cur'], s['gen_desc'])                                   # another menu:
+        self.assertEqual(self.key('gm_key_th', 8, True), 'stock')           # LFO is stock's
+
+    def test_no_request_no_post(self):
+        e = self.e
+        e.watch(0x40001fba)
+        e.run_to_any('lfo_menu_new', (0x40025798,), stack=[SCRATCH])
+        e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0})
+        self.assertEqual(e.visits[0x40001fba], 0)
+
+    def test_number_drawn_only_on_lfo34(self):
+        e = self.e; s = e.sym
+        calls = []
+        e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.append(
+            struct.unpack('>I', uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 28, 4))[0]),
+            begin=0x40071a04, end=0x40071a04)
+        for cur, page, want in ((s['gen_desc'], 2, []), (s['lfo34_desc'], 2, [s['str_lfo3']]),
+                                (s['lfo34_desc'], 3, [s['str_lfo4']])):
+            calls.clear()
+            e.w32(s['gm_cur'], cur); e.w32(s['lfo_page'], page)
+            e.run('gm_draw_th', stack=[0, 0x99])
+            self.assertEqual(calls, want)
 
 
 @unittest.skipUnless(os.environ.get('MODEL_CYCLES_STOCK'), "set MODEL_CYCLES_STOCK for the real-engine test")
@@ -354,6 +547,26 @@ class TRealEngine(unittest.TestCase):
                 if wave == 6:
                     self.assertGreaterEqual(len(seen), len(seen1) // 2, (spd, mult))
                     self.assertEqual(len(seen) > 1, len(seen1) > 1, (spd, mult))
+
+    def test_lfo3_and_4_match_lfo1(self):
+        base = 0x80001000 + 0xc
+        W = self.sym['lfo34_w']
+        for wave in (0, 1, 3, 5):
+            uc = self.machine()
+            self.call(uc, STUBS, [])
+            spd, mult, dep = 100 << 8, 5 << 8, 100 << 8
+            lfo1 = (spd, mult, 16384, 18 << 8, wave << 8, 0, 0, dep)
+            for t in range(6):                      # LFO 3 -> word 22, LFO 4 -> word 21
+                for lfo, dst in ((0, 22), (1, 21)):
+                    for i, v in enumerate((spd, mult, wave << 8, dst << 8, dep)):
+                        uc.mem_write(W + 60 * lfo + 10 * t + 2 * i, struct.pack('>H', v))
+            for blk in range(30):
+                self.setup_words(uc, base, lfo1, (0, 0, 0, 0, 0))
+                self.call(uc, self.sym['lfo_run'], [base, 7200, 0x3f if blk == 0 else 0])
+                for t in range(6):
+                    m1 = self.word(uc, base, t, 18) - 16384
+                    self.assertEqual(self.word(uc, base, t, 22) - 16384, m1, (wave, blk, t))
+                    self.assertEqual(self.word(uc, base, t, 21) - 16384, m1, (wave, blk, t))
 
     def test_lfo1_unchanged_by_lfo2(self):
         """LFO 1's output under lfo_run equals the stock engine called alone."""

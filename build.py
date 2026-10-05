@@ -186,7 +186,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'va_swap','va_det_tab',
               'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
               'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
-              'gen_n_num','gen_n_go'}   # pointer tables (menu descriptors), not code
+              'gen_n_num','gen_n_go','lfo34_desc','l34_items','l34_rows','lfo34_w'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)

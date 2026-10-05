@@ -1,6 +1,9 @@
-# LFO 2: a second LFO on every track
+# LFO 2, 3 and 4: more LFOs on every track
 
-*VA Edition only.* Every track gets a second LFO, the stock LFO's twin.
+*VA Edition only.* Every track gets three more LFOs, each the stock LFO's
+twin. LFO 2 is a full LFO: p-lockable and saved. LFO 3 and LFO 4 are
+lighter: no p-locks, and kept only until power-off (see
+[LFO 3 and LFO 4](#lfo-3-and-lfo-4)).
 
 **Status: verified on the host only (see [Verification](#verification)).
 Not yet tested on hardware: back up first.**
@@ -10,20 +13,41 @@ Not yet tested on hardware: back up first.**
 - Press **LFO** as usual: the LFO menu opens on **LFO 1**.
 - Press **LFO** again: the same menu now edits **LFO 2**, and a **2** appears
   under the word *LFO* on the left of the screen.
-- Press **LFO** a third time to close the menu (or leave it any other way).
-  The menu always opens on LFO 1.
+- Press **LFO** a third time for **LFO 3**, a fourth for **LFO 4**, and a
+  fifth to close (or leave any other way). The menu always opens on LFO 1.
 - On LFO 2, the menu and the **LFO SPEED** knob edit LFO 2's Waveform,
   Multiplier, Destination, Depth and Speed. They work exactly as LFO 1's do:
   same waves, tempo sync and destinations. Each value can be p-locked: hold a
   step while LFO 2 is showing.
-- **Destinations never collide.** When you scroll DEST, the destination the
-  other LFO already uses is skipped. If it is the last one in the list, DEST
-  stays where it was. *None* can be chosen on both.
+- **Destinations never collide.** When you scroll DEST, any destination
+  another of the track's LFOs already uses is skipped. If there is none free
+  further on in the list, DEST stays where it was. *None* can be chosen on
+  all of them.
 - LFO 2 can target any destination LFO 1 can, including LFO 1's own
   parameters (for example LFO 1's Depth or Speed), since LFO 2 runs first
   each block.
 - A new or initialised sound starts LFO 2 with LFO 1's defaults (Destination
   *None*). Sounds and projects from before this version load with LFO 2 off.
+
+### LFO 3 and LFO 4
+
+- Press **LFO** on LFO 2: the menu closes and reopens a moment later as
+  **LFO 3** (a **3** under *LFO*). Press **LFO** again for **LFO 4**, and
+  once more to close. **Return** or **SETTINGS** closes it too.
+- Its rows: **WAV** (waveform), **SPD** (speed), **MUL** (multiplier),
+  **DST** (destination), **DEP** (depth). Turn **DATA** to pick a row, press
+  to edit, turn to change. Values show and step exactly as on LFO 1, through
+  the Cycles' own code. Speed is a row here: the **LFO SPEED** knob stays
+  with LFO 1 / LFO 2.
+- **No p-locks.** Holding a step does not lock LFO 3/4 values.
+- **Not saved.** The Cycles' sound and pattern storage is full (LFO 2 used the
+  last free space), so LFO 3 and 4 live in Model-TG's memory, per track. They
+  keep their settings across pattern and project changes until power-off,
+  then start again with LFO 1's defaults (destination *None*).
+- They belong to the **track**, not the pattern or sound: changing patterns
+  keeps them running as set.
+- They share LFO Setup (Trig Mode, Fade, Start Phase) with LFO 1, like LFO 2.
+- An LFO 3 or 4 with no destination on any track costs no CPU at all.
 
 ### What LFO 2 shares with LFO 1
 
@@ -113,9 +137,19 @@ Host verified (`tests/test_lfo2.py`, Unicorn ColdFire V4e):
 
 - slotOf remaps only the five ids, and only while LFO 2 shows.
 - The key sequence LFO → LFO → LFO opens LFO 1, switches to LFO 2, then
-  closes. FUNC + LFO and other keys stay stock, and auto-repeat is ignored.
-- DEST skips the other LFO's destination, and stays put at the end of the
-  list.
+  closes the stock menu and asks for LFO 3, which the menu's destructor posts
+  to the UI task (and only then). In LFO 3's menu, LFO goes to LFO 4 (redrawn)
+  and then closes it; releases and repeats are swallowed, FUNC + LFO and other
+  menus' keys stay stock. The "3"/"4" is drawn only on that menu.
+- DEST skips every other LFO's destination on the selected track (three in
+  a row if need be), for each of the four pages, not another track's, and
+  stays put at the end of the list.
+- LFO 3/4 rows address the right word for each LFO, track and row; they step
+  through the track handle's own `current + delta` with `clicks << 8` and draw
+  through its value drawer with the stock closure's exact arguments.
+- `lfo_run` skips LFO 3/4 when no track has a destination, otherwise builds
+  their block from their own words (sharing LFO 1's Fade/Phase/Mode), swaps
+  in their own engine state and applies their output.
 - `lfo_run` builds the parameter block correctly, restores LFO 1's state,
   applies LFO 2 with the clamp, and skips None, out-of-range and LFO 1's
   destination.
@@ -124,8 +158,8 @@ Host verified (`tests/test_lfo2.py`, Unicorn ColdFire V4e):
 - Lock rows: every word 0..32 maps to a slot and back, and 26/27 are dropped.
 - **On the real stock engine** (with `MODEL_CYCLES_STOCK` set): LFO 2
   matches LFO 1 sample for sample on every wave except RND, which shares the
-  RNG. LFO 1's output under `lfo_run` is identical to the stock engine
-  alone.
+  RNG. LFO 3 and LFO 4 match LFO 1 too. LFO 1's output under `lfo_run` is
+  identical to the stock engine alone.
 - `build.py` asserts the stock bytes at every patch site. The existing VA
   and regression suites still pass.
 
@@ -142,4 +176,9 @@ Needs hardware:
 6. Save a sound with LFO 2 set, reload it from the pool; init a new sound:
    LFO 2 at defaults.
 7. Load a project saved with an older firmware: LFO 2 is off.
-8. CPU page with six tracks with both LFOs running: no dropouts.
+8. CPU page with six tracks with all four LFOs running: no dropouts.
+9. LFO on LFO 2 opens LFO 3 ("3" shown, rows WAV SPD MUL DST DEP); LFO again:
+   "4"; again: closed. Return and SETTINGS close it as well.
+10. LFO 3/4 values look like LFO 1's (wave names, multipliers, destination
+    names); DST skips the other three LFOs' destinations.
+11. LFO 3 on Pitch and LFO 4 on Filter alongside LFO 1 and 2: all four move.

@@ -95,7 +95,8 @@ These were each verified on hardware; they save a lot of rediscovery.
   like Resample); GEN writes the menu's track through the grid's own
   0x40017b48 (trig on/off) and 0x40016642 (trig note). Everything else:
   [GEN.md](GEN.md)
-- LFO 2 (VA Edition): parameter words 28..32, the stock LFO engine run twice
+- LFO 2, 3, 4 (VA Edition): LFO 2 in parameter words 28..32, LFO 3/4 in
+  Model-TG RAM edited from a list menu; the stock LFO engine run once per LFO
   with its state swapped, slotOf remapped while the LFO menu shows LFO 2, and
   pattern lock rows given slots for words 23..32 (which also fixes
   Attack/Filter/Resonance locks across a pattern save). Everything else:
