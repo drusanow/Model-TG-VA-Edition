@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Writes the machine-page icons of VA KICK, VA SNARE and VA HIHAT into
 src/va_icons/, in the layout gen_va_icons.py uses (column-major, two
-big-endian longs per column, bit n of the first long = row n, lit pixels
-set), as line drawings in 2-pixel strokes:
-  kick  - a bass drum from the front: head, beater and pedal, two feet
-  snare - a snare drum from the side, its stick on the head
-  hihat - two cymbals on their rod
+big-endian longs per column, bit n of the first long = row n from the top,
+lit pixels set), in the style of the stock machines':
+  B (34x34, the right of the page) - a bold, solid picture:
+      kick  - the drum head as a thick ring, the beater in the middle, feet
+      snare - a solid shell with its lugs cut out, a thick stick on top
+      hihat - two solid cymbals on a thick rod
+  A (48x33, the left panel under the name) - the stock "card": CLASS, STYLE
+      and three ratings (STR, DEX, MAG) as five filled / empty diamonds, in
+      a 3x5 capital font drawn here.
 Rerun after changing them; CI checks that the files are up to date. --show
 prints them as text.
 """
@@ -39,71 +43,111 @@ def curve(px, pts):
         line(px, a, b, c, e)
 
 
-def brush(px, x, y):
-    """a 2x2 pen: strokes as heavy as the stock icons'"""
-    h, w = len(px), len(px[0])
-    for dx in (0, 1):
-        for dy in (0, 1):
-            X, Y = int(round(x)) + dx, int(round(y)) + dy
-            if 0 <= X < w and 0 <= Y < h:
-                px[Y][X] = 1
+def fill(px, inside):
+    for y in range(len(px)):
+        for x in range(len(px[0])):
+            if inside(x + 0.5, y + 0.5):
+                px[y][x] = 1
 
 
-def seg(px, x0, y0, x1, y1):
-    n = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 1
-    for i in range(n + 1):
-        brush(px, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)
+def clear(px, inside):
+    for y in range(len(px)):
+        for x in range(len(px[0])):
+            if inside(x + 0.5, y + 0.5):
+                px[y][x] = 0
 
 
-def ellipse(px, cx, cy, rx, ry, a0=0.0, a1=2 * math.pi):
-    n = int(8 * (rx + ry)) + 8
-    for i in range(n + 1):
-        a = a0 + (a1 - a0) * i / n
-        brush(px, cx + rx * math.cos(a) - 0.5, cy + ry * math.sin(a) - 0.5)
+def in_ellipse(cx, cy, rx, ry):
+    return lambda x, y: ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1
 
 
-def kick(w, h):
-    """a bass drum from the front: the head, the beater, two feet"""
-    px = canvas(w, h)
-    cx, cy, r = w / 2, h / 2 - 1, min(w, h) / 2 - 3
-    ellipse(px, cx, cy, r, r)
-    ellipse(px, cx, cy - r * 0.3, r * 0.2, r * 0.2)        # the beater's head
-    seg(px, cx - 0.5, cy - r * 0.1, cx - 0.5, cy + r * 0.35)  # its stem
-    ellipse(px, cx, cy + r * 0.62, r * 0.36, r * 0.3, math.pi, 2 * math.pi)  # the pedal
-    for sx in (-1, 1):                                     # the feet
-        brush(px, cx + sx * (r + 2) - 0.5, cy + r + 1)
+def in_rect(x0, y0, x1, y1):
+    return lambda x, y: x0 <= x < x1 and y0 <= y < y1
+
+
+def in_bar(x0, y0, x1, y1, r):
+    """within r of the segment (x0, y0)-(x1, y1): a thick line"""
+    def f(x, y):
+        dx, dy = x1 - x0, y1 - y0
+        t = max(0, min(1, ((x - x0) * dx + (y - y0) * dy) / (dx * dx + dy * dy)))
+        return (x - x0 - t * dx) ** 2 + (y - y0 - t * dy) ** 2 <= r * r
+    return f
+
+
+def kick():
+    """the drum head as a thick ring, the beater in the middle, two feet"""
+    px = canvas(34, 34)
+    fill(px, in_ellipse(17, 15.5, 14.5, 14.5))
+    clear(px, in_ellipse(17, 15.5, 8, 8))
+    fill(px, in_ellipse(17, 15.5, 3.5, 3.5))            # the beater
+    fill(px, in_rect(3, 30, 9, 34))                     # the feet
+    fill(px, in_rect(25, 30, 31, 34))
     return px
 
 
-def snare(w, h):
-    """a snare drum from the side, its stick resting on the head"""
-    px = canvas(w, h)
-    cx = w / 2 + 1
-    rx = min(w * 0.36, h * 0.48)
-    ry = rx * 0.28
-    top, bot = h * 0.45, h * 0.82
-    ellipse(px, cx, top, rx, ry)                           # the head
-    ellipse(px, cx, bot, rx, ry, 0, math.pi)               # the bottom rim
-    seg(px, cx - rx - 0.5, top, cx - rx - 0.5, bot)        # the shell
-    seg(px, cx + rx - 0.5, top, cx + rx - 0.5, bot)
-    for f in (-0.5, 0.0, 0.5):                             # the lugs
-        x = cx + f * rx - 0.5
-        seg(px, x, top + ry * 0.95, x, bot + ry * 0.85 * math.cos(math.asin(f)))
-    seg(px, cx - rx * 0.15, top - ry * 0.4, cx - rx * 1.05, top - h * 0.38)   # the stick
+def snare():
+    """a solid shell with its lugs cut out, a thick stick on the head"""
+    px = canvas(34, 34)
+    fill(px, in_rect(3, 17, 31, 29))                    # the shell
+    fill(px, in_ellipse(17, 17, 14, 5))                 # the head
+    fill(px, in_ellipse(17, 29, 14, 4))                 # the bottom rim
+    for x in (9, 16, 23):                               # the lugs, cut out
+        clear(px, in_rect(x, 21, x + 2, 29))
+    clear(px, in_ellipse(17, 16.5, 11, 2.2))            # the head's face
+    fill(px, in_bar(15, 13, 4, 2, 2))                   # the stick
     return px
 
 
-def hihat(w, h):
-    """a hi-hat: two cymbals on their rod"""
-    px = canvas(w, h)
-    cx = w / 2
-    rx = min(w * 0.36, h * 0.5)
-    ry = rx * 0.18
-    seg(px, cx - 0.5, h * 0.1, cx - 0.5, h * 0.92)        # the rod
-    ellipse(px, cx, h * 0.42, rx, ry)                      # the top cymbal
-    ellipse(px, cx, h * 0.58, rx, ry, 0, math.pi)          # the bottom one
-    seg(px, cx - rx * 0.95, h * 0.58, cx - rx * 0.6, h * 0.58)
-    seg(px, cx + rx * 0.6, h * 0.58, cx + rx * 0.95, h * 0.58)
+def hihat():
+    """two solid cymbals on a thick rod"""
+    px = canvas(34, 34)
+    fill(px, in_rect(15, 1, 19, 34))                    # the rod
+    for cy in (10, 22):                                 # the cymbals: lenses
+        fill(px, lambda x, y, cy=cy: abs(x - 17) <= 16 and abs(y - cy) <= 3 * (1 - ((x - 17) / 16.5) ** 2) + 0.6)
+    fill(px, in_rect(13, 4, 21, 7))                     # the clutch on top
+    return px
+
+
+# ---- the A card: CLASS / STYLE / three ratings, as the stock machines' ----
+FONT = {                                                # 3x5 capitals
+    'A': ['.#.', '#.#', '###', '#.#', '#.#'], 'B': ['##.', '#.#', '##.', '#.#', '##.'],
+    'C': ['.##', '#..', '#..', '#..', '.##'], 'D': ['##.', '#.#', '#.#', '#.#', '##.'],
+    'E': ['###', '#..', '##.', '#..', '###'], 'G': ['.##', '#..', '#.#', '#.#', '.##'],
+    'H': ['#.#', '#.#', '###', '#.#', '#.#'], 'I': ['###', '.#.', '.#.', '.#.', '###'],
+    'K': ['#.#', '#.#', '##.', '#.#', '#.#'], 'L': ['#..', '#..', '#..', '#..', '###'],
+    'M': ['#.#', '###', '###', '#.#', '#.#'], 'N': ['##.', '#.#', '#.#', '#.#', '#.#'],
+    'O': ['.#.', '#.#', '#.#', '#.#', '.#.'], 'P': ['##.', '#.#', '##.', '#..', '#..'],
+    'R': ['##.', '#.#', '##.', '#.#', '#.#'], 'S': ['.##', '#..', '.#.', '..#', '##.'],
+    'T': ['###', '.#.', '.#.', '.#.', '.#.'], 'U': ['#.#', '#.#', '#.#', '#.#', '###'],
+    'X': ['#.#', '#.#', '.#.', '#.#', '#.#'], 'Y': ['#.#', '#.#', '.#.', '.#.', '.#.'],
+    ':': ['...', '.#.', '...', '.#.', '...'], ' ': ['...'] * 5,
+}
+DIAMOND = (['..#..', '.###.', '#####', '.###.', '..#..'],    # filled
+           ['..#..', '.#.#.', '#...#', '.#.#.', '..#..'])    # empty
+
+
+def text(px, x, y, s):
+    for ch in s:
+        for r, row in enumerate(FONT[ch]):
+            for c, v in enumerate(row):
+                if v == '#':
+                    px[y + r][x + c] = 1
+        x += 4
+    return x
+
+
+def card(cls, style, ratings):
+    px = canvas(48, 33)
+    text(px, 0, 0, 'CLASS:' + cls)
+    text(px, 0, 7, 'STYLE:' + style)
+    for i, (name, n) in enumerate(zip(('STR', 'DEX', 'MAG'), ratings)):
+        y = 14 + 7 * i
+        x = text(px, 0, y, name + ':')
+        for k in range(5):
+            for r, row in enumerate(DIAMOND[0 if k < n else 1]):
+                for c, v in enumerate(row):
+                    if v == '#':
+                        px[y + r][x + 6 * k + c] = 1
     return px
 
 
@@ -122,9 +166,11 @@ def pack(px, w, h):
 
 
 icons = {}
-for name, fn in (('kick', kick), ('snare', snare), ('hihat', hihat)):
-    icons[f'{name}_icon_A_48x33.bin'] = (48, 33, fn(48, 33))
-    icons[f'{name}_icon_B_34x34.bin'] = (34, 34, fn(34, 34))
+for name, fn, cls, style, ratings in (('kick', kick, 'PERC', 'BASS', (5, 2, 2)),
+                                      ('snare', snare, 'PERC', 'SNARE', (4, 4, 2)),
+                                      ('hihat', hihat, 'PERC', 'METAL', (2, 5, 3))):
+    icons[f'{name}_icon_A_48x33.bin'] = (48, 33, card(cls, style, ratings))
+    icons[f'{name}_icon_B_34x34.bin'] = (34, 34, fn())
 os.makedirs(d, exist_ok=True)
 for name, (w, h, px) in icons.items():
     data = pack(px, w, h)

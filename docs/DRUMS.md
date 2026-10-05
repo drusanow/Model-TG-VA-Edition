@@ -115,9 +115,12 @@ widened from 7 to 10:
 - The LFO and Amp Decay gates.
 - `mc_commit_hook` (defaults).
 - `apply_names` (label sets 3..5: `kick_swap`, `snare_swap`, `hat_swap`).
-- The name table and icons (eleven entries). The icons come from
-  `tools/gen_drum_icons.py`: a bass drum from the front, a snare with its
-  stick, and two hi-hat cymbals on their rod.
+- The name table and icons (eleven entries), from `tools/gen_drum_icons.py`
+  in the stock machines' style:
+  - On the right, a bold solid picture: the kick drum's head as a thick
+    ring, a snare with its stick, and two hi-hat cymbals on their rod.
+  - In the left panel, under the name, the stock "card": CLASS PERC and
+    STYLE BASS / SNARE / METAL, with STR / DEX / MAG ratings as diamonds.
 - The machine page's markers. Eleven don't fit one line, so the stock loop
   at 0x400a26a2 is replaced by `mp_markers`. Machines 0..7 sit on the stock
   line (5x5 marks every 7 pixels from x 76). The three drums go on a
