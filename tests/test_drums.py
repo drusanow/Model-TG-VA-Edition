@@ -321,5 +321,29 @@ class TPlumbing(unittest.TestCase):
                 self.assertEqual(e.r32(base + 28 * i + 16), s[f'{n}_icon_{pix}_pixels'], (vec, n))
 
 
+
+class TMarkers(unittest.TestCase):
+    """mp_markers: eight on the stock line, the drums on a second line."""
+    def test_two_lines(self):
+        e = emu()
+        calls = []
+        for fn, kind in ((0x40070c4e, 'outline'), (0x40070efc, 'filled')):
+            e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, k: calls.append(
+                (k,) + struct.unpack('>6i', uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 4, 24))),
+                begin=fn, end=fn, user_data=kind)
+        for sel in (0, 7, 8, 10):
+            calls.clear()
+            e.run('mp_markers', regs={D[2]: 0x5555, D[3]: sel, D[4]: 0x44, D[7]: 0x77})
+            self.assertEqual((e.d(4), e.d(7)), (0x44, 0x77))          # kept
+            self.assertEqual(len(calls), 11)
+            for i, (kind, ctx, x0, y0, x1, y1, one) in enumerate(calls):
+                col, line = (i, 0) if i < 8 else (i - 8, 1)
+                x = 76 + 7 * col
+                self.assertEqual((ctx, x0, x1, one), (0x5555, x - 4, x, 1), i)
+                self.assertEqual((y0, y1), (8, 12) if line == 0 else (1, 5), i)
+                self.assertEqual(kind, 'filled' if i == sel else 'outline', i)
+            self.assertLessEqual(max(c[4] for c in calls), 125)           # on screen
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -243,7 +243,8 @@ The master FX stay on after you close the page, and through pattern changes.
 two-oscillator analogue-style synth. Choose it for any track the way you
 choose any machine; it needs no sample. It plays the note of each trig, pad
 and MIDI note, like Tone or Chord. On the machine page the position markers
-are a little narrower and closer together so that all eleven machines fit.
+for the eight melodic machines (and the Sampler) sit on one line, and those
+for the three drum machines on a second line below.
 
 | knob | label | what it does |
 |---|---|---|

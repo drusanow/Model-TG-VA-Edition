@@ -471,9 +471,7 @@ class T7Static(unittest.TestCase):
             self.assertRegex(b, re.escape(f"({site},'05',_M)"))
         for site in ('0x4001bbd3', '0x4001bbe5', '0x4001bbf3'):
             self.assertIn(f"({site},'18',_L)", b)
-        self.assertIn("(0x400a26a3,'50','43')", b)        # eleven markers
-        self.assertIn("(0x400a26b4,'5980','5780')", b)
-        self.assertIn("(0x400a26e6,'5e84','5c84')", b)
+        self.assertIn("(0x400a26a2,'7850428545f940070c4e','4eb9'+_p('mp_markers')+'60000048')", b)
         self.assertIn("(0x400a7df5,'05','06')", b)   # the audio bound stays
 
     def test_generated_files_current(self):
@@ -508,13 +506,11 @@ class T8FullBuild(unittest.TestCase):
             self.assertEqual(at(a), b'\x0a', hex(a))               # machines 0..10
         for a in (0x4001bbd3, 0x4001bbe5, 0x4001bbf3):
             self.assertEqual(at(a), b'\x2c', hex(a))               # 11 longs
-        self.assertEqual(at(0x400a26a2, 2), b'\x78\x43')            # moveq #67,%d4
-        self.assertEqual(at(0x400a26b4, 2), b'\x57\x80')            # subql #3: x-3..x
-        self.assertEqual(at(0x400a26e6, 2), b'\x5c\x84')            # addql #6
-        self.assertEqual(at(0x400a26e8, 2), b'\x70\x0b')            # moveq #11,%d0
+        mpm = symbols(os.path.join(BUILD, '_b.elf'))['mp_markers']
+        self.assertEqual(at(0x400a26a2, 10),                         # the marker loop:
+                         b'\x4e\xb9' + struct.pack('>I', mpm) + b'\x60\x00\x00\x48')
+        self.assertEqual(0x400a26a8 + 2 + 0x48, 0x400a26f2)          # past it
         self.assertEqual(at(0x400a7df4, 2), b'\x70\x06')            # audio bound: 6
-        # eleven markers inside the right panel: first 64..67, last 124..127
-        self.assertEqual((67 - 3, 67 + 6 * 10), (64, 127))
         # the .syx opens again and holds this very section
         d = os.path.join(BUILD, 'test-va-unpack')
         shutil.rmtree(d, ignore_errors=True)

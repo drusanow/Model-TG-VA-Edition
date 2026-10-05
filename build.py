@@ -189,7 +189,9 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
               'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
               'gen_n_num','gen_n_go','lfo34_w',
-              'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab'}   # pointer tables (menu descriptors), not code
+              'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
+              'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
+              'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -319,10 +321,10 @@ assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{R
 #               the rest for consistency. The LFO list the UI shows takes the
 #               raw machine byte (0x40014042) - the gates in model_tg.s.
 #   0x400a25e0  the machine page: names/icons for 0..N, an error string past
-#   0x400a26a2  ...its position markers: x = 80 + 7i, as x-4..x (0x400a26b4,
-#   0x400a26e6  0x400a26e6). Eleven would run off the 128-pixel screen and
-#   0x400a26e8  into the left panel, so they are drawn x-3..x every 6 from 67
-#               (64..67 to 124..127), and the count is 11
+#   0x400a26a2  ...its position markers: x = 80 + 7i, as x-4..x, six of them.
+#               Eleven do not fit one line, so the loop is replaced by
+#               mp_markers: machines 0..7 on the stock line from x 76, the
+#               drums (8..10) on a second line below
 #   0x400a7df4  the AUDIO dispatch bound stays 6: a VA voice is handed to the
 #               stock dispatch as 6 (va_pre), so no stock audio table ever
 #               sees 7 (the render tables 0x40118610/0x40118628 hold six)
@@ -344,10 +346,10 @@ PHASE1=[
  (0x4004df76,'7205202f0004','4ef9'+_p('table_lookup_b_fixed')),
  (0x4005a79d,'05',_M),  # LFO dest: machine->group bound
  (0x400a25e1,'05',_M), (0x400a2615,'1177e4',_p('sampler_name_table')[2:]),
- # machine-page markers: eleven, as x-3..x every 6 from x 67 (64..67 to
- # 124..127), where stock draws six as x-4..x every 7 from 80
- (0x400a26a3,'50','43'), (0x400a26b4,'5980','5780'), (0x400a26e6,'5e84','5c84'),
- (0x400a26e9,'06',f'{MACH_MAX+1:02x}'),
+ # machine-page markers: the stock loop at 0x400a26a2 becomes a jsr to
+ # mp_markers (drums.inc), two lines; moveq #80,d4 ; clrl d5 ; lea 0x40070c4e,a2
+ # -> jsr mp_markers ; bra.w 0x400a26f2 (past the loop)
+ (0x400a26a2,'7850428545f940070c4e','4eb9'+_p('mp_markers')+'60000048'),
  (0x400a7df5,'05','06'),  # audio dispatch: stays 6 (VA is handed over as 6)
  (0x400a7e0f,'912f0e2f0341f94011861022704c00','714e714e714e714e714e714e714e71'),
  (0x400a7e1f,'91','71'), (0x4010e5e6,'05',_M),

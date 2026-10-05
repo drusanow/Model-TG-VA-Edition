@@ -115,12 +115,13 @@ widened from 7 to 10:
 - The LFO and Amp Decay gates.
 - `mc_commit_hook` (defaults).
 - `apply_names` (label sets 3..5: `kick_swap`, `snare_swap`, `hat_swap`).
-- The name table and icons (eleven entries; icons from
-  `tools/gen_drum_icons.py`).
-- The machine page's markers. Eleven don't fit stock's spacing, so they
-  are drawn 4 pixels wide every 6 from x 67, which puts the last at
-  124..127 (`build.py` patches 0x400a26a3, 0x400a26b4, 0x400a26e6 and the
-  count at 0x400a26e9).
+- The name table and icons (eleven entries). The icons come from
+  `tools/gen_drum_icons.py`: a bass drum from the front, a snare with its
+  stick, and two hi-hat cymbals on their rod.
+- The machine page's markers. Eleven don't fit one line, so the stock loop
+  at 0x400a26a2 is replaced by `mp_markers`. Machines 0..7 sit on the stock
+  line (5x5 marks every 7 pixels from x 76). The three drums go on a
+  second line below, under the first three.
 
 **CPU** (`tests/measure_cpu.py`): instructions of our code per block for
 the whole track path, against the VA's ~3,700 and the Sampler Wave mode's
@@ -178,8 +179,9 @@ Host verified (`tests/test_drums.py`, Unicorn ColdFire V4e):
 
 Needs hardware:
 
-1. The machine page shows eleven markers, the last at the right edge, with
-   the names VA KICK / VA SNARE / VA HIHAT and their icons. Selecting each
+1. The machine page shows eight markers on the top line and three (the
+   drums) on a second line below, with the names VA KICK / VA SNARE /
+   VA HIHAT and their drum icons. Selecting each
    works, and the parameter page shows SWP STM SAT CLK, NOIS PENV TONE SAT,
    or TONE SPRD NOIS SAT.
 2. Each drum plays on trigs and pads. Pitch and notes tune it, and Decay

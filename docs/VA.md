@@ -198,9 +198,9 @@ ladder.
 ## Machine index 7, and every place that knows the count
 
 *Since the drum machines (indexes 8..10, [DRUMS.md](DRUMS.md)) every bound
-below is 10, the lists hold 11 entries and the machine page's markers are
-narrower (x-3..x every 6 from 67); the table records where each site came
-from.*
+below is 10, the lists hold 11 entries, and the machine page's markers are
+drawn by `mp_markers` on two lines (0..7 from x 76, the drums below). The
+table records where each site came from.*
 
 `0..5` stock, `6` Sampler, `7` VA - checked in the stock code: the machine
 byte is `sound+38` (`0x40014042` reads it), mirrored to `trackData+18`, and

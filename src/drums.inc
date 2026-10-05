@@ -530,6 +530,53 @@ df_out:
     lea.l   %sp@(64),%sp
     rts
 
+| ---- the machine page's position markers: two lines ---------------------------
+| Replaces the stock loop at 0x400a26a2 (six markers, x-4..x at y 8..12, every
+| 7 from x 80; selected filled by 0x40070efc, others outlined by 0x40070c4e).
+| Eleven do not fit one line, so machines 0..7 keep that line from x 76 (the
+| last at 121..125) and 8..10 (the drums) go on a second line below, y 1..5,
+| under the first three. Entered (jsr) with d2 = the draw context, d3 = the
+| selected machine; returns to a bra past the stock loop. Keeps d2-d7/a2-a6.
+mp_markers:
+    lea.l   %sp@(-16),%sp
+    moveml  %d4-%d7,%sp@
+    moveq   #0,%d5                | the machine
+mpm_l:
+    movel   %d5,%d0
+    moveq   #8,%d6                | the first line: y 8..12
+    cmpil   #8,%d5
+    bcss    mpm_x
+    subql   #8,%d0
+    moveq   #1,%d6                | the second line: y 1..5
+mpm_x:
+    mulu.w  #7,%d0
+    moveq   #76,%d4
+    addl    %d0,%d4               | x
+    movel   %d6,%d7
+    addql   #4,%d7
+    pea     1
+    movel   %d7,%sp@-
+    movel   %d4,%sp@-
+    movel   %d6,%sp@-
+    movel   %d4,%d0
+    subql   #4,%d0
+    movel   %d0,%sp@-
+    movel   %d2,%sp@-
+    lea.l   0x40070c4e,%a0        | outlined
+    cmpl    %d5,%d3
+    bnes    mpm_d
+    lea.l   0x40070efc,%a0        | the selected one, filled
+mpm_d:
+    jsr     %a0@
+    lea.l   %sp@(24),%sp
+    addql   #1,%d5
+    moveq   #MACH_LAST+1,%d0
+    cmpl    %d5,%d0
+    bnes    mpm_l
+    moveml  %sp@,%d4-%d7
+    lea.l   %sp@(16),%sp
+    rts
+
 | ---- the drums' labels for the four borrowed ids (apply_names d1 = 3/4/5) ---
 | Rows as va_swap's: param_table entry offset, our name / category / short,
 | then the stock three to put back.
