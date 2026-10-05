@@ -171,8 +171,8 @@ class TKeys(unittest.TestCase):
         self.assertEqual(on(), 1)
         self.assertEqual(e.visits[0x40076082], 1)           # redrawn
         self.assertEqual(self.key(8, False), ('ours', 1))   # its release: swallowed
-        self.assertEqual(self.key(8, True), 'stock')        # third press: stock...
-        self.assertEqual(self.key(8, False), 'stock')       # ...which closes on release
+        self.assertEqual(self.key(8, True), ('ours', 1))    # third press: LFO 3
+        self.assertEqual(on(), 0)                           # (TMenu34 has the rest)
         e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0x1234})
         self.assertEqual((on(), e.r32(e.sym['lfo_live'])), (0, 0))
         self.assertEqual(e.d(0), 0x401016dc)                # replayed instructions
@@ -365,114 +365,117 @@ class TRun34(unittest.TestCase):
 
 
 class TMenu34(unittest.TestCase):
-    """The LFO 3/4 menu: rows, keys, the hand-over from LFO 2."""
+    """LFO 3 and 4 as pages 3 and 4 of the stock LFO menu: the key sequence,
+    the handle get/set hooks, slotOf and the p-lock editor gate."""
     def setUp(self):
         self.e = e = emu()
-        e.uc.reg_write(UC_M68K_REG_SR, 0x2000)
+        code(e, 0x4007240c, KEYCODE); code(e, 0x40072490, FUNCBIT); code(e, 0x40072470, RELEASE)
+        code(e, 0x40012412, '7004 4e75')                    # the selected track: 4
 
-    def test_rows_address_their_words(self):
-        e = self.e; s = e.sym
-        for page, lfo in ((2, 0), (3, 1)):
-            e.w32(s['lfo_page'], page)
-            for trk in range(6):
-                e.w32(s['gm_track'], trk)
-                for row, (word, pid) in enumerate(((2, 0x21), (0, 0x1d), (1, 0x1e),
-                                                   (3, 0x20), (4, 0x24))):
-                    e.run('l34_word', regs={D[0]: row})
-                    self.assertEqual(e.a(0), s['lfo34_w'] + 60 * lfo + 10 * trk + 2 * word)
-                    self.assertEqual(e.d(1), pid)
-
-    def handle_stubs(self):
-        e = self.e
-        HND, VT = SCRATCH + 0xd000, SCRATCH + 0xd100
-        rec = SCRATCH + 0xd200
-        e.w32(HND, VT)
-        # vt[0x14]: record its 4 args, return cur + delta; vt[64]: record 7 args
-        code(e, SCRATCH + 0xd300, '41f9' + '%08x' % rec + '20ef0004 20ef0008 20ef000c 20ef0010'
-             ' 202f000c d0af0010 4e75')
-        code(e, SCRATCH + 0xd400, '41f9' + '%08x' % (rec + 0x40) + '20ef0004 20ef0008 20ef000c'
-             ' 20ef0010 20ef0014 20ef0018 20ef001c 4e75')
-        e.w32(VT + 0x14, SCRATCH + 0xd300)
-        e.w32(VT + 64, SCRATCH + 0xd400)
-        code(e, 0x400097f0, '203c' + '%08x' % HND + '4e75')
-        return HND, rec
-
-    def test_turn_and_draw_through_the_handle(self):
-        e = self.e; s = e.sym
-        HND, rec = self.handle_stubs()
-        e.w32(s['lfo_page'], 3); e.w32(s['gm_track'], 4)
-        wp = s['lfo34_w'] + 60 + 40 + 8                      # LFO 4, track 4, Depth
-        e.w16(wp, 16384)
-        e.run('l34_rot_dep', stack=[0, 0, 3])
-        self.assertEqual([e.r32(rec + 4 * i) for i in range(4)], [HND, 0x24, 16384, 3 << 8])
-        self.assertEqual(e.r16(wp), 16384 + 768)
-        e.run('l34_val_dep', stack=[0, 0, 0x111, 0x22, 0x33])
-        self.assertEqual([e.r32(rec + 0x40 + 4 * i) for i in range(7)],
-                         [HND, 0x24, 16384 + 768, 0, 0x111, 0x22 + 7, 0x33])
-        e.w16(wp, (-5) & 0xffff)                             # signed, as vt[28] gives it
-        e.run('l34_val_dep', stack=[0, 0, 1, 2, 3])
-        self.assertEqual(e.rs32(rec + 0x48), -5)
-
-    def key(self, fn, kc, down, func=False, repeat=False):
+    def key(self, down, func=False, repeat=False, kc=8):
         e = self.e
         EV, VIEW = SCRATCH + 0xa100, SCRATCH + 0xa000
         e.w32(EV + 12, kc)
         e.w32(EV + 16, (1 if down else 0) | (2 if func else 0) | (8 if repeat else 0))
-        st = e.run_to_any(fn, (0x4007598e, 0x40024e86, RET), stack=[VIEW, EV])
-        return 'stock' if st != RET else ('ours', e.d(0))
+        st = e.run_to_any('lfo_key_hook', (0x40024e86, RET), stack=[VIEW, EV])
+        return 'stock' if st == 0x40024e86 else ('ours', e.d(0))
 
-    def test_lfo2_to_3_to_4_to_closed(self):
+    def test_four_pages(self):
         e = self.e; s = e.sym
-        code(e, 0x4007240c, KEYCODE); code(e, 0x40072490, FUNCBIT); code(e, 0x40072470, RELEASE)
-        e.watch(0x40076082, 0x40075ba6, 0x40001fba)
+        e.watch(0x40076082)
         e.run_to_any('lfo_menu_new', (0x40025798,), stack=[SCRATCH])
-        self.assertEqual(self.key('lfo_key_hook', 8, True), ('ours', 1))    # LFO 2
-        self.assertEqual(self.key('lfo_key_hook', 8, False), ('ours', 1))
-        self.assertEqual(self.key('lfo_key_hook', 8, True), 'stock')        # stock closes...
-        self.assertEqual(e.r32(s['lfo34_req']), 1)                          # ...LFO 3 asked for
+        page = lambda: (e.r32(s['lfo_page']), e.r32(s['lfo2_on']))
+        self.assertEqual(page(), (0, 0))
+        self.assertEqual(self.key(False), 'stock')          # the opening press's release
+        for want in ((1, 1), (2, 0), (3, 0)):                # LFO 2, 3, 4
+            self.assertEqual(self.key(True), ('ours', 1))
+            self.assertEqual(page(), want)
+            self.assertEqual(self.key(False), ('ours', 1))   # its release swallowed
+        self.assertEqual(e.visits[0x40076082], 3)
+        self.assertEqual(e.r32(s['lfo_view']), SCRATCH + 0xa000)
+        self.assertEqual(self.key(True, repeat=True), ('ours', 1))
+        self.assertEqual(page(), (3, 0))
+        self.assertEqual(self.key(True, func=True), 'stock') # LFO Setup
+        self.assertEqual(self.key(True), 'stock')            # LFO 4: stock closes it
+        self.assertEqual(self.key(False), 'stock')
         e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0})
-        self.assertEqual(e.visits[0x40001fba], 1)                           # posted
-        self.assertEqual(e.r32(s['lfo34_msg'] + 0x10), s['lfo34_run'])
-        self.assertEqual(e.r32(s['lfo34_req']), 0)
-        # the callback, with the opener answering "opened"
-        mm = s['mm_opened']
-        code(e, s['lm_open_sel'], '7001 23c0' + '%08x' % mm + '4e75')
-        e.run('lfo34_run', stack=[0, 0])
-        self.assertEqual((e.r32(s['lfo_page']), e.r32(s['lfo_live']), e.r32(s['lm_want'])),
-                         (2, 1, s['lfo34_desc']))
-        # in our menu: gm_key_th routes LFO to lfo34_key while it is LFO 3/4's
-        e.w32(s['gm_cur'], s['lfo34_desc'])
-        self.assertEqual(self.key('gm_key_th', 8, True), ('ours', 1))       # LFO 4
-        self.assertEqual(e.r32(s['lfo_page']), 3)
-        self.assertEqual(e.visits[0x40076082], 2)                           # redrawn
-        self.assertEqual(self.key('gm_key_th', 8, False), ('ours', 1))      # release eaten
-        self.assertEqual(self.key('gm_key_th', 8, True, repeat=True), ('ours', 1))
-        self.assertEqual(self.key('gm_key_th', 8, True, func=True), 'stock')
-        self.assertEqual(self.key('gm_key_th', 8, True), ('ours', 1))       # closed
-        self.assertEqual(e.visits[0x40075ba6], 1)
-        self.assertEqual(e.r32(s['lfo_live']), 0)
-        e.w32(s['gm_cur'], s['gen_desc'])                                   # another menu:
-        self.assertEqual(self.key('gm_key_th', 8, True), 'stock')           # LFO is stock's
+        self.assertEqual((e.r32(s['lfo_page']), e.r32(s['lfo_live']), e.r32(s['lfo_view'])),
+                         (0, 0, 0))
 
-    def test_no_request_no_post(self):
-        e = self.e
-        e.watch(0x40001fba)
-        e.run_to_any('lfo_menu_new', (0x40025798,), stack=[SCRATCH])
-        e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0})
-        self.assertEqual(e.visits[0x40001fba], 0)
+    def test_slot_answers(self):
+        e = self.e; s = e.sym
+        for page, on, want in ((0, 0, 'stock'), (1, 1, 'lfo2'), (2, 0, -1), (3, 0, -1)):
+            e.w32(s['lfo_page'], page); e.w32(s['lfo2_on'], on)
+            for i, pid in enumerate(IDS):
+                st = e.run_to_any('lfo_slot', (0x4005a4ee, RET), stack=[pid])
+                if want == 'stock':
+                    self.assertEqual(st, 0x4005a4ee)
+                elif want == 'lfo2':
+                    self.assertEqual((st, e.d(0)), (RET, K0 + i))
+                else:
+                    self.assertEqual((st, s32(e.d(0))), (RET, -1))   # no word: no lock
+            for pid in (0x1f, 0x22, 0x18):                     # Setup and others: stock
+                self.assertEqual(e.run_to_any('lfo_slot', (0x4005a4ee, RET), stack=[pid]),
+                                 0x4005a4ee)
 
-    def test_number_drawn_only_on_lfo34(self):
+    def test_get_set(self):
+        e = self.e; s = e.sym
+        e.watch(0x40076082)
+        W = s['lfo34_w']
+        e.w32(s['lfo_view'], 0x1234)
+        for page, lfo in ((2, 0), (3, 1)):
+            e.w32(s['lfo_page'], page)
+            for i, pid in enumerate(IDS):                    # Speed, Mult, Wave, Dest, Depth
+                addr = W + 60 * lfo + 40 + 2 * i            # track 4
+                e.w16(addr, (-300 - i) & 0xffff)
+                self.assertEqual(e.run_to_any('lfo34_get', (0x4000ae20, RET),
+                                              stack=[0, pid]), RET)
+                self.assertEqual(s32(e.d(0)), -300 - i)
+                self.assertEqual(e.run_to_any('lfo34_set', (0x4000ba7a, RET),
+                                              stack=[0, pid, 5000 + i, 0, 0]), RET)
+                self.assertEqual(e.r16(addr), 5000 + i)
+        self.assertEqual(e.visits[0x40076082], 10)           # each set redrawn
+        for page in (0, 1):                                   # LFO 1 / 2: the sound
+            e.w32(s['lfo_page'], page)
+            self.assertEqual(e.run_to_any('lfo34_get', (0x4000ae20, RET), stack=[0, 0x1d]),
+                             0x4000ae20)
+            self.assertEqual(e.run_to_any('lfo34_set', (0x4000ba7a, RET),
+                                          stack=[0, 0x1d, 1, 0, 0]), 0x4000ba7a)
+        e.w32(s['lfo_page'], 2)
+        for pid in (0x1f, 0x22, 0x23, 0x2a):                  # not one of the five
+            self.assertEqual(e.run_to_any('lfo34_get', (0x4000ae20, RET), stack=[0, pid]),
+                             0x4000ae20)
+
+    def test_lock_gate(self):
+        e = self.e; s = e.sym
+        for page in (2, 3):
+            e.w32(s['lfo_page'], page)
+            self.assertEqual(e.run_to_any('lfo34_lock_gate', (0x40025e16, RET), stack=[1, 2]),
+                             RET)                             # ignored
+        for page in (0, 1):
+            e.w32(s['lfo_page'], page)
+            e.uc.reg_write(A[2], 0x7777)
+            self.assertEqual(e.run_to_any('lfo34_lock_gate', (0x40025e16, RET),
+                                          regs={A[2]: 0x7777}, stack=[1, 2]), 0x40025e16)
+            sp = e.sp()
+            self.assertEqual(e.r32(sp), 0x7777)               # movel a2,sp@-
+            self.assertEqual(e.r32(sp + 4 + 16), RET)          # after lea -16
+
+    def test_number_drawn(self):
         e = self.e; s = e.sym
         calls = []
         e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.append(
             struct.unpack('>I', uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 28, 4))[0]),
             begin=0x40071a04, end=0x40071a04)
-        for cur, page, want in ((s['gen_desc'], 2, []), (s['lfo34_desc'], 2, [s['str_lfo3']]),
-                                (s['lfo34_desc'], 3, [s['str_lfo4']])):
+        for page, want in ((0, None), (1, '2'), (2, '3'), (3, '4')):
             calls.clear()
-            e.w32(s['gm_cur'], cur); e.w32(s['lfo_page'], page)
-            e.run('gm_draw_th', stack=[0, 0x99])
-            self.assertEqual(calls, want)
+            e.w32(s['lfo_page'], page)
+            e.run('lfo_render_hook', stack=[0, 0x99])
+            if want is None:
+                self.assertEqual(calls, [])
+            else:
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(bytes(e.uc.mem_read(calls[0], 2)), want.encode() + b'\0')
 
 
 @unittest.skipUnless(os.environ.get('MODEL_CYCLES_STOCK'), "set MODEL_CYCLES_STOCK for the real-engine test")

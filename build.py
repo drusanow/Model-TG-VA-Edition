@@ -188,7 +188,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'va_swap','va_det_tab',
               'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
               'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
-              'gen_n_num','gen_n_go','lfo34_desc','l34_items','l34_rows','lfo34_w',
+              'gen_n_num','gen_n_go','lfo34_w',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
@@ -536,12 +536,19 @@ for _a,_old,_new,_what in (
     (0x4005b9c6,'16b548031742 0001'.replace(' ',''),'4eb9'+_p('lk_slot_save')+'4e71','lock-row slot (save)'),
     # pattern load, slot -> word: movel d2,sp@- ; moveq #6,d2 ; movel sp@(8),d1
     (0x4005aa1a,'2f027406222f0008','4ef9'+_p('lk_slot_load')+'4e71','lock-row slot (load)'),
+    # LFO 3/4 on the stock menu's pages 3 and 4: the track handle's vtable
+    # (0x400fd134, the only one holding them) +28 get and +92 set
+    (0x400fd150,'4000ae20',_p('lfo34_get'),'track handle get'),
+    (0x400fd190,'4000ba7a',_p('lfo34_set'),'track handle set'),
+    # the LFO menu's p-lock editor: lea sp@(-16),sp ; movel a2,sp@-
+    (0x40025e10,'4feffff02f0a','4ef9'+_p('lfo34_lock_gate'),'LFO p-lock editor'),
     ):
     _o=_a-BASE; _ob=bytes.fromhex(_old); _nb=bytes.fromhex(_new)
     assert len(_ob)==len(_nb), (_what, len(_ob), len(_nb))
     assert bytes(d[_o:_o+len(_ob)])==_ob, (_what, hex(_a), bytes(d[_o:_o+len(_ob)]).hex())
     d[_o:_o+len(_nb)]=_nb
-print("  LFO 2: engine call, slotOf, LFO menu (new/key/draw/delete), default fill, lock rows")
+print("  LFO 2-4: engine call, slotOf, LFO menu (new/key/draw/delete), default fill, lock rows,"
+      " handle get/set, p-lock editor")
 # Start/End waveform: slot 0x90 of the parameter view's vtable, the value popup
 # 0x4001d818, goes through wf_popup (stock for everything but Sampler Start/End).
 assert struct.unpack('>I',bytes(d[0x401005bc-BASE:0x401005c0-BASE]))[0]==0x4001d818, \

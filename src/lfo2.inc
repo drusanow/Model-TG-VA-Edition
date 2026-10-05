@@ -174,6 +174,21 @@ lsw_l:
 | ids the LFO menu and the SPEED knob use answer LFO 2's words.
 lfo_slot:
     movel   %sp@(4),%d0
+    moveq   #2,%d1                | LFO 3 / 4 showing: no word for the five
+    cmpl    lfo_page,%d1
+    bhis    ls_12
+    lea.l   lfo2_ids,%a0
+    moveq   #4,%d1
+ls_n:
+    cmpl    %a0@+,%d0
+    beqs    ls_none
+    subql   #1,%d1
+    bpls    ls_n
+    bras    ls_stock
+ls_none:
+    moveq   #-1,%d0
+    rts
+ls_12:
     tstl    lfo2_on
     beqs    ls_stock
     lea.l   lfo2_ids,%a0
@@ -200,7 +215,7 @@ lfo_menu_new:
     clrl    lfo2_on
     clrl    lfo_ate
     clrl    lfo_page
-    clrl    lfo34_req
+    clrl    lfo_view
     moveq   #1,%d0
     movel   %d0,lfo_live
     jmp     0x40025798            | the constructor, with the caller's args
@@ -208,13 +223,8 @@ lfo_menu_dtor:
     clrl    lfo2_on
     clrl    lfo_ate
     clrl    lfo_live
-    tstl    lfo34_req             | LFO pressed on LFO 2: LFO 3 opens next, in
-    beqs    lmd_go                | the UI task, once this menu is gone
-    clrl    lfo34_req
-    lea.l   lfo34_msg,%a0
-    lea.l   lfo34_run,%a1
-    bsr     ui_post
-lmd_go:
+    clrl    lfo_page
+    clrl    lfo_view
     movel   %a2,%sp@-             | the two instructions the jump replaced
     movel   #0x401016dc,%d0
     jmp     0x400d97a2
@@ -222,10 +232,10 @@ lmd_go:
 | ---- the LFO menu's key handler (View vtable 0x401016dc, slot +8) ------------
 | (view, event). Stock (0x40024e86 -> 0x40024e0c): the LFO key's press is
 | taken, its release closes the menu - except the release of the press that
-| opened it. Here, while LFO 1 shows, a fresh LFO press switches to LFO 2 and
-| its release is swallowed; with LFO 2 showing the stock handling closes it
-| and LFO 3 is asked for (lfo34_req, lfo_menu_dtor). FUNC + LFO (LFO Setup)
-| and every other key are stock. Returns d0 = 1 when the key was ours.
+| opened it. Here a fresh LFO press moves LFO 1 -> 2 -> 3 -> 4 (redrawn, its
+| release swallowed); with LFO 4 showing the stock handling closes it. FUNC +
+| LFO (LFO Setup) and every other key are stock. Returns d0 = 1 when the key
+| was ours.
 lfo_key_hook:
     movel   %sp@(8),%sp@-
     jsr     0x4007240c            | the key code
@@ -251,17 +261,23 @@ lk_press:
     movea.l %sp@(8),%a0
     btst    #3,%a0@(19)           | auto-repeat: not a fresh press
     bnes    lk_ours
-    tstl    lfo2_on
-    beqs    lk_to2
-    moveq   #1,%d0                | LFO 2 showing: stock closes the menu on
-    movel   %d0,lfo34_req         | the release, then LFO 3 opens
-    bras    lk_stock
-lk_to2:
+    movel   lfo_page,%d0
+    moveq   #3,%d1
+    cmpl    %d0,%d1
+    beqs    lk_stock              | LFO 4 showing: stock, which closes on release
+    addql   #1,%d0
+    movel   %d0,lfo_page          | the next LFO
+    clrl    lfo2_on
+    moveq   #1,%d1
+    cmpl    %d0,%d1
+    bnes    lk_n2
+    movel   %d1,lfo2_on           | LFO 2: its words (slotOf)
+lk_n2:
     moveq   #1,%d0
-    movel   %d0,lfo2_on
     movel   %d0,lfo_ate
-    movel   %d0,lfo_page
-    movel   %sp@(4),%sp@-         | redraw: the values and the "2"
+    movel   %sp@(4),%d0
+    movel   %d0,lfo_view          | for lfo34_set's redraws
+    movel   %d0,%sp@-             | redraw: the values and the number
     jsr     0x40076082
     addql   #4,%sp
 lk_ours:
@@ -279,9 +295,13 @@ lfo_render_hook:
     movel   %sp@(8),%sp@-
     jsr     0x400426fa
     addql   #8,%sp
-    tstl    lfo2_on
+    movel   lfo_page,%d0
     beqs    lrh_out
-    pea     str_lfo2
+    lea.l   str_lfo2,%a0          | "2" / "3" / "4"
+    subql   #1,%d0
+    addl    %d0,%d0
+    adda.l  %d0,%a0
+    movel   %a0,%sp@-
     movel   %sp@(12),%sp@-        | ctx
     bsr     lfo_draw_num
     addql   #8,%sp
@@ -421,281 +441,101 @@ ld_pg:
     clrb    %a1@(0,%d0:l)         | the one being edited is not "another"
     rts
 
-| ============== LFO 3 and LFO 4: a list menu of Model-TG's own ==============
-| A sound has no words left for them, so their settings live in lfo34_w
-| (per track, in RAM: no p-locks, not saved) and are edited in one of
-| Model-TG's list menus (lm_build), titled "LFO" with "3" or "4" beneath as
-| LFO 2's "2". Its rows behave as the stock LFO menu's: each is drawn by the
-| track handle's own value drawer (vtable +64) and stepped by its own "current
-| + delta" (vtable +0x14, through fine_hook and so lfo_dest_step), exactly as
-| the stock closures 0x40025d28 / 0x40025eba do - only the value comes from,
-| and goes back to, lfo34_w instead of the sound.
-| LFO on LFO 2 -> (stock closes it) -> LFO 3 -> LFO -> LFO 4 -> LFO -> closed.
+| ============== LFO 3 and LFO 4: the stock LFO menu, two more pages ==========
+| A sound has no words left for them, so their settings live in lfo34_w (per
+| track, in RAM: no p-locks, not saved). The stock LFO menu shows them as it
+| shows LFO 1 and 2 - same rows, icon, values, DEST list, SPEED knob - because
+| every one of its edits goes through the track handle: vtable +28 reads a
+| parameter, +32 (0x4000b7d6) adjusts it by reading (+28), stepping (+0x14,
+| fine_hook) and storing (0x4000b274 -> +92, 0x4000ba7a). With LFO 3 or 4
+| showing, lfo34_get / lfo34_set answer +28 / +92 for the five LFO ids from
+| lfo34_w instead of the sound, and ask the menu to redraw (its own redraw
+| comes from the sound's observers, which never hear of lfo34_w). slotOf
+| answers -1 for those ids meanwhile, and a turn with a step held (the p-lock
+| editor, 0x40025e10) is ignored, so nothing can reach LFO 1's words.
 
-| ui_post(a0 = a 0x1c-byte message, a1 = its callback): run the callback in
-| the master UI task (see sv_post). Already queued: that will do. Clobbers
-| d0/d1/a0/a1.
-ui_post:
-    tstl    %a0@(0x18)
-    bnes    up_out
-    movel   %a1,%sp@-
-    movel   %a0,%sp@-
-    pea     1
-    jsr     ALLOC                 | closure data, released by the manager
+| (handle, id) -> d0 = the value (vtable +28, in place of 0x4000ae20)
+lfo34_get:
+    movel   %sp@(8),%d0
+    bsr     l34_ours
+    beqs    l34g_stock
+    mvsw    %a0@,%d0
+    rts
+l34g_stock:
+    jmp     0x4000ae20
+
+| (handle, id, value, ...) (vtable +92, in place of 0x4000ba7a)
+lfo34_set:
+    movel   %sp@(8),%d0
+    bsr     l34_ours
+    beqs    l34s_stock
+    movew   %sp@(14),%a0@         | the value's low word
+    movel   lfo_view,%d0
+    beqs    l34s_out
+    movel   %d0,%sp@-
+    jsr     0x40076082            | redraw the menu
     addql   #4,%sp
-    movea.l %sp@+,%a0
-    movea.l %sp@+,%a1
-    movel   %d0,%a0@(4)
-    clrl    %a0@(8)
-    movel   #GENERIC_MANAGER,%d0
-    movel   %d0,%a0@(0x0c)
-    movel   %a1,%a0@(0x10)
-    clrl    %a0@(0x14)
-    moveq   #1,%d0
-    movel   %d0,%a0@(0x18)
-    moveq   #6,%d0                | type 6: run the callback
-    moveb   %d0,%a0@
-    movel   %a0,%sp@-
-    pea     MQ_MAIN
-    jsr     0x40001fba            | post
-    addql   #8,%sp
-up_out:
-    rts
-
-lfo34_run:                        | (closure, arg), in the UI task
-    lea.l   lfo34_desc,%a0
-    movel   %a0,lm_want
-    jsr     lm_open_sel
-    tstl    mm_opened
-    beqs    l34r_out
-    moveq   #2,%d0                | LFO 3 showing
-    movel   %d0,lfo_page
-    moveq   #1,%d0
-    movel   %d0,lfo_live
-    clrl    lfo2_on
-    clrl    lfo34_eat
-l34r_out:
-    rts
-
-| ---- rows ----
-l34_lab_wav:
-    lea.l   l34_s_wav,%a1
-    jmp     gm_lab
-l34_lab_spd:
-    lea.l   l34_s_spd,%a1
-    jmp     gm_lab
-l34_lab_mul:
-    lea.l   l34_s_mul,%a1
-    jmp     gm_lab
-l34_lab_dst:
-    lea.l   l34_s_dst,%a1
-    jmp     gm_lab
-l34_lab_dep:
-    lea.l   l34_s_dep,%a1
-    jmp     gm_lab
-l34_val_wav:
+l34s_out:
     moveq   #0,%d0
-    bras    l34_val
-l34_val_spd:
-    moveq   #1,%d0
-    bras    l34_val
-l34_val_mul:
-    moveq   #2,%d0
-    bras    l34_val
-l34_val_dst:
-    moveq   #3,%d0
-    bras    l34_val
-l34_val_dep:
-    moveq   #4,%d0
-| the stock value closure 0x40025d28, the value from lfo34_w:
-| vt[64](handle, id, value, 0, arg3, arg4 + 7, arg5)
-l34_val:
-    lea.l   %sp@(-16),%sp
-    moveml  %d2/%a2-%a3,%sp@
-    bsr     l34_word              | a0 = &value, d1 = id
-    mvsw    %a0@,%d2
-    movel   %d1,%sp@(12)
-    bsr     l34_handle            | a2 = the track handle
-    movea.l %a2@,%a0
-    movel   %sp@(36),%sp@-
-    movel   %sp@(36),%d1
-    addql   #7,%d1
+    rts
+l34s_stock:
+    jmp     0x4000ba7a
+
+| d0 = a parameter id -> Z clear and a0 = its word in lfo34_w (the LFO
+| showing, the selected track) when LFO 3 or 4 shows and it is one of the
+| five LFO ids; Z set otherwise. Clobbers d0/d1/a0/a1.
+l34_ours:
+    moveq   #2,%d1
+    cmpl    lfo_page,%d1
+    bhis    l34o_no               | LFO 1 or 2
+    lea.l   lfo2_ids,%a0          | Speed, Multiplier, Waveform, Dest, Depth:
+    moveq   #0,%d1                | lfo34_w's own order
+l34o_l:
+    cmpl    %a0@+,%d0
+    beqs    l34o_yes
+    addql   #1,%d1
+    cmpil   #5,%d1
+    bcss    l34o_l
+l34o_no:
+    moveq   #0,%d0                | Z set
+    rts
+l34o_yes:
     movel   %d1,%sp@-
-    movel   %sp@(36),%sp@-
-    clrl    %sp@-
-    movel   %d2,%sp@-
-    movel   %sp@(32),%sp@-        | the id
-    movel   %a2,%sp@-
-    movea.l %a0@(64),%a0
-    jsr     %a0@
-    moveml  %sp@(28),%d2/%a2-%a3
-    lea.l   %sp@(44),%sp
-    rts
-l34_rot_wav:
+    jsr     0x400cf866            | the selected track
+    movel   %d0,%sp@-
+    jsr     0x4000eb90
+    movel   %d0,%sp@-
+    jsr     0x40012412
+    addql   #8,%sp
+    cmpil   #MAX_TRK,%d0
+    bcss    l34o_t
     moveq   #0,%d0
-    bras    l34_rot
-l34_rot_spd:
-    moveq   #1,%d0
-    bras    l34_rot
-l34_rot_mul:
-    moveq   #2,%d0
-    bras    l34_rot
-l34_rot_dst:
-    moveq   #3,%d0
-    bras    l34_rot
-l34_rot_dep:
-    moveq   #4,%d0
-| (closure, item, clicks): value = vt[0x14](handle, id, value, clicks << 8),
-| as the stock turn closure 0x40025eba steps through the handle
-l34_rot:
-    lea.l   %sp@(-16),%sp
-    moveml  %d2-%d3/%a2-%a3,%sp@
-    bsr     l34_word
-    movea.l %a0,%a3
-    movel   %d1,%d3
-    bsr     l34_handle
-    movel   %sp@(28),%d0          | clicks
-    lsll    #8,%d0
-    movel   %d0,%sp@-
-    mvsw    %a3@,%d0
-    movel   %d0,%sp@-
-    movel   %d3,%sp@-
-    movel   %a2,%sp@-
-    movea.l %a2@,%a0
-    movea.l %a0@(0x14),%a0
-    jsr     %a0@
-    lea.l   %sp@(16),%sp
-    movew   %d0,%a3@
-    moveml  %sp@,%d2-%d3/%a2-%a3
-    lea.l   %sp@(16),%sp
-    rts
-
-| d0 = row -> a0 = its word in lfo34_w (this LFO, the menu's track), d1 = its
-| parameter id. Clobbers d0.
-l34_word:
-    lea.l   l34_rows,%a0
-    lsll    #2,%d0
-    mvzw    %a0@(2,%d0:l),%d1     | the id
-    mvzw    %a0@(0,%d0:l),%d0     | the word, 0..4
-    addl    %d0,%d0
+l34o_t:
+    mulu.w  #10,%d0
+    movel   %sp@+,%d1
+    addl    %d1,%d0
+    addl    %d1,%d0               | + the word x 2
     lea.l   lfo34_w,%a0
     adda.l  %d0,%a0
-    movel   gm_track,%d0
-    mulu.w  #10,%d0
-    adda.l  %d0,%a0
     moveq   #3,%d0
     cmpl    lfo_page,%d0
-    bnes    lw_out
+    bnes    l34o_p
     lea.l   %a0@(60),%a0          | LFO 4
-lw_out:
-    rts
-| -> a2 = the menu's track's handle, as the stock closures find it.
-| Clobbers d0/d1/a0/a1.
-l34_handle:
-    jsr     0x400cf866
-    movel   %d0,%sp@-
-    jsr     0x4000eb9c
-    addql   #4,%sp
-    movel   gm_track,%sp@-
-    movel   %d0,%sp@-
-    jsr     0x400097f0
-    addql   #8,%sp
-    movea.l %d0,%a2
+l34o_p:
+    moveq   #1,%d0                | Z clear
     rts
 
-| ---- LFO in the LFO 3/4 menu (from gm_key_th; d0 = the key code, 8) ----
-| (view, event). A fresh press: LFO 3 -> LFO 4 (redrawn), LFO 4 -> closed;
-| its release is swallowed too. FUNC + LFO goes on as usual.
-lfo34_key:
-    movel   %sp@(8),%sp@-
-    jsr     0x40072490            | FUNC held
-    addql   #4,%sp
-    tstb    %d0
-    bnes    l34k_stock
-    movel   %sp@(8),%sp@-
-    jsr     0x40072470            | 1: a release
-    addql   #4,%sp
-    tstb    %d0
-    beqs    l34k_press
-    tstl    lfo34_eat
-    beqs    l34k_stock
-    clrl    lfo34_eat
-    bras    l34k_ours
-l34k_press:
-    movea.l %sp@(8),%a0
-    btst    #3,%a0@(19)
-    bnes    l34k_ours             | auto-repeat
-    moveq   #1,%d0
-    movel   %d0,lfo34_eat
+| the p-lock editor (0x40025e10, a turn with a step held): not for LFO 3/4.
+| Replaces `lea %sp@(-16),%sp ; movel %a2,%sp@-`.
+lfo34_lock_gate:
     moveq   #2,%d0
     cmpl    lfo_page,%d0
-    bnes    l34k_close
-    moveq   #3,%d0                | LFO 4
-    movel   %d0,lfo_page
-    movel   %sp@(4),%sp@-
-    jsr     0x40076082            | redraw
-    addql   #4,%sp
-    bras    l34k_ours
-l34k_close:
-    movel   %sp@(4),%d0
-    subil   #0x38,%d0             | the menu object
-    movel   %d0,%sp@-
-    jsr     0x40075ba6            | close (as Return does)
-    addql   #4,%sp
-    clrl    lfo_live
-l34k_ours:
-    moveq   #1,%d0
+    bhis    llg_go
     rts
-l34k_stock:
-    jmp     0x4007598e
-
-| ---- our list menus' draw (gm_vvt slot +0x10, see lm_build) ----
-| (view, ctx): the stock draw; for LFO 3/4's menu, then its number.
-gm_draw_th:
-    movel   %sp@(8),%sp@-
-    movel   %sp@(8),%sp@-
-    movea.l gm_draw_orig,%a0
-    jsr     %a0@
-    addql   #8,%sp
-    lea.l   lfo34_desc,%a0
-    cmpal   gm_cur,%a0
-    bnes    gdt_out
-    lea.l   str_lfo3,%a0
-    moveq   #2,%d0
-    cmpl    lfo_page,%d0
-    beqs    gdt_n
-    lea.l   str_lfo4,%a0
-gdt_n:
-    movel   %a0,%sp@-
-    movel   %sp@(12),%sp@-        | ctx
-    bsr     lfo_draw_num
-    addql   #8,%sp
-gdt_out:
-    rts
-
-    .align 4
-lfo34_desc:   .long l34_title, l34_vname, 5, l34_items
-l34_items:    .long l34_lab_wav, l34_val_wav, l34_rot_wav, new_slot2_invoker
-              .long l34_lab_spd, l34_val_spd, l34_rot_spd, new_slot2_invoker
-              .long l34_lab_mul, l34_val_mul, l34_rot_mul, new_slot2_invoker
-              .long l34_lab_dst, l34_val_dst, l34_rot_dst, new_slot2_invoker
-              .long l34_lab_dep, l34_val_dep, l34_rot_dep, new_slot2_invoker
-l34_rows:     .word 2, 0x21       | {word in lfo34_w, parameter id} per row
-              .word 0, 0x1d
-              .word 1, 0x1e
-              .word 3, 0x20
-              .word 4, 0x24
-gm_draw_orig: .long 0x400426fa    | the list menu's draw (lm_build reads it)
-l34_title:    .asciz "LFO"
-l34_vname:    .asciz "LFO34MenuView"
-l34_s_wav:    .asciz "WAV"
-l34_s_spd:    .asciz "SPD"
-l34_s_mul:    .asciz "MUL"
-l34_s_dst:    .asciz "DST"
-l34_s_dep:    .asciz "DEP"
-str_lfo3:     .asciz "3"
-str_lfo4:     .asciz "4"
-    .align 2
+llg_go:
+    lea.l   %sp@(-16),%sp
+    movel   %a2,%sp@-
+    jmp     0x40025e16
 
 | ---- LFO 2's defaults, after the stock default fill (0x40061866) -------------
 | (sound, ?, group): it writes every word a parameter claims and zero for the
@@ -889,7 +729,9 @@ lk_ext_slot:                      | words 23..32 -> slot
 lk_ext_word:                      | slots 24..31 -> word
     .byte   23, 24, 25, 28, 29, 30, 31, 32
 str_lfo2:
-    .asciz  "2"
+    .asciz  "2"                   | 2 bytes apart: "2", "3", "4"
+    .asciz  "3"
+    .asciz  "4"
 
 | ---- state ------------------------------------------------------------------
     .balign 4
@@ -897,8 +739,7 @@ lfo2_on:    .long 0               | the LFO menu shows LFO 2: remap ids
 lfo_ate:    .long 0               | we took an LFO press: take its release
 lfo_live:   .long 0               | an LFO menu (stock, or LFO 3/4's) is up
 lfo_page:   .long 0               | the LFO it shows: 0..3 = LFO 1..4
-lfo34_req:  .long 0               | LFO 3 asked for: open it after LFO 2's goes
-lfo34_eat:  .long 0               | LFO 3/4's menu took an LFO press
+lfo_view:   .long 0               | the LFO menu's View, for redraws
 lfo_dbuf:   .long 0               | lfo_dests: the four destinations
 lfo2_state: .space 6*32           | the engine's state for LFO 2
 lfo34_state: .space 2*6*32        | ... for LFO 3 and LFO 4
@@ -908,5 +749,5 @@ lfo2_buf:   .space 14+6*66+2      | the parameter block lfo_one builds
 lfo34_w:    .rept 12
             .word 28672, 1024, 0, 0, 16384
             .endr
-lfo34_msg:  .space 0x1c           | the UI-task message that opens LFO 3
+
     .align 2

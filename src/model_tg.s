@@ -7494,10 +7494,6 @@ gm_vcp:
     lea.l   gm_vvt,%a1
     movel   #gm_key_th,%d0
     movel   %d0,%a1@(16)          | slot 2
-    movel   %a1@(24),%d0          | slot 4, the draw: LFO 3/4's number (lfo2.inc)
-    movel   %d0,gm_draw_orig
-    movel   #gm_draw_th,%d0
-    movel   %d0,%a1@(24)
     lea.l   %a1@(8),%a0
     movel   %a0,%a2@(0x38)
     lea.l   gm_obj,%a0
@@ -7639,14 +7635,6 @@ gm_key_th:
     movel   %sp@(8),%sp@-
     jsr     0x4007240c
     addql   #4,%sp
-    moveq   #8,%d1                | LFO, in LFO 3/4's menu: lfo34_key
-    cmpl    %d0,%d1
-    bnes    gm_k_nlfo
-    lea.l   lfo34_desc,%a0
-    cmpal   gm_cur,%a0
-    bnes    gm_k_nlfo
-    jmp     lfo34_key
-gm_k_nlfo:
     cmpil   #KEY_SETTINGS,%d0
     bnes    gm_k_stock
     movel   %sp@(8),%sp@-

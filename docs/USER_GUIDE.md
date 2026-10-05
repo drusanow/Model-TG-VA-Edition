@@ -295,8 +295,8 @@ LFO menu as usual (LFO 1); press **LFO** again for LFO 2 (a **2** shows
 under *LFO*), again for LFO 3, again for LFO 4, and once more to close. On
 LFO 2 the menu and the **LFO SPEED** knob edit LFO 2's Waveform, Multiplier,
 Destination, Depth and Speed, which p-lock and are saved like LFO 1's. LFO 3
-and 4 have their own menu, with Speed as a row (**SPD**); **they cannot be
-p-locked and are not saved** (they keep their settings until power-off).
+and 4 look and work the same, but **they cannot be p-locked and are not
+saved** (they keep their settings until power-off).
 
 - The LFOs never share a destination: scrolling DEST skips the ones the
   track's other LFOs use (*None* excepted).

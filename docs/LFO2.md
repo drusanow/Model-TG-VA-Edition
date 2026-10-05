@@ -31,15 +31,12 @@ Not yet tested on hardware: back up first.**
 
 ### LFO 3 and LFO 4
 
-- Press **LFO** on LFO 2: the menu closes and reopens a moment later as
-  **LFO 3** (a **3** under *LFO*). Press **LFO** again for **LFO 4**, and
-  once more to close. **Return** or **SETTINGS** closes it too.
-- Its rows: **WAV** (waveform), **SPD** (speed), **MUL** (multiplier),
-  **DST** (destination), **DEP** (depth). Turn **DATA** to pick a row, press
-  to edit, turn to change. Values show and step exactly as on LFO 1, through
-  the Cycles' own code. Speed is a row here: the **LFO SPEED** knob stays
-  with LFO 1 / LFO 2.
-- **No p-locks.** Holding a step does not lock LFO 3/4 values.
+- Press **LFO** on LFO 2 for **LFO 3** (a **3** under *LFO*), again for
+  **LFO 4**, and once more to close. It is the same LFO menu: the same rows
+  (Wav, Mul, Dst, Dep), icon and values, and the **LFO SPEED** knob sets the
+  LFO showing, exactly as on LFO 1 and LFO 2.
+- **No p-locks.** With LFO 3 or 4 showing, turning a value while holding a
+  step does nothing (it never touches LFO 1's or 2's locks).
 - **Not saved.** The Cycles' sound and pattern storage is full (LFO 2 used the
   last free space), so LFO 3 and 4 live in Model-TG's memory, per track. They
   keep their settings across pattern and project changes until power-off,
@@ -136,17 +133,18 @@ Stock words keep their stock slots (0..23, slot 18 unused), and the FX row
 Host verified (`tests/test_lfo2.py`, Unicorn ColdFire V4e):
 
 - slotOf remaps only the five ids, and only while LFO 2 shows.
-- The key sequence LFO → LFO → LFO opens LFO 1, switches to LFO 2, then
-  closes the stock menu and asks for LFO 3, which the menu's destructor posts
-  to the UI task (and only then). In LFO 3's menu, LFO goes to LFO 4 (redrawn)
-  and then closes it; releases and repeats are swallowed, FUNC + LFO and other
-  menus' keys stay stock. The "3"/"4" is drawn only on that menu.
+- The key sequence LFO → LFO → LFO → LFO → LFO opens LFO 1, switches to LFO
+  2, 3 and 4 (each redrawn, its release swallowed), then closes through the
+  stock handling. Repeats are ignored, FUNC + LFO stays stock, and the
+  number under *LFO* is "2", "3" or "4" as it should be.
 - DEST skips every other LFO's destination on the selected track (three in
   a row if need be), for each of the four pages, not another track's, and
   stays put at the end of the list.
-- LFO 3/4 rows address the right word for each LFO, track and row; they step
-  through the track handle's own `current + delta` with `clicks << 8` and draw
-  through its value drawer with the stock closure's exact arguments.
+- On pages 3 and 4 the track handle's get (+28) and set (+92) answer the
+  five LFO ids from the right LFO's words for the selected track, and ask the
+  menu to redraw; other ids, and pages 1 and 2, go to the stock methods.
+  slotOf answers -1 for those ids there (no lock can land on LFO 1 or 2),
+  and the menu's p-lock editor ignores a turn with a step held.
 - `lfo_run` skips LFO 3/4 when no track has a destination, otherwise builds
   their block from their own words (sharing LFO 1's Fade/Phase/Mode), swaps
   in their own engine state and applies their output.
@@ -177,8 +175,8 @@ Needs hardware:
    LFO 2 at defaults.
 7. Load a project saved with an older firmware: LFO 2 is off.
 8. CPU page with six tracks with all four LFOs running: no dropouts.
-9. LFO on LFO 2 opens LFO 3 ("3" shown, rows WAV SPD MUL DST DEP); LFO again:
-   "4"; again: closed. Return and SETTINGS close it as well.
+9. LFO, LFO, LFO, LFO, LFO: pages 1-4 ("2", "3", "4" under LFO), the same
+   rows and icon on each, then closed. LFO SPEED sets the LFO showing.
 10. LFO 3/4 values look like LFO 1's (wave names, multipliers, destination
     names); DST skips the other three LFOs' destinations.
 11. LFO 3 on Pitch and LFO 4 on Filter alongside LFO 1 and 2: all four move.
