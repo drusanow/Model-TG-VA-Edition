@@ -1,16 +1,18 @@
 # Model-TG VA Edition
 
 **Unofficial firmware additions for the Elektron Model:Cycles (OS 1.13):
-a full Sampler machine, a two-oscillator VA synth machine, resampling,
+a full Sampler machine, a two-oscillator VA synth machine, three analogue-
+style drum machines, four LFOs a track, a trig generator, resampling,
 beat-repeat with master FX, and more.**
 
 This is a fork of [TinyGregAudio/Model-TG](https://github.com/TinyGregAudio/Model-TG)
-that adds one machine, **VA** (machine 8 on the machine page, index 7),
-a **second LFO** on every track and a **trig generator**, and keeps everything else Model-TG
-does. See **[docs/VA.md](docs/VA.md)** and **[docs/LFO2.md](docs/LFO2.md)**
-and **[docs/GEN.md](docs/GEN.md)** (the trig generator) for how they work
-and what has been verified. **LFO 2 and the trig generator have not yet
-been tested on hardware**: back up first.
+that adds four machines - **VA** (index 7) and **VA KICK**, **VA SNARE**,
+**VA HIHAT** (8..10) - **three more LFOs** on every track and a **trig
+generator**, and keeps everything else Model-TG does. See
+**[docs/VA.md](docs/VA.md)**, **[docs/DRUMS.md](docs/DRUMS.md)**,
+**[docs/LFO2.md](docs/LFO2.md)** and **[docs/GEN.md](docs/GEN.md)** for how
+they work and what has been verified. **The drum machines, LFO 2-4 and the
+trig generator have not yet been tested on hardware**: back up first.
 
 Model-TG is built on your computer from your own copy of the stock OS. It
 patches new code into the firmware, so everything the Cycles already does
@@ -27,6 +29,11 @@ keeps working.
   (saw, square, triangle each), OSC 2 tuning and a mix, with gentle
   analogue drift, through the same Attack, Amp Decay, Filter and Resonance
   as the stock machines. All four parameters p-lock and take LFOs.
+- **VA KICK, VA SNARE, VA HIHAT** (this fork), after the VA: a gritty
+  sine kick with pitch sweep, click and drive; a dropping sine with filtered
+  white noise, a noise mix, pitch drop and drive; and the TR-808's six
+  detuned square waves for hats, with tone, spread, noise and drive. Low
+  CPU, integer DSP; every knob p-locks and takes LFOs.
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale

@@ -113,6 +113,7 @@ _txt=open(f"{proto}/{src}").read()
 # below covers the VA as well (appended, so the index-based checks, which
 # look for model_tg.s's own labels, are unaffected)
 _txt+="\n"+open(f"{proto}/va_synth.inc").read()
+_txt+="\n"+open(f"{proto}/drums.inc").read()
 _txt+="\n"+open(f"{proto}/lfo2.inc").read()
 _txt+="\n"+open(f"{proto}/gen.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
@@ -133,10 +134,11 @@ print(f"  stack frames balanced ({sorted(_neg)})")
 # engines themselves - lofi/tape/vinyl_apply, gran_fill, pluck_fill, wave_fill
 # - take it from fx_buf / gf_dst / pk_dst / wf_dst, which start at +32). Every
 # reference in any register is counted, so none can slip past at +0.
-# The VA's va_fill writes the same window, the tenth.
+# The VA's va_fill writes the same window, the tenth; the drums' dr_fill the
+# eleventh.
 _bufs=_re.findall(r'lea\.l\s+sampler_buf(\+32)?,%a[0-7]', _txt)
-if _bufs.count('') or len(_bufs)!=10:
-    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected ten '+32')")
+if _bufs.count('') or len(_bufs)!=11:
+    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected eleven '+32')")
 print(f"  sampler_buf: fill, filter, granular, pluck, wavetable, lo-fi, tape, vinyl and VA all at +32")
 # Everything that renders a voice must reach the amp stage through amp_hook, or
 # it silently loses its attack. The six stock call sites are retargeted in the
@@ -186,7 +188,8 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'va_swap','va_det_tab',
               'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
               'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
-              'gen_n_num','gen_n_go','lfo34_desc','l34_items','l34_rows','lfo34_w'}   # pointer tables (menu descriptors), not code
+              'gen_n_num','gen_n_go','lfo34_desc','l34_items','l34_rows','lfo34_w',
+              'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -316,9 +319,10 @@ assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{R
 #               the rest for consistency. The LFO list the UI shows takes the
 #               raw machine byte (0x40014042) - the gates in model_tg.s.
 #   0x400a25e0  the machine page: names/icons for 0..N, an error string past
-#   0x400a26a2  ...its position markers: x = 80 + 7i, as x-4..x. Eight from
-#   0x400a26e8  80 would end at x 129, off the 128-pixel screen, so they start
-#               at 76 (last at 121..125) and the count is 8
+#   0x400a26a2  ...its position markers: x = 80 + 7i, as x-4..x (0x400a26b4,
+#   0x400a26e6  0x400a26e6). Eleven would run off the 128-pixel screen and
+#   0x400a26e8  into the left panel, so they are drawn x-3..x every 6 from 67
+#               (64..67 to 124..127), and the count is 11
 #   0x400a7df4  the AUDIO dispatch bound stays 6: a VA voice is handed to the
 #               stock dispatch as 6 (va_pre), so no stock audio table ever
 #               sees 7 (the render tables 0x40118610/0x40118628 hold six)
@@ -329,7 +333,8 @@ assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{R
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
-MACH_MAX=7                    # the last machine: 0-5 stock, 6 Sampler, 7 VA
+MACH_MAX=10                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
+                              # 8-10 VA KICK / VA SNARE / VA HIHAT
 _M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),
@@ -339,7 +344,9 @@ PHASE1=[
  (0x4004df76,'7205202f0004','4ef9'+_p('table_lookup_b_fixed')),
  (0x4005a79d,'05',_M),  # LFO dest: machine->group bound
  (0x400a25e1,'05',_M), (0x400a2615,'1177e4',_p('sampler_name_table')[2:]),
- (0x400a26a3,'50','4c'),  # machine-page markers start at x 76, not 80
+ # machine-page markers: eleven, as x-3..x every 6 from x 67 (64..67 to
+ # 124..127), where stock draws six as x-4..x every 7 from 80
+ (0x400a26a3,'50','43'), (0x400a26b4,'5980','5780'), (0x400a26e6,'5e84','5c84'),
  (0x400a26e9,'06',f'{MACH_MAX+1:02x}'),
  (0x400a7df5,'05','06'),  # audio dispatch: stays 6 (VA is handed over as 6)
  (0x400a7e0f,'912f0e2f0341f94011861022704c00','714e714e714e714e714e714e714e71'),

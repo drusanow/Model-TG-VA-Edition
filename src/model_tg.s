@@ -223,6 +223,10 @@
 | that byte in place, so the copy is gone and only our labels remain.
     param_table = 0x4010dce0
     VA_MACH = 7                   | the VA machine's index (va_synth.inc)
+    DR_KICK  = 8                  | VA KICK, VA SNARE, VA HIHAT (drums.inc)
+    DR_SNARE = 9
+    DR_HAT   = 10
+    MACH_LAST = 10                | the last machine index
     .include "sampler_strings.inc"
     .include "name_swap.inc"
     .include "note_ratio.inc"
@@ -259,10 +263,11 @@ va_descr_atk:                     | the VA's, modifier held: Attack, Filter
 
 
 
-| machine+1 list for ParameterPageView, now including the Sampler (7) and
-| the VA (8). build.py widens the three sizes at 0x4001bbd0.. to 8 longs.
+| machine+1 list for ParameterPageView, now including the Sampler (7), the
+| VA (8) and the drums (9..11). build.py widens the three sizes at
+| 0x4001bbd0.. to 11 longs.
 page_machine_list:
-    .long 1,2,3,4,5,6,7,8
+    .long 1,2,3,4,5,6,7,8,9,10,11
 
     .align 2
 | Geometric midpoints between adjacent semitones around 45710 (1.0x),
@@ -450,9 +455,9 @@ ap_done:
     jsr     gflt_coef             | Filter/Res for the stock machines (jsr:
                                   | a bsr.w wrapped once the blob passed 32 KiB
                                   | between the two - samplerGI's boot crash)
-    cmpil   #VA_MACH,%d1          | the VA (machine 7): its dials, its trigger,
-    bnes    sp_not_va             | then the stock dispatch as for a Sampler
-    jmp     va_pre                | voice (va_synth.inc)
+    cmpil   #VA_MACH,%d1          | the VA (machine 7) and the drums (8..10):
+    blts    sp_not_va             | their dials, their trigger, then the stock
+    jmp     va_pre                | dispatch as for a Sampler (va_synth.inc)
 sp_not_va:
     cmpil   #6,%d1
     bnew    sp_not_sampler
@@ -1475,10 +1480,10 @@ sv_live:
     lea.l   sx_pkinit,%a0
     clrb    %a0@(0,%d4:l)
 sv_lv:
-    lea.l   trk_mach,%a0          | the VA: its oscillators instead of all of
-    moveq   #VA_MACH,%d0          | the sample modes below, then the same tail
-    cmpl    %a0@(0,%d4:l:4),%d0
-    beqw    sv_va
+    lea.l   trk_mach,%a0          | the VA and the drums: their oscillators
+    movel   %a0@(0,%d4:l:4),%d0   | instead of all of the sample modes below,
+    cmpil   #VA_MACH,%d0          | then the same tail
+    bgew    sv_va
 
     | ---- slice mode: the window, decided HERE ---------------------------
     | 0x400a9120 is what makes this block's pitch current, so this is the
@@ -2636,10 +2641,21 @@ sv_va:
 sv_va_1x:
     movel   #0x10000,%d1
 sv_va_go:
+    lea.l   trk_mach,%a0
+    movel   %a0@(0,%d4:l:4),%d0
+    cmpil   #VA_MACH,%d0
+    bnes    sv_dr
     movel   %d1,%sp@-             | step
     movel   %d4,%sp@-             | track
     jsr     va_fill
     addql   #8,%sp
+    braw    sv_nofilt
+sv_dr:
+    movel   %d0,%sp@-             | the drum (drums.inc)
+    movel   %d1,%sp@-             | step
+    movel   %d4,%sp@-             | track
+    jsr     dr_fill
+    lea.l   %sp@(12),%sp
     braw    sv_nofilt
 
 
@@ -4083,19 +4099,24 @@ descr_hook:
     moveq   #1,%d1
     bras    ns_go
 ns_va:
-    cmpil   #VA_MACH+1,%d0        | 8: the VA's labels
-    bnes    ns_go
-    moveq   #2,%d1
+    movel   %d0,%d1               | 8..11: the VA's and the drums' labels, 2..5
+    subql   #6,%d1
+    cmpil   #2,%d1
+    bcss    ns_none
+    cmpil   #5,%d1
+    blss    ns_go
+ns_none:
+    moveq   #0,%d1
 ns_go:
     bsr     apply_names
 ns_done:
     moveml  %sp@,%d0-%d1/%a0-%a1
     lea.l   %sp@(16),%sp
     movel   %sp@(4),%d0
-    cmpil   #VA_MACH+1,%d0        | index 8 = the VA: the same as the Sampler's
-    beqs    dh_ours               | below, but its own modifier variant
-    cmpil   #7,%d0
-    bnes    dh_pass
+    cmpil   #7,%d0                | index 7 = the Sampler; 8..11 = the VA and
+    bcss    dh_pass               | the drums: the same, but the VA's modifier
+    cmpil   #MACH_LAST+1,%d0      | variant
+    bhis    dh_pass
 dh_ours:
     | sampler_descr is built by sampler_pre on the AUDIO thread. Until that has
     | happened it is 76 zero bytes, and the caller dereferences fields out of
@@ -4121,7 +4142,7 @@ dh_ours:
     rts
 dh_atk:
     cmpil   #VA_MACH+1,%d0        | d0 still holds the index here
-    beqs    dh_vatk
+    bccs    dh_vatk
     movel   #sampler_descr_atk,%d0
     rts
 dh_vatk:
@@ -4185,8 +4206,8 @@ dh_stock:
 sampler_lfo_gate:
     cmpil   #5,%d2
     blss    lg_stock              | groups 0..5 keep the stock array
-    cmpil   #VA_MACH,%d2
-    bhis    lg_none               | -1 (unclamped, unsigned) and past the VA:
+    cmpil   #MACH_LAST,%d2
+    bhis    lg_none               | -1 (unclamped, unsigned) and past the drums:
                                   | none. 6 (Sampler) and 7 (VA) share the
                                   | four ids: the same trackData words
     movel   %a2,%d0
@@ -4223,10 +4244,10 @@ lg_none:
 | which this replays for machines 0..5. The eight bytes behind it are orphaned
 | but unreachable: nothing branches between 0x4005a6b6 and 0x4005a6c4.
 sampler_amp_gate:
-    cmpil   #6,%d2
-    beqs    sag_ours
-    cmpil   #VA_MACH,%d2          | the VA too: past the 6x32 array as well
-    bnes    sag_stock
+    cmpil   #6,%d2                | the Sampler, the VA and the drums: past
+    bcss    sag_stock             | the 6x32 array as well
+    cmpil   #MACH_LAST,%d2
+    bhis    sag_stock
 sag_ours:
     moveq   #0x4b,%d0
     jmp     0x4005a6fc            | pops %d2/%a2, returns %d0
@@ -9409,32 +9430,42 @@ msg_oneshot:   .asciz "One shot"
 apply_names:
     lea.l   name_swap,%a1
     tstl    %d1
-    beqs    an_loop
+    beqw    an_loop
     cmpil   #2,%d1                | d1 = 2: the VA's labels, whatever mode the
-    bnes    an_smp                | track had as a Sampler
+    bnew    an_dk                 | track had as a Sampler; 3..5 the drums'
     lea.l   va_swap,%a1
-    bras    an_loop
+    braw    an_loop
+an_dk:
+    lea.l   kick_swap,%a1
+    cmpil   #3,%d1
+    beqw    an_loop
+    lea.l   snare_swap,%a1
+    cmpil   #4,%d1
+    beqw    an_loop
+    lea.l   hat_swap,%a1
+    cmpil   #5,%d1
+    beqw    an_loop
 an_smp:
     lea.l   ui_gran,%a1           | our labels: the selected track's mode picks
     movel   %a1@,%d0              | the set - 1 granular, 2 stretch
     lea.l   name_swap,%a1
     tstl    %d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   gran_swap,%a1
     cmpil   #1,%d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   strch_swap,%a1
     cmpil   #2,%d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   pluck_swap,%a1
     cmpil   #3,%d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   wave_swap,%a1
     cmpil   #4,%d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   lofi_swap,%a1
     cmpil   #5,%d0
-    beqs    an_loop
+    beqw    an_loop
     lea.l   tv_swap,%a1
 an_loop:
     movel   %a1@,%d0              | entry byte offset, -1 terminates
@@ -9712,17 +9743,22 @@ descr_b_hook:
     moveq   #1,%d1
     bras    dbh_names
 dbh_va:
-    cmpil   #VA_MACH,%d0          | the VA's labels
-    bnes    dbh_names
-    moveq   #2,%d1
+    movel   %d0,%d1               | 7..10: the VA's and the drums' labels, 2..5
+    subql   #5,%d1
+    cmpil   #2,%d1
+    bcss    dbh_none
+    cmpil   #5,%d1
+    blss    dbh_names
+dbh_none:
+    moveq   #0,%d1
 dbh_names:
     movel   %d0,%sp@-             | apply_names clobbers d0
     bsr     apply_names
     movel   %sp@+,%d0             | sp restored: dbh_pass re-reads the argument
-    cmpil   #VA_MACH,%d0          | the VA shares the Sampler's descriptor
-    beqs    dbh_ours
-    cmpil   #6,%d0
-    bnes    dbh_pass
+    cmpil   #6,%d0                | the VA and the drums share the Sampler's
+    bcss    dbh_pass              | descriptor
+    cmpil   #MACH_LAST,%d0
+    bhis    dbh_pass
 dbh_ours:
     | sampler_descr is built on the AUDIO thread by sampler_pre; until that has
     | run it is 76 zero bytes, and a search would match id 0 at position 0 and
@@ -9738,7 +9774,7 @@ dbh_ours:
     rts
 dbh_atk:
     cmpil   #VA_MACH,%d0          | d0 still holds the machine here
-    beqs    dbh_vatk
+    bccs    dbh_vatk
     movel   #sampler_descr_atk,%d0
     rts
 dbh_vatk:
@@ -19357,9 +19393,20 @@ mc_commit_hook:
     movea.l %d0,%a0
     mvzb    %a0@(38),%d0          | the machine just set
     cmpil   #VA_MACH,%d0          | the VA: its four dials' defaults only (no
-    bnes    mch_nva               | packed state - that word is the Sampler's)
+    bnes    mch_ndr               | packed state - that word is the Sampler's)
     lea.l   %a0@(42),%a0
     lea.l   va_defaults,%a1
+    bras    mch_wn
+mch_ndr:
+    cmpil   #DR_KICK,%d0          | the drums: theirs, 8 bytes each
+    bcss    mch_nva
+    cmpil   #MACH_LAST,%d0
+    bhis    mch_nva
+    subql   #DR_KICK,%d0
+    lsll    #3,%d0
+    lea.l   dr_defaults,%a1
+    adda.l  %d0,%a1
+    lea.l   %a0@(42),%a0
     bras    mch_wn
 mch_nva:
     cmpil   #6,%d0
@@ -20781,6 +20828,10 @@ msg_buf:    .space 64
 | ---- the VA machine (machine 7): its code, tables and state -----------------
     .align 2
     .include "va_synth.inc"
+
+| ---- VA KICK / VA SNARE / VA HIHAT (machines 8..10) ------------------------
+    .align 2
+    .include "drums.inc"
 
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2

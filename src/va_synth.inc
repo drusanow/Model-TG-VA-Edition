@@ -41,13 +41,21 @@ VA_TRI    = 2
 | trackData, a3/a5 = last/this block's trigger flags, fp = voice. d0/d1/d4,
 | a0/a1 are free; everything else belongs to the voice loop.
 va_pre:
+    cmpil   #VA_MACH,%d1          | 8..10: the drums' dials (drums.inc)
+    beqs    vp_va
+    jsr     dr_params
+    bras    vp_tr
+vp_va:
     bsr     va_params
+vp_tr:
     tstl    %a5@                  | triggered this block...
     beqs    vp_nt
     tstl    %a3@                  | ...and not last block: a new note
     bnes    vp_nt
     lea.l   wv_trig,%a0           | the render restarts the phases (va_fill),
     moveq   #1,%d0                | as sampler_pre's sp_wave_trig does for Wave
+    moveb   %d0,%a0@(0,%d2:l)
+    lea.l   dr_trig,%a0           | the drums' envelopes restart (dr_fill)
     moveb   %d0,%a0@(0,%d2:l)
 vp_nt:
     | The stock dispatch sees a Sampler voice: 0x400a7dcc compares this with

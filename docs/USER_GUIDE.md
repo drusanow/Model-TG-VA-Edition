@@ -243,7 +243,7 @@ The master FX stay on after you close the page, and through pattern changes.
 two-oscillator analogue-style synth. Choose it for any track the way you
 choose any machine; it needs no sample. It plays the note of each trig, pad
 and MIDI note, like Tone or Chord. On the machine page the position markers
-start a little further left so that eight fit.
+are a little narrower and closer together so that all eleven machines fit.
 
 | knob | label | what it does |
 |---|---|---|
@@ -305,6 +305,22 @@ p-locked and are not saved** (they keep their settings until power-off).
 - **Clear LFO** resets LFO 1 only.
 
 Details and limits: [LFO2.md](LFO2.md).
+
+## The drum machines: VA KICK, VA SNARE, VA HIHAT
+
+*VA Edition only.* Three analogue-style drum machines after the VA. Pitch
+and the trig's note tune them, Decay sets their length, and Attack, Filter
+and Resonance work as on every machine.
+
+| machine | Color | Shape | Sweep | Contour |
+|---|---|---|---|---|
+| **VA KICK** | **SWP** sweep depth | **STM** sweep time | **SAT** drive | **CLK** click |
+| **VA SNARE** | **NOIS** body/noise mix | **PENV** pitch drop | **TONE** noise colour | **SAT** drive |
+| **VA HIHAT** | **TONE** high-pass | **SPRD** spread of the six squares | **NOIS** noise | **SAT** drive |
+
+Use a short Decay on VA HIHAT for a closed hat and a long one for open.
+Every knob p-locks, slides, takes LFOs and is saved. Details:
+[DRUMS.md](DRUMS.md).
 
 ## Additions for every machine
 

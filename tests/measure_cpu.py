@@ -87,6 +87,17 @@ def main():
     print(f"  Sampler, One shot          : {path_cost(6, 0, smp_words):7.0f}")
     print(f"  Sampler, Wave              : {path_cost(6, 6, wave_words):7.0f}")
 
+    def drum_words(*d):
+        def f(w):
+            w[11:15] = [v << 8 for v in d]
+        return f
+    print(f"  VA KICK, defaults          : {path_cost(8, 0, drum_words(48, 40, 24, 40)):7.0f}")
+    print(f"  VA KICK, full drive        : {path_cost(8, 0, drum_words(48, 40, 127, 40)):7.0f}")
+    print(f"  VA SNARE, defaults         : {path_cost(9, 0, drum_words(64, 32, 88, 16)):7.0f}")
+    print(f"  VA SNARE, full drive       : {path_cost(9, 0, drum_words(64, 32, 88, 127)):7.0f}")
+    print(f"  VA HIHAT, defaults         : {path_cost(10, 0, drum_words(80, 64, 16, 0)):7.0f}")
+    print(f"  VA HIHAT, full drive       : {path_cost(10, 0, drum_words(80, 64, 16, 127)):7.0f}")
+
 
 if __name__ == '__main__':
     main()

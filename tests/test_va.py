@@ -195,20 +195,20 @@ class T4Gates(unittest.TestCase):
     def test_lfo_gate(self):
         e = emu()
         ids = [e.r32(e.sym['sampler_lfo_ids'] + 4 * i) for i in range(4)]
-        for grp in (6, 7):
+        for grp in (6, 7, 8, 9, 10):                # the Sampler, the VA, the drums
             for idx in range(11, 15):
                 e.run('sampler_lfo_gate', 0x4005a6fc, regs={D[2]: grp, A[2]: idx})
                 self.assertEqual(e.d(0), ids[idx - 11])
             for idx in (10, 15, 18):
                 e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: idx})
-        for grp in (8, 100, -1):
+        for grp in (11, 100, -1):
             e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: 12})
         for grp in range(6):
             e.run('sampler_lfo_gate', 0x4005a6dc, regs={D[2]: grp, A[2]: 12})
 
     def test_amp_gate(self):
         e = emu()
-        for grp in (6, 7):
+        for grp in (6, 7, 8, 9, 10):
             e.run('sampler_amp_gate', 0x4005a6fc, regs={D[2]: grp})
             self.assertEqual(e.d(0), 0x4b)
         for grp in range(6):
@@ -227,15 +227,16 @@ class T4Gates(unittest.TestCase):
     def test_table_lookups(self):
         e = emu()
         exp_a = {i: 0x40a71540 + 76 * i for i in range(7)}
-        exp_a[7] = exp_a[8] = 0x40a71540 + 76
+        for i in range(7, 12):                      # Sampler, VA, drums: machine+1
+            exp_a[i] = 0x40a71540 + 76
         for i, v in exp_a.items():
             e.run('table_lookup_a_fixed', stack=[i])
             self.assertEqual(e.d(0), v, i)
-        e.run('table_lookup_a_fixed', stack=[9])
+        e.run('table_lookup_a_fixed', stack=[12])
         self.assertEqual(e.d(0), (0x40a71540 - 76) & M32)       # stock: out of range
         for i in range(6):
             e.w8(0x401091b4 + i, i)
-        for i in range(8):
+        for i in range(11):
             e.run('table_lookup_b_fixed', stack=[i])
             self.assertEqual(e.d(0), 0x40a71540 + 76 * (i if i < 6 else 0), i)
 
@@ -397,7 +398,8 @@ class T5PreDispatch(unittest.TestCase):
                 self.assertEqual(got, exp, (blk, t))
         # the render's and the hooks' own per-block state may change; VA code
         # and every other machine's data may not
-        allowed = va_writable(e) + [(s['va_w1'], s['va_mix'] + 24)]
+        allowed = va_writable(e) + [(s['va_w1'], s['va_mix'] + 24),
+                                    (s['dr_trig'], s['dr_trig'] + 8)]
         for n, size in (('trk_mach', 28), ('voice_ptr', 28), ('atk_key', 28), ('atk_step', 28),
                         ('atk_gain', 28), ('sil_cnt', 28), ('sil_pk', 28), ('trig_seen', 8),
                         ('sv_idle', 8), ('sx_on', 28), ('prof_trk', 28), ('prof_ta', 4),
@@ -463,17 +465,23 @@ class T7Static(unittest.TestCase):
 
     def test_build_patch_list(self):
         b = open(os.path.join(REPO, 'build.py')).read()
-        self.assertIn('MACH_MAX=7', b)
+        self.assertIn('MACH_MAX=10', b)
         for site in ('0x400147a5', '0x400148ab', '0x400148b3', '0x4005a79d', '0x400a25e1',
                      '0x4010e5e6'):
             self.assertRegex(b, re.escape(f"({site},'05',_M)"))
         for site in ('0x4001bbd3', '0x4001bbe5', '0x4001bbf3'):
             self.assertIn(f"({site},'18',_L)", b)
-        self.assertIn("(0x400a26a3,'50','4c')", b)
+        self.assertIn("(0x400a26a3,'50','43')", b)        # eleven markers
+        self.assertIn("(0x400a26b4,'5980','5780')", b)
+        self.assertIn("(0x400a26e6,'5e84','5c84')", b)
         self.assertIn("(0x400a7df5,'05','06')", b)   # the audio bound stays
 
     def test_generated_files_current(self):
+        icons = [f'src/va_icons/{n}_icon_{k}.bin' for n in ('kick', 'snare', 'hihat')
+                 for k in ('A_48x33', 'B_34x34')]
         for tool, outs in (('gen_va_tables.py', ['src/va_tables.inc']),
+                           ('gen_drum_tables.py', ['src/drum_tables.inc']),
+                           ('gen_drum_icons.py', icons),
                            ('gen_va_icons.py', ['src/va_icons/va_icon_A_48x33.bin',
                                                 'src/va_icons/va_icon_B_34x34.bin'])):
             old = [open(os.path.join(REPO, o), 'rb').read() for o in outs]
@@ -497,14 +505,16 @@ class T8FullBuild(unittest.TestCase):
         B = 0x40000400
         at = lambda a, n=1: img[a - B:a - B + n]
         for a in (0x400147a5, 0x400148ab, 0x400148b3, 0x4005a79d, 0x400a25e1, 0x4010e5e6):
-            self.assertEqual(at(a), b'\x07', hex(a))
+            self.assertEqual(at(a), b'\x0a', hex(a))               # machines 0..10
         for a in (0x4001bbd3, 0x4001bbe5, 0x4001bbf3):
-            self.assertEqual(at(a), b'\x20', hex(a))
-        self.assertEqual(at(0x400a26a2, 2), b'\x78\x4c')            # moveq #76,%d4
-        self.assertEqual(at(0x400a26e8, 2), b'\x70\x08')            # moveq #8,%d0
+            self.assertEqual(at(a), b'\x2c', hex(a))               # 11 longs
+        self.assertEqual(at(0x400a26a2, 2), b'\x78\x43')            # moveq #67,%d4
+        self.assertEqual(at(0x400a26b4, 2), b'\x57\x80')            # subql #3: x-3..x
+        self.assertEqual(at(0x400a26e6, 2), b'\x5c\x84')            # addql #6
+        self.assertEqual(at(0x400a26e8, 2), b'\x70\x0b')            # moveq #11,%d0
         self.assertEqual(at(0x400a7df4, 2), b'\x70\x06')            # audio bound: 6
-        # last marker: x0 = 76 + 7*7 - 4, x1 = 76 + 7*7
-        self.assertLessEqual(76 + 7 * 7, 127)
+        # eleven markers inside the right panel: first 64..67, last 124..127
+        self.assertEqual((67 - 3, 67 + 6 * 10), (64, 127))
         # the .syx opens again and holds this very section
         d = os.path.join(BUILD, 'test-va-unpack')
         shutil.rmtree(d, ignore_errors=True)
