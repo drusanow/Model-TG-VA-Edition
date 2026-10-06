@@ -237,7 +237,7 @@ class TCommon(unittest.TestCase):
         if os.environ.get('VA_TEST_VERBOSE'):
             print("\n  dr_fill instructions a block:", worst)
         for k, n in worst.items():
-            self.assertLess(n, 5300, k)                       # about a VA track's
+            self.assertLess(n, 5600, k)                       # about a VA track's
 
 
 class TPlumbing(unittest.TestCase):
@@ -320,6 +320,57 @@ class TPlumbing(unittest.TestCase):
             for i, n in ((7, 'va'), (8, 'kick'), (9, 'snare'), (10, 'hihat')):
                 self.assertEqual(e.r32(base + 28 * i + 16), s[f'{n}_icon_{pix}_pixels'], (vec, n))
 
+
+
+def cubic_ref(u):
+    u = max(-32767, min(32767, u))
+    u3 = ((((u * u) >> 15) * u) >> 16)
+    return max(-32767, min(32767, u + (u >> 1) - u3))
+
+
+class TPunch(unittest.TestCase):
+    """dr_punch: after the envelope, a drum's level made up (x2 / x2.5 / x4
+    for small signals) through the cubic soft clip; other machines untouched."""
+    BUF = SCRATCH + 0x60000
+
+    def run_punch(self, e, mach, vals, t=2):
+        e.w32(e.arr('trk_mach', t), mach)
+        for i, v in enumerate(vals):
+            e.w32(self.BUF + 4 * i, v)
+        e.run('dr_punch', stack=[self.BUF, t])
+        return [e.rs32(self.BUF + 4 * i) for i in range(32)]
+
+    def test_gain_and_curve(self):
+        e = emu()
+        rnd = random.Random(4)
+        for mach, g in ((KICK, 2.0), (SNARE, 2.5), (HAT, 4.0)):
+            vals = [rnd.randrange(-2 ** 31, 2 ** 31) for _ in range(28)] + \
+                   [0, 100 << 16, -(100 << 16), 0x7fffffff]
+            out = self.run_punch(e, mach, vals)
+            gq = round(4096 * g * 2 / 3)
+            for v, o in zip(vals, out):
+                u = (((v >> 16) * gq) >> 12)
+                self.assertEqual(o, cubic_ref(u) << 16, (mach, v))
+                self.assertLessEqual(abs(o), 32767 << 16)
+            small = out[29] / (100 << 16)
+            self.assertAlmostEqual(small, g, delta=0.05)               # small-signal gain
+        # loud input is soft-limited, not wrapped, and keeps its sign
+        out = self.run_punch(e, HAT, [0x7fff0000, -0x7fff0000] + [0] * 30)
+        self.assertEqual((out[0], out[1]), (32767 << 16, -(32767 << 16)))
+
+    def test_other_machines_untouched(self):
+        e = emu()
+        vals = [(i * 0x1234567) & M32 for i in range(32)]
+        for mach in (0, 5, 6, 7, 11):
+            out = self.run_punch(e, mach, vals)
+            self.assertEqual([o & M32 for o in out], vals, mach)
+
+    def test_amp_hook_runs_it(self):
+        e = emu()
+        e.watch('dr_punch', 'gflt_run')
+        e.w32(e.arr('trk_mach', 2), KICK)
+        V.T5PreDispatch()._dispatch(e, 2)
+        self.assertEqual((e.visits['dr_punch'], e.visits['gflt_run']), (1, 1))
 
 
 class TMarkers(unittest.TestCase):

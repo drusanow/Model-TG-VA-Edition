@@ -11923,6 +11923,10 @@ ah_cp:
     bpls    ah_cp
     braw    ah_pg
 ah_mid:
+    movel   %d3,%sp@-             | the drums: their level and punch
+    movel   %sp@(32),%sp@-        | (drums.inc)
+    jsr     dr_punch
+    addql   #8,%sp
     movel   %d3,%sp@-             | then Filter/Res, stock machines only
     movel   %sp@(32),%sp@-        | outBuf again: the attack loop moved a2
     bsr     gflt_run

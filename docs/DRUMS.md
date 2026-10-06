@@ -32,7 +32,7 @@ and sweeps down to it. It adds a short noise click and drive.
 |---|---|---|---|
 | **Color** | SWP | sweep depth: how far above the base the pitch starts. 0 = none (808-like); 48 is about 2.5x; 127 = 5x (a zap) | 48 |
 | **Shape** | STM | sweep time: how fast the pitch falls, 2 ms (0) to 150 ms (127) | 40 |
-| **Sweep** | SAT | drive: 0 = clean; up to about 9x into a soft clip | 24 |
+| **Sweep** | SAT | drive: extra saturation before the envelope, from 0 (none) up to about 5x into a soft clip | 24 |
 | **Contour** | CLK | click: a 1.3 ms burst of noise at the start | 40 |
 
 ### VA SNARE
@@ -63,6 +63,37 @@ closed hat and a long one for open.
 | **Shape** | SPRD | spread: 64 = the 808's own frequencies. Lower pulls the six together (0 = one pitch, bell-like); higher spreads them (127 = twice as far, clangorous) | 64 |
 | **Sweep** | NOIS | white noise mixed in, for a washier hat | 16 |
 | **Contour** | SAT | drive | 0 |
+
+### Level and punch
+
+All three are made loud on their own, with no knob needed. The VA and
+Sampler path only reaches half of a stock machine's level. So after the
+envelope each drum gets a fixed make-up gain:
+
+| drum | make-up gain |
+|---|---|
+| kick | ×2 (+6 dB) |
+| snare | ×2.5 (+8 dB) |
+| hi-hat | ×4 (+12 dB) |
+
+The gain goes into a smooth soft clip at full scale, which works like an
+analogue mixer channel driven hard:
+- The loud start of each hit is rounded and dense: it punches through.
+- The decay stays clean.
+- Nothing hard-clips or wraps.
+
+**SAT** adds character on top, before the envelope, and is now gentler (up
+to ~5x, a cubic curve that leaves quiet parts clean). For loudness alone,
+leave SAT low. Measured over the first 50 ms of a hit at default settings,
+against full scale:
+
+| drum | before | now |
+|---|---|---|
+| kick | -7.3 dB RMS | -2.5 dB RMS |
+| snare | -13.5 dB RMS | -6.2 dB RMS |
+| hi-hat | -32.4 dB RMS | -20.4 dB RMS |
+
+Peaks reach -1 to -2 dBFS.
 
 ### Notes
 
@@ -101,9 +132,14 @@ The code is in `src/drums.inc`, and the tables come from
   each block. They are counted, not added: the sum is `top - (squares low)
   x step`. Then come two one-pole high-pass stages. At 96 kHz the squares'
   aliases sit far below the cluster.
-- **Drive:** `u = x x gain / 2`, clipped to ±1, then `y = u (2 - |u|)`. A
-  signal below the knee keeps the gain and the peak is full scale.
-  SAT = 0 bypasses it.
+- **Drive (SAT):** `u = x x gain x 2/3`, clipped to ±1, then the cubic
+  `y = 1.5u - 0.5u³`. It is clean while quiet, rounds the peaks, and is full
+  scale at most. Gain is 1 + dial/32; SAT = 0 bypasses it.
+- **Punch (`dr_punch`, from `amp_hook`):** after the amp envelope, at 48 kHz
+  on the channel's 32 samples, the same cubic with a fixed gain per drum (×2
+  kick, ×2.5 snare, ×4 hi-hat), held to ±32767 so `<< 16` never wraps. It
+  makes up the 6 dB the Sampler path sits below the stock machines, and
+  compresses each hit's attack. Other machines are untouched.
 
 **Machine plumbing.** These are the sites listed in
 [VA.md](VA.md#machine-index-7-and-every-place-that-knows-the-count),
@@ -132,9 +168,11 @@ the whole track path, against the VA's ~3,700 and the Sampler Wave mode's
 
 | machine | defaults | full drive |
 |---|---|---|
-| VA KICK | ~4,440 | ~4,490 |
-| VA SNARE | ~4,850 | ~4,910 |
-| VA HIHAT | ~4,950 | ~5,880 |
+| VA KICK | ~5,810 | ~5,870 |
+| VA SNARE | ~6,210 | ~6,280 |
+| VA HIHAT | ~5,960 | ~7,240 |
+
+These figures include the punch stage (~1,300 a block).
 
 Idle drum tracks cost what idle stock tracks cost: 0.25 s after silence the
 track is skipped until its next trig.

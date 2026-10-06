@@ -77,27 +77,24 @@ dr_mq14:
     rts
 
 | d0 = the SAT dial -> dr_gq: the soft clip's input gain, Q12, 0 = bypass.
-| Small signals get 1 + dial/16 (up to ~9x); the clip is y = u (2 - |u|) on
-| u = x x gain / 2 (|u| <= 1), so a signal below the knee keeps that gain
-| and the peak is full scale. Clobbers d0.
+| Small signals get 1 + dial/32 (up to ~5x); the clip is the cubic y = 1.5u -
+| 0.5u^3 on u = x x gain x 2/3, clipped to |u| <= 1: clean while quiet, the
+| peaks rounded off, full scale at most. Clobbers d0.
 dr_setgq:
     tstl    %d0
     beqs    dsg_set
-    lsll    #8,%d0
+    lsll    #7,%d0
     addil   #4096,%d0
-    lsrl    #1,%d0                | / 2, Q12
+    muluw   #2731,%d0             | x 2/3, Q12
+    lsrl    #8,%d0
+    lsrl    #4,%d0
 dsg_set:
     movel   %d0,dr_gq
     rts
 
-| DR_SAT: d0 (s32, about +-32767) -> d0 driven and soft-clipped: one
-| multiply for the gain, one for the curve. Clobbers d1.
-    .macro DR_SAT
-    movel   dr_gq,%d1
-    beqs    1f
-    mulsl   %d1,%d0
-    asrl    #8,%d0
-    asrl    #4,%d0                | u = x x gain / 2
+| DR_CUBIC: d0 = u, clipped to +-32767 here -> d0 = 1.5u - 0.5u^3 (Q15).
+| Clobbers d1, a0.
+    .macro DR_CUBIC
     cmpil   #32767,%d0
     bles    2f
     movel   #32767,%d0
@@ -107,14 +104,29 @@ dsg_set:
     movel   #-32767,%d0
 3:
     movel   %d0,%d1
-    bpls    4f
-    negl    %d1
-4:
-    negl    %d1
-    addil   #65536,%d1            | 2 - |u|
+    mulsl   %d1,%d1
+    asrl    #8,%d1
+    asrl    #7,%d1                | u^2
+    mulsl   %d0,%d1
+    asrl    #8,%d1
+    asrl    #8,%d1                | u^3 / 2
+    movea.l %d0,%a0
+    asrl    #1,%d0
+    adda.l  %d0,%a0
+    movel   %a0,%d0
+    subl    %d1,%d0               | 1.5u - 0.5u^3: +-32768 at the very ends
+    .endm                         | (DR_OUT and dr_punch hold it to +-32767)
+
+| DR_SAT: d0 (s32, about +-32767) -> d0 driven by SAT and soft-clipped, or
+| as it was with SAT at 0. Clobbers d1, a0.
+    .macro DR_SAT
+    movel   dr_gq,%d1
+    beqs    1f
+    asrl    #1,%d0
     mulsl   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0                | u (2 - |u|)
+    asrl    #3,%d0                | u = x x gain x 2/3
+    DR_CUBIC
 1:
     .endm
 
@@ -530,6 +542,55 @@ df_out:
     lea.l   %sp@(64),%sp
     rts
 
+| ---- dr_punch(outBuf, track): the drums' level and punch ---------------------
+| From amp_hook, after the amp envelope and before the common Filter: the 32
+| output samples at 48 kHz, at the channel's scale. The render path the drums
+| share with the Sampler peaks at half the channel's full scale, where the
+| stock machines reach all of it, so a drum is made up here - x2 (kick),
+| x2.5 (snare), x4 (hi-hat) for small signals - through the same cubic soft
+| clip, at full scale. After the envelope, the loud start of each hit is
+| rounded and dense while its decay stays clean: an analogue channel driven
+| hard. Other machines: untouched. Keeps d2-d7/a2-a6.
+dr_punch:
+    movel   %sp@(8),%d0           | track
+    lea.l   trk_mach,%a0
+    movel   %a0@(0,%d0:l:4),%d0
+    subql   #DR_KICK,%d0
+    cmpil   #2,%d0
+    bhiw    dp_out                | not a drum
+    lea.l   dr_pgain,%a0
+    movel   %a0@(0,%d0:l:4),%d0
+    movel   %d2,%sp@-
+    movel   %d3,%sp@-
+    movel   %d0,%d3               | the gain x 2/3, Q12
+    movea.l %sp@(12),%a1          | outBuf
+    moveq   #31,%d2
+dp_l:
+    movel   %a1@,%d0
+    asrl    #8,%d0
+    asrl    #8,%d0                | Q15 of full scale
+    mulsl   %d3,%d0
+    asrl    #8,%d0
+    asrl    #4,%d0                | u
+    DR_CUBIC
+    cmpil   #32767,%d0            | +-32768 at the very ends: << 16 must not
+    bles    dp_hi                 | wrap
+    movel   #32767,%d0
+dp_hi:
+    cmpil   #-32767,%d0
+    bges    dp_lo
+    movel   #-32767,%d0
+dp_lo:
+    swap    %d0
+    clrw    %d0                   | << 16: full scale again
+    movel   %d0,%a1@+
+    subql   #1,%d2
+    bplw    dp_l
+    movel   %sp@+,%d3
+    movel   %sp@+,%d2
+dp_out:
+    rts
+
 | ---- the machine page's position markers: two lines ---------------------------
 | Replaces the stock loop at 0x400a26a2 (six markers, x-4..x at y 8..12, every
 | 7 from x 80; selected filled by 0x40070efc, others outlined by 0x40070c4e).
@@ -636,6 +697,7 @@ dr_hph:    .space 6*6*4           | the hat's six phases
 dr_hinc:   .space 6*4             | this block's six hat increments
 dr_seed:   .long 0x1f123bb5       | the noise's LCG
 dr_gq:     .long 0                | this block's drive gain (dr_setgq)
+dr_pgain:  .long 5461, 6827, 10923 | dr_punch: x2, x2.5, x4, x 2/3 (Q12)
 dr_trig:   .space 8               | a new note for the next block
 | Written over sound +42..+48 (k = 11..14) when a track becomes one of them,
 | by mc_commit_hook, as dial << 8.
