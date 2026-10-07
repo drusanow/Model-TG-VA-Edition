@@ -1913,6 +1913,96 @@ mw_off:
 mw_out:
     rts
 
+| ---- Contour names the engine ---------------------------------------------
+| The page prints a parameter's value through the formatter at +0x20 of its
+| 100-byte UI record (0x40a71754 + id x 100), called as (record + 0x14,
+| value, buf) - see an_done. Contour is id 0x4a (Chord Contour, record
+| 0x40a7343c). While PLAITS' labels are up (apply_names set 6) its formatter
+| is mi_eng_fmt, which prints the engine's name as the stock list formatters
+| (0x40045720) print theirs: sprintf(buf, "%s", name). Any other set puts
+| the stock one back. From an_done, d1 = the set; keeps d1, clobbers d0/a0.
+MI_ENG_FMT = 0x40a7345c
+mi_fmtswap:
+    lea.l   MI_ENG_FMT,%a0
+    movel   %a0@,%d0
+    cmpil   #6,%d1
+    bnes    1f
+    cmpil   #mi_eng_fmt,%d0
+    beqs    2f
+    movel   %d0,mi_fmt0           | the stock formatter, kept
+    movel   #mi_eng_fmt,%a0@
+    rts
+1:  cmpil   #mi_eng_fmt,%d0
+    bnes    2f
+    movel   mi_fmt0,%a0@
+2:  rts
+
+| (record + 0x14, value, buf) -> sprintf(buf, "%s", the engine's name)
+mi_eng_fmt:
+    movel   %sp@(8),%d0
+    moveq   #12,%d1
+    asrl    %d1,%d0               | the engine: value / 4096, as mi_fill
+    bpls    1f
+    moveq   #0,%d0
+1:  moveq   #7,%d1
+    cmpl    %d0,%d1
+    bges    2f
+    movel   %d1,%d0
+2:  lea.l   mi_engn,%a0
+    movel   %a0@(0,%d0:l:4),%d0
+    movel   %sp@(12),%d1
+    movel   %d1,%sp@(4)           | buf
+    movel   #0x40124b58,%d1       | "%s"
+    movel   %d1,%sp@(8)
+    movel   %d0,%sp@(12)          | the name
+    jmp     0x40000e6e            | sprintf
+
+| ---- Contour steps one engine a click ---------------------------------------
+| From fine_hook (track-handle slot 0x14, "current + delta") for id 0x4a. On
+| a PLAITS track any turn moves to the middle of the next or previous
+| engine's 16 values, so each click is one engine, whatever the speed; on
+| every other machine (Chord's Contour, the Sampler's Resonance) the step
+| is the stock one.   args: sp@(4) this, sp@(8) id, sp@(12) current,
+| sp@(16) delta
+mi_eng_step:
+    movea.l %sp@(4),%a0           | the track handle; +4 its track object
+    movel   %a0@(4),%d0
+    beqs    3f
+    movea.l %d0,%a0
+    movea.l %a0@,%a1
+    movea.l %a1@(40),%a1          | vtable[40]: the sound
+    movel   %d0,%sp@-
+    jsr     %a1@
+    addql   #4,%sp
+    tstl    %d0
+    beqs    3f
+    movea.l %d0,%a0
+    mvzb    %a0@(38),%d0
+    cmpil   #MI_MACH,%d0
+    bnes    3f
+    movel   %sp@(16),%d1
+    beqs    3f
+    movel   %sp@(12),%d0
+    asrl    #8,%d0
+    asrl    #4,%d0                | this engine
+    tstl    %d1
+    bmis    1f
+    addql   #1,%d0
+    moveq   #7,%d1
+    cmpl    %d0,%d1
+    bges    2f
+    movel   %d1,%d0
+    bras    2f
+1:  subql   #1,%d0
+    bpls    2f
+    moveq   #0,%d0
+2:  moveq   #12,%d1
+    lsll    %d1,%d0
+    addil   #2048,%d0             | its middle
+    subl    %sp@(12),%d0
+    movel   %d0,%sp@(16)          | the delta that lands there
+3:  jmp     0x4000c264
+
     .align 2
 mi_swap:
     .long 2576, str_mih, str_mic, str_mihs, 0x4012999c, 0x4012996f, 0x401299a7
@@ -1920,16 +2010,21 @@ mi_swap:
     .long 4088, str_mim, str_mic, str_mims, 0x40129ab6, 0x4012996f, 0x401299c7
     .long 4144, str_mie, str_mic, str_mies, 0x40129ac2, 0x4012996f, 0x401299d9
     .long -1,0,0,0,0,0,0
-| per engine: HARM, TIMB, MORP, ENG - each a name and a short label
+| per engine: HARM, TIMB, MORP, ENG - each a name and a short label. Names
+| are kept to 9 characters and labels to 4 (build.py checks), short of the
+| stock ones, so nothing runs out of its box.
 mi_labs:
-    .long s_wsh, s_wshs, s_fld, s_flds, s_asy, s_asys, s_eng, s_e0
-    .long s_rat, s_rats, s_idx, s_idxs, s_fdb, s_fdbs, s_eng, s_e1
-    .long s_frt, s_frts, s_frm, s_frms, s_wdt, s_wdts, s_eng, s_e2
-    .long s_rat, s_rats, s_dst, s_dsts, s_asy, s_asys, s_eng, s_e3
-    .long s_chd, s_chds, s_arp, s_arps, s_syn, s_syns, s_eng, s_e4
-    .long s_typ, s_typs, s_clk, s_clks, s_res, s_ress, s_eng, s_e5
-    .long s_spr, s_sprs, s_den, s_dens, s_res, s_ress, s_eng, s_e6
-    .long s_brd, s_brds, s_brt, s_brts, s_dmp, s_dmps, s_eng, s_e7
+    .long s_wsh, s_wshs, s_fld, s_flds, s_asy, s_asys, s_eng, s_engs
+    .long s_rat, s_rats, s_idx, s_idxs, s_fdb, s_fdbs, s_eng, s_engs
+    .long s_frt, s_frts, s_frm, s_frms, s_wdt, s_wdts, s_eng, s_engs
+    .long s_rat, s_rats, s_dst, s_dsts, s_asy, s_asys, s_eng, s_engs
+    .long s_chd, s_chds, s_arp, s_arps, s_syn, s_syns, s_eng, s_engs
+    .long s_typ, s_typs, s_clk, s_clks, s_res, s_ress, s_eng, s_engs
+    .long s_spr, s_sprs, s_den, s_dens, s_res, s_ress, s_eng, s_engs
+    .long s_stf, s_stfs, s_brt, s_brts, s_dmp, s_dmps, s_eng, s_engs
+| Contour's value, per engine (mi_eng_fmt)
+mi_engn:
+    .long s_e0, s_e1, s_e2, s_e3, s_e4, s_e5, s_e6, s_e7
 str_mih:  .asciz "Harmonics"
 str_mit:  .asciz "Timbre"
 str_mim:  .asciz "Morph"
@@ -1940,6 +2035,7 @@ str_mits: .asciz "TIMB"
 str_mims: .asciz "MORP"
 str_mies: .asciz "ENG"
 s_eng:    .asciz "Engine"
+s_engs:   .asciz "ENG"
 s_e0:     .asciz "WSHP"
 s_e1:     .asciz "FM"
 s_e2:     .asciz "GRAN"
@@ -1960,33 +2056,33 @@ s_idx:    .asciz "Mod Index"
 s_idxs:   .asciz "INDX"
 s_fdb:    .asciz "Feedback"
 s_fdbs:   .asciz "FDBK"
-s_frt:    .asciz "Formant Ratio"
-s_frts:   .asciz "FRAT"
+s_frt:    .asciz "Formant 2"
+s_frts:   .asciz "FRM2"
 s_frm:    .asciz "Formant"
 s_frms:   .asciz "FRMT"
 s_wdt:    .asciz "Width"
 s_wdts:   .asciz "WDTH"
-s_dst:    .asciz "Distortion"
+s_dst:    .asciz "Distort"
 s_dsts:   .asciz "DIST"
 s_chd:    .asciz "Chord"
 s_chds:   .asciz "CHRD"
-s_arp:    .asciz "Arp Pattern"
+s_arp:    .asciz "Arpeggio"
 s_arps:   .asciz "ARP"
-s_syn:    .asciz "Sync Ratio"
+s_syn:    .asciz "Sync"
 s_syns:   .asciz "SYNC"
-s_typ:    .asciz "Filter Type"
+s_typ:    .asciz "Filt Type"
 s_typs:   .asciz "TYPE"
-s_clk:    .asciz "Clock Rate"
-s_clks:   .asciz "RATE"
+s_clk:    .asciz "Clock"
+s_clks:   .asciz "CLK"
 s_res:    .asciz "Resonance"
 s_ress:   .asciz "RESO"
 s_spr:    .asciz "Spread"
 s_sprs:   .asciz "SPRD"
 s_den:    .asciz "Density"
 s_dens:   .asciz "DENS"
-s_brd:    .asciz "Bridge/Stiff"
-s_brds:   .asciz "STIF"
-s_brt:    .asciz "Brightness"
+s_stf:    .asciz "Stiffness"
+s_stfs:   .asciz "STIF"
+s_brt:    .asciz "Bright"
 s_brts:   .asciz "BRIG"
 s_dmp:    .asciz "Damping"
 s_dmps:   .asciz "DAMP"
@@ -1997,6 +2093,7 @@ s_dmps:   .asciz "DAMP"
 mi_p:      .space 6*16            | the four dials, Q15
 mi_eng:    .long -1,-1,-1,-1,-1,-1 | the engine each track's state is for
 mi_lab:    .long -1               | the engine labelled (mi_watch)
+mi_fmt0:   .long 0x400456c8       | Contour's stock formatter (mi_fmtswap)
 mi_seed:   .long 0x2545f491       | the noise's LCG
 mi_dz:     .space 8               | a track's delay line is ours and zeroed
 mi_st:     .space 6*MI_ST         | per track

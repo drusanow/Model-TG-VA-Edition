@@ -30,25 +30,31 @@ The four machine knobs are Plaits' controls:
 | **Color** | (per engine) | HARMONICS |
 | **Shape** | (per engine) | TIMBRE |
 | **Sweep** | (per engine) | MORPH |
-| **Contour** | the engine's name | the engine: eight steps of 16 on the dial |
+| **Contour** | ENG | the engine, shown by name |
 
 All four p-lock, slide, take LFOs and are saved. So the engine itself can
 be p-locked per step, or swept by an LFO.
 
-The labels follow the engine. Turn **Contour** and its label shows the
-engine's name (WSHP, FM, GRAN...). The other three knobs take that
-engine's names for HARMONICS, TIMBRE and MORPH.
+**Choosing the engine.** Contour's value is shown as the engine's name
+(WSHP, FM, GRAN, PD, CHIP, NOIS, PART, STRG), not a number. Each click of
+the knob is one engine, however fast it is turned, and it stops at either
+end. A p-lock or an LFO on Contour picks engines too: underneath it is still
+0..127, 16 values an engine.
+
+The other three knobs take that engine's names for HARMONICS, TIMBRE and
+MORPH. Every name is kept to 9 characters and every short label to 4, short
+of the stock ones, so none runs past its box (`build.py` checks this).
 
 | Contour | engine | Color | Shape | Sweep |
 |---|---|---|---|---|
-| 0-15 | **WSHP** waveshaping | **SHPE** which waveshaper | **FOLD** wavefolder amount | **ASYM** triangle to ramp |
-| 16-31 | **FM** 2-op FM | **RATI** frequency ratio | **INDX** modulation index | **FDBK** feedback |
-| 32-47 | **GRAN** formants (grains) | **FRAT** 2nd formant's ratio | **FRMT** formant frequency | **WDTH** grain shape |
-| 48-63 | **PD** phase distortion | **RATI** ratio | **DIST** amount | **ASYM** asymmetry |
-| 64-79 | **CHIP** chiptune arpeggio | **CHRD** chord | **ARP** pattern | **SYNC** synced ratio |
-| 80-95 | **NOIS** filtered noise | **TYPE** LP - BP - HP | **RATE** clock | **RESO** resonance |
-| 96-111 | **PART** particles (dust) | **SPRD** pitch spread | **DENS** density | **RESO** resonance |
-| 112-127 | **STRG** plucked string | **STIF** bridge / stiffness | **BRIG** brightness | **DAMP** damping |
+| WSHP | waveshaping | **SHPE** Waveshape | **FOLD** Fold | **ASYM** Asymmetry (triangle to ramp) |
+| FM | 2-op FM | **RATI** Ratio | **INDX** Mod Index | **FDBK** Feedback |
+| GRAN | formants (grains) | **FRM2** Formant 2 (its ratio) | **FRMT** Formant | **WDTH** Width (grain shape) |
+| PD | phase distortion | **RATI** Ratio | **DIST** Distort | **ASYM** Asymmetry |
+| CHIP | chiptune arpeggio | **CHRD** Chord | **ARP** Arpeggio (pattern) | **SYNC** Sync (synced ratio) |
+| NOIS | filtered noise | **TYPE** Filt Type (LP - BP - HP) | **CLK** Clock | **RESO** Resonance |
+| PART | particles (dust) | **SPRD** Spread | **DENS** Density | **RESO** Resonance |
+| STRG | plucked string | **STIF** Stiffness (bridge / dispersion) | **BRIG** Bright | **DAMP** Damping |
 
 The defaults are Color, Shape and Sweep at 64 and the WSHP engine. Each
 engine starts from rest whenever it is selected.
@@ -71,7 +77,7 @@ engine starts from rest whenever it is selected.
     formant.
   - FRMT sets the first formant, from note 24 to 108, whatever note is
     played: a vowel-like, talking tone.
-  - FRAT sets the second formant's ratio to it, -24 to +24 semitones. Below
+  - FRM2 sets the second formant's ratio to it, -24 to +24 semitones. Below
     the middle it also lets the carrier bleed through.
   - WDTH shapes the window.
 - **PD** (Plaits 1.2's phase distortion engine)
@@ -89,7 +95,7 @@ engine starts from rest whenever it is selected.
     0.51x to 1x below the middle, then up to about 5x.
   - Before the first trig it plays the root.
 - **NOIS** (Plaits' noise engine)
-  - White noise, sampled and held at a clock: RATE, from a few Hz up to
+  - White noise, sampled and held at a clock: CLK, from a few Hz up to
     raw noise.
   - Then a resonant state-variable filter at the note's pitch. TYPE
     sweeps low-pass, band-pass, high-pass; RESO goes from Q 0.5 to 512.
@@ -198,6 +204,17 @@ from 10 to 11:
 engine. `mi_watch` keeps that the selected track's engine: it runs from
 `led_hook` once per audio block, and relabels when the engine changes.
 
+**Contour by name.** The page prints a value through the formatter at
++0x20 of the parameter's 100-byte UI record (0x40a71754 + id x 100); see
+`an_done`.
+- While set 6 is up, `mi_fmtswap` makes Contour's (id 0x4a) formatter
+  `mi_eng_fmt`. That prints the engine's name the way the stock list
+  formatters print theirs: `sprintf(buf, "%s", name)`.
+- Every other set puts the stock formatter back. The same id is Chord's
+  Contour and the Sampler's Resonance.
+- `fine_hook` sends id 0x4a to `mi_eng_step`. On a PLAITS track any turn
+  lands on the middle of the next or previous engine.
+
 **Space.** The blob grows to ~110 KB: seven of the filesystem's sixteen
 16 KiB cache blocks, one more than the VA Edition. Nine stay the
 filesystem's.
@@ -271,9 +288,13 @@ Host-verified in `tests/test_plaits.py` (Unicorn ColdFire V4e).
   - `sampler_pre` routes machine 11 to `mi_params`, a Sampler voice and
     the dials.
   - The render calls `mi_fill` and then the tail.
-  - The labels change per engine: Contour shows the engine's name, and they
-    go back to stock for other machines.
+  - The labels change per engine; every name is 9 characters or fewer and
+    every short label 4. They go back to stock for other machines.
   - `mi_watch` relabels as the engine turns.
+  - Contour's value prints the engine's name ("%s", the name for each of
+    0..32767), and the stock formatter comes back for other machines.
+  - Contour steps one engine a click, slow or fast, held at both ends; on
+    Chord and the Sampler it is the stock step.
   - The defaults are written.
   - Level x2, clean, held.
   - The LFO and Amp Decay gates take machine 11.
@@ -287,10 +308,12 @@ Needs hardware:
    - PLAITS is the twelfth machine, the fourth marker on the second line.
    - It shows its name, card and picture.
 2. **Parameter page.**
-   - Turning Contour steps through the eight engines.
-   - Contour's label shows each engine's name, and the other three
-     labels change with it (if they only change on leaving and re-entering
-     the page, tell us).
+   - Contour's value shows the engine's name, and each click steps one
+     engine.
+   - The other three labels change with it (if they only change on leaving
+     and re-entering the page, tell us).
+   - No name or label runs out of its box.
+   - Chord's Contour and the Sampler's Resonance still show numbers.
 3. **Each engine sounds as described.**
    - Pitch and notes tune it.
    - Decay shapes it.

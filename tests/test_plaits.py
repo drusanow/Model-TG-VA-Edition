@@ -313,12 +313,12 @@ class TPlumbing(unittest.TestCase):
             e.w32(s['mi_lab'], eng)
             e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
             names = [rd(e.r32(pt + off + 44)) for off in (2576, 3472, 4088, 4144)]
+            self.assertTrue(all(1 <= len(x) <= 9 for x in names), names)   # fit their box
             cats = {rd(e.r32(pt + off + 48)) for off in (2576, 3472, 4088, 4144)}
             shorts.append([rd(e.r32(pt + off + 52)) for off in (2576, 3472, 4088, 4144)])
             self.assertEqual(names[3], 'Engine')
             self.assertEqual(cats, {'Plaits'})
-        self.assertEqual([x[3] for x in shorts],
-                         ['WSHP', 'FM', 'GRAN', 'PD', 'CHIP', 'NOIS', 'PART', 'STRG'])
+        self.assertEqual({x[3] for x in shorts}, {'ENG'})       # the value names it
         self.assertEqual(shorts[1][:3], ['RATI', 'INDX', 'FDBK'])
         self.assertEqual(shorts[7][:3], ['STIF', 'BRIG', 'DAMP'])
         for row in shorts:
@@ -337,13 +337,61 @@ class TPlumbing(unittest.TestCase):
         e.run('mi_watch')
         self.assertEqual(e.r32(s['mi_lab']), PD)
         rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
-        self.assertEqual(rd(e.r32(pt + 4144 + 52)), 'PD')
+        self.assertEqual(rd(e.r32(pt + 3472 + 52)), 'DIST')
         dials(e, 2, STRG, 0, 0, 0)
         e.run('mi_watch')
-        self.assertEqual(rd(e.r32(pt + 4144 + 52)), 'STRG')
+        self.assertEqual(rd(e.r32(pt + 3472 + 52)), 'BRIG')
         e.w32(e.arr('trk_mach', 2), 3)                          # not a PLAITS
         e.run('mi_watch')
         self.assertEqual(e.r32(s['mi_lab']), M32)
+
+    def test_contour_value_names_the_engine(self):
+        e = emu(); s = e.sym
+        REC = 0x40a7345c                                        # id 0x4a's formatter
+        e.w32(REC, 0x400456c8)
+        e.w32(s['mi_lab'], FM)
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
+        self.assertEqual(e.r32(REC), s['mi_eng_fmt'])
+        rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
+        names = []
+        for v in (0, 2048, 4095, 4096, 12288, 20480, 30720, 32512, 32767):
+            e.run('mi_eng_fmt', 0x40000e6e, stack=[0x1000, v, 0x2000])
+            sp = e.sp()
+            self.assertEqual((e.r32(sp + 4), e.r32(sp + 8)), (0x2000, 0x40124b58), v)  # buf, "%s"
+            names.append(rd(e.r32(sp + 12)))
+        self.assertEqual(names, ['WSHP', 'WSHP', 'WSHP', 'FM', 'PD', 'NOIS', 'STRG', 'STRG', 'STRG'])
+        for m in (2, 6, 7):                                     # any other machine: stock
+            e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[m])
+            self.assertEqual(e.r32(REC), 0x400456c8, m)
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
+        self.assertEqual(e.r32(s['mi_fmt0']), 0x400456c8)       # never saves its own
+
+    def test_contour_steps_one_engine_a_click(self):
+        e = emu()
+        HANDLE, TRK, VT, SNDO = SCRATCH + 0xb000, SCRATCH + 0xb100, SCRATCH + 0xb200, SCRATCH + 0xb400
+        STUB = SCRATCH + 0xb300
+        # 0x4000c264 stand-in: d0 = current + delta, clamped 0..32512
+        e.uc.mem_write(0x4000c264, bytes.fromhex(
+            '202f000c d0af0010 6c027000 0c8000007f00 6f06 203c00007f00 4e75'.replace(' ', '')))
+        e.w32(HANDLE + 4, TRK)
+        e.w32(TRK, VT)
+        e.w32(VT + 40, STUB)
+        e.uc.mem_write(STUB, bytes.fromhex('203c' + '%08x' % SNDO + '4e75'))
+        def step(mach, cur, delta):
+            e.w8(SNDO + 38, mach)
+            e.run('fine_hook', stack=[HANDLE, 0x4a, cur, delta])
+            return e.d(0)
+        mid = lambda k: 4096 * k + 2048
+        self.assertEqual(step(MI, mid(0), 256), mid(1))
+        self.assertEqual(step(MI, mid(1), 4096), mid(2))        # a fast turn: still one
+        self.assertEqual(step(MI, 5000, -256), mid(0))          # 5000 is FM: back to WSHP
+        self.assertEqual(step(MI, mid(7), 256), mid(7))         # held at the ends
+        self.assertEqual(step(MI, mid(0), -2048), mid(0))
+        self.assertEqual(step(MI, 0, 256), mid(1))
+        self.assertEqual(step(MI, 32512, -256), mid(6))
+        self.assertEqual(step(4, 1000, 256), 1256)              # Chord: the stock step
+        self.assertEqual(step(6, 1000, -256), 744)              # the Sampler too
 
     def test_commit_defaults(self):
         e = emu()

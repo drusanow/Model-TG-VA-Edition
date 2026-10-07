@@ -9494,6 +9494,7 @@ an_next:
     lea.l   %a1@(28),%a1
     bras    an_loop
 an_done:
+    jsr     mi_fmtswap            | PLAITS: Contour's value names the engine
     | Start and End show two decimals while our labels are up, so the fine steps
     | fine_hook makes are visible. The display calls the invoker at record+0x20
     | of the parameter's 100-byte UI record (0x40a71754 + id*100) as
@@ -9694,6 +9695,10 @@ fine_hook:
     bnes    fh_nlfo               | (lfo2.inc)
     jmp     lfo_dest_step
 fh_nlfo:
+    cmpil   #0x4a,%d0             | PLAITS' engine: one a click (plaits.inc)
+    bnes    fh_n4a
+    jmp     mi_eng_step
+fh_n4a:
     cmpil   #0x2e,%d0
     beqs    fh_ours
     cmpil   #0x3e,%d0

@@ -170,6 +170,22 @@ if _pub > _skip:
                      "slice windows will collapse to one sample")
 print("  Start/End published before the slice-mode skip")
 
+# PLAITS' labels: every name 9 characters at most and every short label 4,
+# short of the stock ones, so none runs out of its box on the page.
+_pl=open(f"{proto}/plaits.inc").read()
+_str=dict(_re.findall(r'^(\w+):\s+\.asciz\s+"([^"]*)"', _pl, _re.M))
+_rows=_re.findall(r'^\s+\.long\s+(s_\w+(?:,\s*s_\w+){7})\s*$', _pl[_pl.index('mi_labs:'):_pl.index('mi_engn:')], _re.M)
+assert len(_rows)==8, f"mi_labs: {len(_rows)} rows"
+for _r in _rows:
+    for _i,_n in enumerate(_r.replace(' ','').split(',')):
+        _lim=4 if _i%2 else 9
+        if len(_str[_n])>_lim:
+            raise SystemExit(f"PLAITS label {_n} = {_str[_n]!r} is longer than {_lim}")
+for _n in ('s_e0','s_e1','s_e2','s_e3','s_e4','s_e5','s_e6','s_e7','str_mih','str_mit','str_mim','str_mie'):
+    if len(_str[_n])>(4 if _n.startswith('s_e') else 9):
+        raise SystemExit(f"PLAITS label {_n} = {_str[_n]!r} is too long")
+print("  PLAITS labels: names <= 9 characters, short labels and engine names <= 4")
+
 sym={}
 for line in subprocess.run([CROSS+"nm",elf],capture_output=True,text=True).stdout.splitlines():
     p=line.split()
@@ -193,7 +209,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
@@ -418,6 +434,10 @@ assert bytes(d[0x4004dcca-BASE:0x4004dcca-BASE+4])==bytes.fromhex('4e56ffc8'), '
 for _a,_s in ((0x4012771e,b'999'),(0x4012772d,b'.X'),(0x4012772e,b'X'),(0x4012a9ea,b'%d'),(0x4012b9e9,b'.%d')):
     assert bytes(d[_a-BASE:_a-BASE+len(_s)+1])==_s+b'\0', (hex(_a), _s)
 assert bytes.fromhex('4879'+'40a727e0') in bytes(d[0x400de244-BASE:0x400e1584-BASE]), 'Pitch renderer record moved'
+# PLAITS' Contour prints the engine's name as the stock list formatter
+# 0x40045720 prints its strings: sprintf (0x40000e6e) with "%s" (0x40124b58).
+assert bytes(d[0x40045746-BASE:0x40045746-BASE+6])==bytes.fromhex('4ef940000e6e'), 'list formatter moved'
+assert bytes(d[0x40124b58-BASE:0x40124b58-BASE+3])==b'%s\0', '"%s" moved'
 # Machine-change defaults, applied where the firmware commits the change.
 # 0x4001413e is 0x40014072's closing notify (`moveal a2@,a0 / clrl sp@- /
 # movel a2,sp@-`, then vtable[16]); mc_commit_hook replays those three and
