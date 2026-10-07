@@ -6,7 +6,7 @@ and style of gen_drum_icons.py:
   mi_<engine>_B_34x34 - one picture per engine; the machine page shows the
       selected track's (mi_watch / mi_icon):
       WSHP  a triangle folding inside a frame
-      FM    two operators, modulator into carrier, with a feedback hook
+      FM    two operators: two rings joined by a diagonal line
       GRAN  a cloud of grain squares rising diagonally
       PD    a trapezoid wave: slanted edges, flat tops
       CHIP  a square wave
@@ -71,9 +71,6 @@ def fm():
         fill(px, in_ellipse(cx, cy, 7.5, 7.5))
         clear(px, in_ellipse(cx, cy, 3.5, 3.5))
     fill(px, in_bar(14, 14, 20, 20, 1.8))
-    fill(px, in_rect(26, 2, 32, 5))
-    fill(px, in_rect(29, 2, 32, 12))
-    fill(px, in_bar(30.5, 11, 16, 9, 1.6))
     return px
 
 

@@ -47,7 +47,7 @@ PLAITS' picture is the selected track's engine:
 | engine | picture |
 |---|---|
 | WSHP | a triangle folding inside a frame |
-| FM | two operators, modulator into carrier, with a feedback hook |
+| FM | two operators: two rings joined by a diagonal line |
 | GRAN | a cloud of grain squares rising diagonally |
 | PD | a trapezoid wave: slanted edges, flat tops |
 | CHIP | a square wave |
