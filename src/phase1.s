@@ -24,6 +24,7 @@
 
     .globl  boot_extra_hook, sampler_lazy_init_trampoline, sampler_name_table
     .globl  table_lookup_a_fixed, table_lookup_b_fixed, log_trampoline
+    .globl  plaits_icon_b_pixels
     .text
     | Guard: this is linked straight after sampler_voice, whose last item is
     | sampler_buf - driven by EMAC code whose extent we cannot read. Keep a

@@ -209,7 +209,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():

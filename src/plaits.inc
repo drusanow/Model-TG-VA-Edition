@@ -1901,6 +1901,9 @@ mi_watch:
     movel   %a0@(12,%d0:l),%d0
     moveq   #12,%d1
     lsrl    %d1,%d0
+    movel   %d0,%sp@-
+    bsr     mi_icon               | the machine page's picture: this engine's
+    movel   %sp@+,%d0
     cmpl    mi_lab,%d0
     beqs    mw_out
     movel   %d0,mi_lab
@@ -1910,8 +1913,28 @@ mi_watch:
 mw_off:
     moveq   #-1,%d0
     movel   %d0,mi_lab
+    bras    mi_icon               | ...and PLAITS' own when it is not one
 mw_out:
     rts
+
+| ---- mi_icon: PLAITS' picture on the machine page --------------------------
+| d0 = an engine (0..7), or -1 for PLAITS' own picture. Table B's twelve
+| entries (0x40fe384c, built by build_sampler_icons) hold PLAITS' at entry 11
+| (+308); its pixel pointer (+16) is set to the engine's. Nothing is written
+| until the table has been rebuilt to twelve entries. Clobbers d0/d1/a0/a1.
+mi_icon:
+    lea.l   plaits_icon_b_pixels,%a1
+    tstl    %d0
+    bmis    1f
+    lea.l   mi_icons,%a0
+    movea.l %a0@(0,%d0:l:4),%a1
+1:  movea.l 0x40fe384c,%a0
+    movel   0x40fe3850,%d1
+    subl    %a0,%d1
+    cmpil   #336,%d1
+    bnes    2f
+    movel   %a1,%a0@(308+16)
+2:  rts
 
 | ---- Contour names the engine ---------------------------------------------
 | The page prints a parameter's value through the formatter at +0x20 of its
@@ -2022,6 +2045,18 @@ mi_labs:
     .long s_typ, s_typs, s_clk, s_clks, s_res, s_ress, s_eng, s_engs
     .long s_spr, s_sprs, s_den, s_dens, s_res, s_ress, s_eng, s_engs
     .long s_stf, s_stfs, s_brt, s_brts, s_dmp, s_dmps, s_eng, s_engs
+| the machine page's picture, per engine (mi_icon; tools/gen_mi_icons.py)
+mi_icons:
+    .long mi_ic_wshp, mi_ic_fm, mi_ic_gran, mi_ic_pd
+    .long mi_ic_chip, mi_ic_nois, mi_ic_part, mi_ic_strg
+mi_ic_wshp: .incbin "va_icons/mi_wshp_B_34x34.bin"
+mi_ic_fm:   .incbin "va_icons/mi_fm_B_34x34.bin"
+mi_ic_gran: .incbin "va_icons/mi_gran_B_34x34.bin"
+mi_ic_pd:   .incbin "va_icons/mi_pd_B_34x34.bin"
+mi_ic_chip: .incbin "va_icons/mi_chip_B_34x34.bin"
+mi_ic_nois: .incbin "va_icons/mi_nois_B_34x34.bin"
+mi_ic_part: .incbin "va_icons/mi_part_B_34x34.bin"
+mi_ic_strg: .incbin "va_icons/mi_strg_B_34x34.bin"
 | Contour's value, per engine (mi_eng_fmt)
 mi_engn:
     .long s_e0, s_e1, s_e2, s_e3, s_e4, s_e5, s_e6, s_e7

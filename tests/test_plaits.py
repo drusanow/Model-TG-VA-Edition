@@ -393,6 +393,28 @@ class TPlumbing(unittest.TestCase):
         self.assertEqual(step(4, 1000, 256), 1256)              # Chord: the stock step
         self.assertEqual(step(6, 1000, -256), 744)              # the Sampler too
 
+    def test_machine_page_picture_follows_the_engine(self):
+        e = emu(); s = e.sym
+        TB = SCRATCH + 0x70000                                  # table B, rebuilt: 12 entries
+        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 336)
+        e.w32(e.arr('trk_mach', 2), MI)
+        e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))   # the selected track: 2
+        names = ('wshp', 'fm', 'gran', 'pd', 'chip', 'nois', 'part', 'strg')
+        for eng in (FM, STRG, WSHP, NOIS, PD, CHIP, PART, GRAN):
+            dials(e, 2, eng, 0, 0, 0)
+            e.run('mi_watch')
+            self.assertEqual(e.r32(TB + 308 + 16), s[f'mi_ic_{names[eng]}'], eng)
+        e.w32(e.arr('trk_mach', 2), 7)                          # not a PLAITS: its own
+        e.run('mi_watch')
+        self.assertEqual(e.r32(TB + 308 + 16), s['plaits_icon_b_pixels'])
+        e.w32(0x40fe3850, TB + 168)                             # stock six: untouched
+        e.w32(TB + 308 + 16, 0x1234)
+        e.w32(e.arr('trk_mach', 2), MI)
+        e.run('mi_watch')
+        self.assertEqual(e.r32(TB + 308 + 16), 0x1234)
+        for n in names:                                         # 34 x 34, as the others
+            self.assertEqual(s[f'mi_ic_{n}'] % 2, 0)
+
     def test_commit_defaults(self):
         e = emu()
         T = V.T6Commit()

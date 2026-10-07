@@ -41,6 +41,22 @@ the knob is one engine, however fast it is turned, and it stops at either
 end. A p-lock or an LFO on Contour picks engines too: underneath it is still
 0..127, 16 values an engine.
 
+**The machine page's picture follows the engine.** On the machine page,
+PLAITS' picture is the selected track's engine:
+
+| engine | picture |
+|---|---|
+| WSHP | a triangle folding inside a frame |
+| FM | two operators, modulator into carrier, with a feedback hook |
+| GRAN | a cloud of grain squares rising diagonally |
+| PD | a trapezoid wave: slanted edges, flat tops |
+| CHIP | a square wave |
+| NOIS | speckle thinning out to the right (filtered noise) |
+| PART | scattered dust |
+| STRG | three strings from their pegs, the middle one plucked |
+
+When the selected track is not a PLAITS, it shows PLAITS' own folded sine.
+
 The other three knobs take that engine's names for HARMONICS, TIMBRE and
 MORPH. Every name is kept to 9 characters and every short label to 4, short
 of the stock ones, so none runs past its box (`build.py` checks this).
@@ -203,6 +219,10 @@ from 10 to 11:
 **Labels.** `apply_names` set 6 fills `mi_swap` from `mi_labs` for one
 engine. `mi_watch` keeps that the selected track's engine: it runs from
 `led_hook` once per audio block, and relabels when the engine changes.
+It also calls `mi_icon`, which points the machine page's picture for
+PLAITS at that engine's: entry 11 of icon table B (0x40fe384c, +308, its
+pixel pointer at +16). It writes only once `build_sampler_icons` has
+rebuilt the table to twelve entries.
 
 **Contour by name.** The page prints a value through the formatter at
 +0x20 of the parameter's 100-byte UI record (0x40a71754 + id x 100); see
@@ -299,6 +319,9 @@ Host-verified in `tests/test_plaits.py` (Unicorn ColdFire V4e).
   - Level x2, clean, held.
   - The LFO and Amp Decay gates take machine 11.
   - The machine list, the names and the twelve icon entries.
+  - The machine page's picture follows the selected track's engine, is
+    PLAITS' own for other machines, and is left alone until the table is
+    rebuilt.
 - **Existing suites:** the VA, drums, LFO, generator and regression suites
   still pass, updated for twelve machines.
 
@@ -307,6 +330,9 @@ Needs hardware:
 1. **Machine page.**
    - PLAITS is the twelfth machine, the fourth marker on the second line.
    - It shows its name, card and picture.
+   - With a PLAITS track selected, the picture is its engine's (WSHP's
+     frame, FM's operators...). Change the engine and come back: it
+     follows.
 2. **Parameter page.**
    - Contour's value shows the engine's name, and each click steps one
      engine.
