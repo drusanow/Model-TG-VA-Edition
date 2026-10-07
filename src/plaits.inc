@@ -1945,6 +1945,11 @@ mi_icon:
 | (0x40045720) print theirs: sprintf(buf, "%s", name). Any other set puts
 | the stock one back. From an_done, d1 = the set; keeps d1, clobbers d0/a0.
 MI_ENG_FMT = 0x40a7345c
+| The knob screen draws through the record's function object too (+0x24
+| storage, +0x28, +0x2c manager, +0x30 invoker; see an_done and fine_draw):
+| with set 6 up that is mi_draw, on Pitch's storage and manager words as
+| fine_draw is, and every other set puts the four words back.
+MI_ENG_DRW = 0x40a73460
 mi_fmtswap:
     lea.l   MI_ENG_FMT,%a0
     movel   %a0@,%d0
@@ -1954,11 +1959,151 @@ mi_fmtswap:
     beqs    2f
     movel   %d0,mi_fmt0           | the stock formatter, kept
     movel   #mi_eng_fmt,%a0@
+    lea.l   MI_ENG_DRW,%a0        | ...and the stock function object
+    lea.l   mi_drw0,%a1
+    movel   %a0@,%a1@+
+    movel   %a0@(4),%a1@+
+    movel   %a0@(8),%a1@+
+    movel   %a0@(12),%a1@
+    movel   #mi_draw,%d0
+    movel   %d0,%a0@(12)          | the invoker first: the manager is the flag
+    movel   0x40a727e0,%d0        | Pitch's storage words
+    movel   %d0,%a0@
+    movel   0x40a727e4,%d0
+    movel   %d0,%a0@(4)
+    movel   0x40a727e8,%d0        | and manager, last
+    movel   %d0,%a0@(8)
     rts
 1:  cmpil   #mi_eng_fmt,%d0
     bnes    2f
     movel   mi_fmt0,%a0@
+    lea.l   MI_ENG_DRW,%a0
+    lea.l   mi_drw0,%a1
+    movel   %a1@(8),%a0@(8)       | the manager first: off before the rest
+    movel   %a1@,%a0@
+    movel   %a1@(4),%a0@(4)
+    movel   %a1@(12),%a0@(12)
 2:  rts
+
+| ---- mi_draw: the knob screen while Contour picks the engine ---------------
+| Invoked as fine_draw is: (functor, value, ctx, 0x60, y, flag), after the
+| page has drawn the parameter's name on the left and its five stock pips.
+|  - the left: a black square at the picture slot (centre 32, 19) and the
+|    engine's picture on it, white (the machine page's blit, 0x40071da4)
+|  - the pips: the stock five cleared, eight drawn in their place, the
+|    engine's filled (0x40070efc filled / 0x40070c4e outlined, as stock)
+|  - the engine's name in the big font, centred on the pips (x 96)
+MI_PIP0 = 73                      | the first pip's left edge; 6 apart
+mi_draw:
+    linkw   %fp,#-60
+    moveml  %d2-%d7/%a2-%a5,%sp@
+    movel   %fp@(16),%d2          | ctx
+    movel   %fp@(24),%d3          | y
+    movel   %fp@(12),%d7          | the engine
+    moveq   #12,%d0
+    asrl    %d0,%d7
+    bpls    1f
+    moveq   #0,%d7
+1:  moveq   #7,%d0
+    cmpl    %d7,%d0
+    bges    2f
+    movel   %d0,%d7
+2:  lea.l   0x40070efc,%a2        | filled
+    lea.l   0x40070c4e,%a3        | outlined
+    clrl    %sp@-                 | the picture: black behind it
+    pea     37
+    pea     50
+    pea     1
+    pea     14
+    movel   %d2,%sp@-
+    jsr     %a2@
+    lea.l   %sp@(24),%sp
+    lea.l   mi_icons,%a0
+    movel   %a0@(0,%d7:l:4),%d0
+    lea.l   mi_icobj,%a0
+    movel   %d0,%a0@(16)
+    pea     1
+    pea     19
+    pea     32
+    movel   %a0,%sp@-
+    movel   %d2,%sp@-
+    jsr     0x40071da4
+    lea.l   %sp@(20),%sp
+    clrl    %sp@-                 | the pips: the stock five cleared
+    pea     28
+    pea     122
+    pea     22
+    pea     70
+    movel   %d2,%sp@-
+    jsr     %a2@
+    lea.l   %sp@(24),%sp
+    moveq   #0,%d4                | ...and eight drawn
+    moveq   #MI_PIP0,%d5
+3:  pea     1
+    pea     0x1b
+    movel   %d5,%d0
+    addql   #4,%d0
+    movel   %d0,%sp@-
+    pea     0x17
+    movel   %d5,%sp@-
+    movel   %d2,%sp@-
+    movea.l %a3,%a0
+    cmpl    %d4,%d7
+    bnes    4f
+    movea.l %a2,%a0
+4:  jsr     %a0@
+    lea.l   %sp@(24),%sp
+    addql   #6,%d5
+    addql   #1,%d4
+    moveq   #8,%d0
+    cmpl    %d4,%d0
+    bnes    3b
+    lea.l   mi_engn,%a0           | the name, centred on the pips
+    movea.l %a0@(0,%d7:l:4),%a4
+    movea.l %a4,%a0               | its length
+    moveq   #0,%d6
+5:  tstb    %a0@+
+    beqs    6f
+    addql   #1,%d6
+    bras    5b
+6:  movel   %fp,%d4
+    subql   #4,%d4                | a 4-byte String at fp-4, tag byte at fp-5
+    pea     %fp@(-5)
+    movel   %a4,%sp@-
+    movel   %d4,%sp@-
+    jsr     0x400f980c
+    pea     FD_BIG
+    jsr     0x400720f8
+    movel   %d4,%sp@-
+    movel   %d6,%sp@-
+    movel   %d0,%sp@-
+    jsr     0x40072102            | its width
+    lea.l   %sp@(28),%sp
+    movel   %d0,%d5
+    movel   %d4,%sp@-
+    jsr     0x400f7d5c
+    addql   #4,%sp
+    lsrl    #1,%d5
+    moveq   #96,%d0
+    subl    %d5,%d0
+    movel   %d0,%d5               | x
+    pea     FD_BIG
+    jsr     0x400720f8
+    addql   #4,%sp
+    movel   %a4,%sp@-             | (ctx, font, x, y, 0, 0, template, "%s", name)
+    pea     0x40124b58
+    movel   %a4,%sp@-
+    clrl    %sp@-
+    clrl    %sp@-
+    movel   %d3,%sp@-
+    movel   %d5,%sp@-
+    movel   %d0,%sp@-
+    movel   %d2,%sp@-
+    jsr     0x40071c10
+    lea.l   %sp@(36),%sp
+    moveml  %fp@(-60),%d2-%d7/%a2-%a5
+    unlk    %fp
+    rts
 
 | (record + 0x14, value, buf) -> sprintf(buf, "%s", the engine's name)
 mi_eng_fmt:
@@ -1980,17 +2125,20 @@ mi_eng_fmt:
     movel   %d0,%sp@(12)          | the name
     jmp     0x40000e6e            | sprintf
 
-| ---- Contour steps one engine a click ---------------------------------------
+| ---- Contour steps one engine per four clicks ------------------------------
 | From fine_hook (track-handle slot 0x14, "current + delta") for id 0x4a. On
-| a PLAITS track any turn moves to the middle of the next or previous
-| engine's 16 values, so each click is one engine, whatever the speed; on
+| a PLAITS track the turn is added up (mi_eacc; a click is 256) and every
+| MI_CLICKS of it moves to the middle of the next or previous engine's 16
+| values - four clicks an engine, whatever the speed; turning back starts
+| the count again; on
 | every other machine (Chord's Contour, the Sampler's Resonance) the step
 | is the stock one.   args: sp@(4) this, sp@(8) id, sp@(12) current,
 | sp@(16) delta
+MI_CLICKS = 4*256
 mi_eng_step:
     movea.l %sp@(4),%a0           | the track handle; +4 its track object
     movel   %a0@(4),%d0
-    beqs    3f
+    beqw    mes_out
     movea.l %d0,%a0
     movea.l %a0@,%a1
     movea.l %a1@(40),%a1          | vtable[40]: the sound
@@ -1998,13 +2146,31 @@ mi_eng_step:
     jsr     %a1@
     addql   #4,%sp
     tstl    %d0
-    beqs    3f
+    beqw    mes_out
     movea.l %d0,%a0
     mvzb    %a0@(38),%d0
     cmpil   #MI_MACH,%d0
-    bnes    3f
+    bnew    mes_out
     movel   %sp@(16),%d1
-    beqs    3f
+    beqw    mes_out
+    movel   mi_eacc,%d0           | the turn so far, MI_CLICKS to an engine
+    movea.l %d0,%a0
+    eorl    %d1,%d0
+    bpls    5f
+    suba.l  %a0,%a0               | the other way: start again
+5:  movel   %a0,%d0
+    addl    %d1,%d0
+    cmpil   #MI_CLICKS,%d0
+    bges    6f
+    cmpil   #-MI_CLICKS,%d0
+    bles    7f
+    movel   %d0,mi_eacc           | not yet: stay
+    clrl    %sp@(16)
+    braw    mes_out
+6:  moveq   #1,%d1
+    bras    8f
+7:  moveq   #-1,%d1
+8:  clrl    mi_eacc
     movel   %sp@(12),%d0
     asrl    #8,%d0
     asrl    #4,%d0                | this engine
@@ -2024,7 +2190,8 @@ mi_eng_step:
     addil   #2048,%d0             | its middle
     subl    %sp@(12),%d0
     movel   %d0,%sp@(16)          | the delta that lands there
-3:  jmp     0x4000c264
+mes_out:
+    jmp     0x4000c264
 
     .align 2
 mi_swap:
@@ -2129,6 +2296,10 @@ mi_p:      .space 6*16            | the four dials, Q15
 mi_eng:    .long -1,-1,-1,-1,-1,-1 | the engine each track's state is for
 mi_lab:    .long -1               | the engine labelled (mi_watch)
 mi_fmt0:   .long 0x400456c8       | Contour's stock formatter (mi_fmtswap)
+mi_drw0:   .long 0,0,0,0          | ...and its stock function object
+mi_eacc:   .long 0                | the Contour turn so far (mi_eng_step)
+| the engine's picture as an icon object, as build_sampler_icons builds them
+mi_icobj:  .long 0x401117c8, 34, 34, 2, 0, 0x4017c20c, 0
 mi_seed:   .long 0x2545f491       | the noise's LCG
 mi_dz:     .space 8               | a track's delay line is ours and zeroed
 mi_st:     .space 6*MI_ST         | per track

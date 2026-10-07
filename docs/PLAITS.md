@@ -35,10 +35,15 @@ The four machine knobs are Plaits' controls:
 All four p-lock, slide, take LFOs and are saved. So the engine itself can
 be p-locked per step, or swept by an LFO.
 
-**Choosing the engine.** Contour's value is shown as the engine's name
-(WSHP, FM, GRAN, PD, CHIP, NOIS, PART, STRG), not a number. Each click of
-the knob is one engine, however fast it is turned, and it stops at either
-end. A p-lock or an LFO on Contour picks engines too: underneath it is still
+**Choosing the engine.** Turning Contour shows the engine selection screen:
+- the engine's picture on the left, white on black;
+- eight pips, one per engine, the selected one filled;
+- the engine's name (WSHP, FM, GRAN, PD, CHIP, NOIS, PART, STRG), centred
+  under the pips, instead of a number.
+
+It takes four clicks of the knob to move one engine, so you can land on
+the one you want; turning back starts the count again, a fast turn moves
+one engine, and it stops at either end. A p-lock or an LFO on Contour picks engines too: underneath it is still
 0..127, 16 values an engine.
 
 **The machine page's picture follows the engine.** On the machine page,
@@ -232,10 +237,19 @@ rebuilt the table to twelve entries.
   formatters print theirs: `sprintf(buf, "%s", name)`.
 - Every other set puts the stock formatter back. The same id is Chord's
   Contour and the Sampler's Resonance.
-- `fine_hook` sends id 0x4a to `mi_eng_step`. On a PLAITS track any turn
-  lands on the middle of the next or previous engine.
+- While set 6 is up, Contour's function object (record +0x24..+0x30, the
+  hook the knob screen draws its value through, as `fine_draw` does for
+  Start/End) is `mi_draw`. The stock screen has already drawn the name on
+  the left and five pips. `mi_draw` blacks out the picture slot (centre
+  32, 19) and blits the engine's picture there with the machine page's
+  routine (0x40071da4). It clears the five pips and draws eight (from x 73,
+  6 apart, y 23..27). It draws the name in the big font, centred on x 96
+  by its measured width. Other sets put the stock words back.
+- `fine_hook` sends id 0x4a to `mi_eng_step`. On a PLAITS track the turn is
+  counted (`mi_eacc`) and every four clicks (1,024) is one engine, landing
+  on the middle of the next or previous engine's values.
 
-**Space.** The blob grows to ~110 KB: seven of the filesystem's sixteen
+**Space.** The blob grows to ~113 KB: seven of the filesystem's sixteen
 16 KiB cache blocks, one more than the VA Edition. Nine stay the
 filesystem's.
 
@@ -313,7 +327,8 @@ Host-verified in `tests/test_plaits.py` (Unicorn ColdFire V4e).
   - `mi_watch` relabels as the engine turns.
   - Contour's value prints the engine's name ("%s", the name for each of
     0..32767), and the stock formatter comes back for other machines.
-  - Contour steps one engine a click, slow or fast, held at both ends; on
+  - Contour steps one engine per four clicks (turning back restarts the
+    count, a fast turn is one engine), held at both ends; on
     Chord and the Sampler it is the stock step.
   - The defaults are written.
   - Level x2, clean, held.
@@ -334,8 +349,9 @@ Needs hardware:
      frame, FM's operators...). Change the engine and come back: it
      follows.
 2. **Parameter page.**
-   - Contour's value shows the engine's name, and each click steps one
-     engine.
+   - Turning Contour shows the engine's picture on the left (white on
+     black), eight pips with the engine's filled, and its name centred.
+   - Four clicks move one engine.
    - The other three labels change with it (if they only change on leaving
      and re-entering the page, tell us).
    - No name or label runs out of its box.

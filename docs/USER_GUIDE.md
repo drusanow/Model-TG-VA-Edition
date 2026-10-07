@@ -326,8 +326,9 @@ Every knob p-locks, slides, takes LFOs and is saved. Details:
 ## PLAITS
 
 *Plaits Edition only.* One machine, the twelfth, with eight sound engines
-after Mutable Instruments Plaits. **Contour** (ENG) picks the engine: its
-value shows the engine's name and each click is one engine. **Color**,
+after Mutable Instruments Plaits. **Contour** (ENG) picks the engine: turning
+it shows the engine's picture, eight pips and its name, and four clicks move
+one engine. **Color**,
 **Shape** and **Sweep** are Plaits' HARMONICS, TIMBRE and MORPH, labelled
 for the engine.
 

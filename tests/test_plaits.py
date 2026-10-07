@@ -383,15 +383,73 @@ class TPlumbing(unittest.TestCase):
             e.run('fine_hook', stack=[HANDLE, 0x4a, cur, delta])
             return e.d(0)
         mid = lambda k: 4096 * k + 2048
-        self.assertEqual(step(MI, mid(0), 256), mid(1))
-        self.assertEqual(step(MI, mid(1), 4096), mid(2))        # a fast turn: still one
-        self.assertEqual(step(MI, 5000, -256), mid(0))          # 5000 is FM: back to WSHP
-        self.assertEqual(step(MI, mid(7), 256), mid(7))         # held at the ends
-        self.assertEqual(step(MI, mid(0), -2048), mid(0))
-        self.assertEqual(step(MI, 0, 256), mid(1))
-        self.assertEqual(step(MI, 32512, -256), mid(6))
+        def clicks(cur, n, d=256):                              # n clicks of d
+            for _ in range(n):
+                cur = step(MI, cur, d)
+            return cur
+        self.assertEqual(clicks(mid(0), 3), mid(0))             # three clicks: not yet
+        self.assertEqual(clicks(mid(0), 1), mid(1))             # the fourth: the next
+        self.assertEqual(clicks(mid(1), 4), mid(2))
+        self.assertEqual(clicks(mid(2), 3, -256), mid(2))       # back the other way:
+        self.assertEqual(clicks(mid(2), 1, -256), mid(1))       # the count starts again
+        self.assertEqual(clicks(mid(1), 2), mid(1))
+        self.assertEqual(clicks(mid(1), 2, -256), mid(1))       # 2 up, 2 down: nothing
+        self.assertEqual(clicks(mid(1), 3, -256), mid(0))
+        self.assertEqual(step(MI, mid(0), 4096), mid(1))        # a fast turn: one engine
+        self.assertEqual(clicks(5000, 4, -256), mid(0))         # 5000 is FM: back to WSHP
+        self.assertEqual(clicks(mid(7), 8), mid(7))             # held at the ends
+        self.assertEqual(clicks(mid(0), 8, -256), mid(0))
         self.assertEqual(step(4, 1000, 256), 1256)              # Chord: the stock step
         self.assertEqual(step(6, 1000, -256), 744)              # the Sampler too
+
+    def test_knob_screen_draw(self):
+        e = emu(); s = e.sym
+        calls = []
+        def hook(fn, kind, n):
+            e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.append(
+                (kind,) + struct.unpack('>%di' % n, uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 4, 4 * n))),
+                begin=fn, end=fn)
+        hook(0x40070efc, 'fill', 6); hook(0x40070c4e, 'box', 6)
+        hook(0x40071da4, 'icon', 5); hook(0x40071c10, 'text', 9)
+        e.uc.mem_write(0x40072102, bytes.fromhex('70284e75'))   # width: 40
+        e.uc.mem_write(0x400720f8, bytes.fromhex('70074e75'))   # the font's handle: 7
+        names = ('WSHP', 'FM', 'GRAN', 'PD', 'CHIP', 'NOIS', 'PART', 'STRG')
+        rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
+        for eng in range(8):
+            calls.clear()
+            e.run('mi_draw', stack=[0x1000, 4096 * eng + 2048, 0x5555, 0x60, 0x22, 0])
+            fills = [c for c in calls if c[0] == 'fill']
+            self.assertEqual(fills[0][1:], (0x5555, 14, 1, 50, 37, 0))      # black behind
+            self.assertEqual(fills[1][1:], (0x5555, 70, 22, 122, 28, 0))    # stock pips off
+            icon = [c for c in calls if c[0] == 'icon'][0]
+            self.assertEqual(icon[1], 0x5555)
+            self.assertEqual(icon[3:], (32, 19, 1))
+            self.assertEqual(e.r32(icon[2] + 16),
+                             s[f'mi_ic_{names[eng].lower()}'])
+            pips = [c for c in calls if c[0] in ('box', 'fill')][2:]
+            self.assertEqual(len(pips), 8)
+            for i, p in enumerate(pips):
+                self.assertEqual(p[1:], (0x5555, 73 + 6 * i, 0x17, 77 + 6 * i, 0x1b, 1))
+                self.assertEqual(p[0], 'fill' if i == eng else 'box', (eng, i))
+            text = [c for c in calls if c[0] == 'text'][0]
+            self.assertEqual(text[1:5], (0x5555, 7, 96 - 20, 0x22))          # centred on 96
+            self.assertEqual(rd(text[9] & M32), names[eng])
+            self.assertEqual(text[8] & M32, 0x40124b58)
+
+    def test_knob_screen_draw_installed_for_plaits_only(self):
+        e = emu(); s = e.sym
+        DRW = 0x40a73460
+        stock = (0x11111111, 0x22222222, 0, 0x44444444)
+        for i, v in enumerate(stock):
+            e.w32(DRW + 4 * i, v)
+        for i, v in enumerate((0xa1, 0xa2, 0xa3)):
+            e.w32(0x40a727e0 + 4 * i, v)                        # Pitch's words
+        e.w32(s['mi_lab'], FM)
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
+        self.assertEqual([e.r32(DRW + 4 * i) for i in range(4)], [0xa1, 0xa2, 0xa3, s['mi_draw']])
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[4])
+        self.assertEqual([e.r32(DRW + 4 * i) for i in range(4)], list(stock))
 
     def test_machine_page_picture_follows_the_engine(self):
         e = emu(); s = e.sym

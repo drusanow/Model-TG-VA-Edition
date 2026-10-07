@@ -209,7 +209,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
@@ -434,6 +434,14 @@ assert bytes(d[0x4004dcca-BASE:0x4004dcca-BASE+4])==bytes.fromhex('4e56ffc8'), '
 for _a,_s in ((0x4012771e,b'999'),(0x4012772d,b'.X'),(0x4012772e,b'X'),(0x4012a9ea,b'%d'),(0x4012b9e9,b'.%d')):
     assert bytes(d[_a-BASE:_a-BASE+len(_s)+1])==_s+b'\0', (hex(_a), _s)
 assert bytes.fromhex('4879'+'40a727e0') in bytes(d[0x400de244-BASE:0x400e1584-BASE]), 'Pitch renderer record moved'
+# PLAITS' knob screen (mi_draw): the routines it calls, and where the stock
+# screen puts its picture (32, 19), its five pips (from x 76, y 23..27) and
+# its value (96, 34), which mi_draw draws over.
+for _a,_h in ((0x40071da4,'4fefffd0'),(0x40070c4e,'4fefffd4'),(0x40070efc,'4fefffe8'),
+              (0x40071c10,'4e56ff44'),(0x40072102,'4fefffec'),(0x400720f8,'206f0004'),
+              (0x400f980c,'4e560000'),(0x400f7d5c,'4e56fffc'),
+              (0x4001d84e,'4878001348780020'),(0x4001d938,'7850'),(0x4001d86e,'4878002248780060')):
+    assert bytes(d[_a-BASE:_a-BASE+len(_h)//2])==bytes.fromhex(_h), f"knob screen: 0x{_a:08x} moved"
 # PLAITS' Contour prints the engine's name as the stock list formatter
 # 0x40045720 prints its strings: sprintf (0x40000e6e) with "%s" (0x40124b58).
 assert bytes(d[0x40045746-BASE:0x40045746-BASE+6])==bytes.fromhex('4ef940000e6e'), 'list formatter moved'
