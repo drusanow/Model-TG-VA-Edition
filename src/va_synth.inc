@@ -41,8 +41,13 @@ VA_TRI    = 2
 | trackData, a3/a5 = last/this block's trigger flags, fp = voice. d0/d1/d4,
 | a0/a1 are free; everything else belongs to the voice loop.
 va_pre:
-    cmpil   #VA_MACH,%d1          | 8..10: the drums' dials (drums.inc)
-    beqs    vp_va
+    cmpil   #VA_MACH,%d1          | 8..10: the drums' dials (drums.inc),
+    beqs    vp_va                 | 11: PLAITS' (plaits.inc)
+    cmpil   #MI_MACH,%d1
+    bnes    vp_dr
+    jsr     mi_params
+    bras    vp_tr
+vp_dr:
     jsr     dr_params
     bras    vp_tr
 vp_va:

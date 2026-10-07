@@ -226,7 +226,8 @@
     DR_KICK  = 8                  | VA KICK, VA SNARE, VA HIHAT (drums.inc)
     DR_SNARE = 9
     DR_HAT   = 10
-    MACH_LAST = 10                | the last machine index
+    MI_MACH  = 11                 | PLAITS (plaits.inc)
+    MACH_LAST = 11                | the last machine index
     .include "sampler_strings.inc"
     .include "name_swap.inc"
     .include "note_ratio.inc"
@@ -264,10 +265,10 @@ va_descr_atk:                     | the VA's, modifier held: Attack, Filter
 
 
 | machine+1 list for ParameterPageView, now including the Sampler (7), the
-| VA (8) and the drums (9..11). build.py widens the three sizes at
-| 0x4001bbd0.. to 11 longs.
+| VA (8), the drums (9..11) and PLAITS (12). build.py widens the three sizes
+| at 0x4001bbd0.. to 12 longs.
 page_machine_list:
-    .long 1,2,3,4,5,6,7,8,9,10,11
+    .long 1,2,3,4,5,6,7,8,9,10,11,12
 
     .align 2
 | Geometric midpoints between adjacent semitones around 45710 (1.0x),
@@ -2651,6 +2652,15 @@ sv_va_go:
     addql   #8,%sp
     braw    sv_nofilt
 sv_dr:
+    cmpil   #MI_MACH,%d0          | PLAITS (plaits.inc)
+    bnes    sv_dr2
+    movel   %d0,%sp@-
+    movel   %d1,%sp@-
+    movel   %d4,%sp@-
+    jsr     mi_fill
+    lea.l   %sp@(12),%sp
+    braw    sv_nofilt
+sv_dr2:
     movel   %d0,%sp@-             | the drum (drums.inc)
     movel   %d1,%sp@-             | step
     movel   %d4,%sp@-             | track
@@ -4099,11 +4109,11 @@ descr_hook:
     moveq   #1,%d1
     bras    ns_go
 ns_va:
-    movel   %d0,%d1               | 8..11: the VA's and the drums' labels, 2..5
-    subql   #6,%d1
+    movel   %d0,%d1               | 8..12: the VA's, the drums' and PLAITS'
+    subql   #6,%d1                | labels, 2..6
     cmpil   #2,%d1
     bcss    ns_none
-    cmpil   #5,%d1
+    cmpil   #6,%d1
     blss    ns_go
 ns_none:
     moveq   #0,%d1
@@ -9433,6 +9443,10 @@ an_dk:
     lea.l   hat_swap,%a1
     cmpil   #5,%d1
     beqw    an_loop
+    cmpil   #6,%d1                | 6: PLAITS, for the selected engine
+    bnew    an_smp
+    jsr     mi_fillswap
+    braw    an_loop
 an_smp:
     lea.l   ui_gran,%a1           | our labels: the selected track's mode picks
     movel   %a1@,%d0              | the set - 1 granular, 2 stretch
@@ -9731,11 +9745,11 @@ descr_b_hook:
     moveq   #1,%d1
     bras    dbh_names
 dbh_va:
-    movel   %d0,%d1               | 7..10: the VA's and the drums' labels, 2..5
-    subql   #5,%d1
+    movel   %d0,%d1               | 7..11: the VA's, the drums' and PLAITS'
+    subql   #5,%d1                | labels, 2..6
     cmpil   #2,%d1
     bcss    dbh_none
-    cmpil   #5,%d1
+    cmpil   #6,%d1
     blss    dbh_names
 dbh_none:
     moveq   #0,%d1
@@ -19480,6 +19494,7 @@ led_hook:
     movel   %d0,%a0@
     jsr     atk_watch
     jsr     gran_watch
+    jsr     mi_watch
     jsr     slice_watch
     jsr     name_probe
     jsr     load_pending
@@ -20824,6 +20839,10 @@ msg_buf:    .space 64
 | ---- VA KICK / VA SNARE / VA HIHAT (machines 8..10) ------------------------
     .align 2
     .include "drums.inc"
+
+| ---- PLAITS (machine 11) -----------------------------------------------------
+    .align 2
+    .include "plaits.inc"
 
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2

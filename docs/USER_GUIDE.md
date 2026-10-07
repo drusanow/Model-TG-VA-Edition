@@ -323,6 +323,28 @@ Use a short Decay on VA HIHAT for a closed hat and a long one for open.
 Every knob p-locks, slides, takes LFOs and is saved. Details:
 [DRUMS.md](DRUMS.md).
 
+## PLAITS
+
+*Plaits Edition only.* One machine, the twelfth, with eight sound engines
+after Mutable Instruments Plaits. **Contour** picks the engine (eight steps
+of 16) and its label shows the engine's name. **Color**, **Shape** and
+**Sweep** are Plaits' HARMONICS, TIMBRE and MORPH, labelled for the engine.
+
+| Contour | engine | Color | Shape | Sweep |
+|---|---|---|---|---|
+| 0-15 | **WSHP** waveshaping | **SHPE** waveshaper | **FOLD** wavefolder | **ASYM** slope |
+| 16-31 | **FM** 2-op FM | **RATI** ratio | **INDX** index | **FDBK** feedback |
+| 32-47 | **GRAN** formants | **FRAT** formant ratio | **FRMT** formant | **WDTH** grain shape |
+| 48-63 | **PD** phase distortion | **RATI** ratio | **DIST** amount | **ASYM** asymmetry |
+| 64-79 | **CHIP** chiptune arpeggio (a step per trig) | **CHRD** chord | **ARP** pattern | **SYNC** synced ratio |
+| 80-95 | **NOIS** filtered noise | **TYPE** LP-BP-HP | **RATE** clock | **RESO** resonance |
+| 96-111 | **PART** particles | **SPRD** spread | **DENS** density | **RESO** resonance |
+| 112-127 | **STRG** plucked string | **STIF** bridge / stiffness | **BRIG** brightness | **DAMP** damping |
+
+Pitch and the trig's note tune it; Decay, Attack, Filter and Resonance work
+as on the VA. Every knob - Contour too - p-locks, slides, takes LFOs and is
+saved. Details: [PLAITS.md](PLAITS.md).
+
 ## Additions for every machine
 
 - **Attack:** hold **PRESET** and turn **Decay**. From instant up to ~2 s.

@@ -195,20 +195,20 @@ class T4Gates(unittest.TestCase):
     def test_lfo_gate(self):
         e = emu()
         ids = [e.r32(e.sym['sampler_lfo_ids'] + 4 * i) for i in range(4)]
-        for grp in (6, 7, 8, 9, 10):                # the Sampler, the VA, the drums
-            for idx in range(11, 15):
+        for grp in (6, 7, 8, 9, 10, 11):            # the Sampler, the VA, the drums,
+            for idx in range(11, 15):               # PLAITS
                 e.run('sampler_lfo_gate', 0x4005a6fc, regs={D[2]: grp, A[2]: idx})
                 self.assertEqual(e.d(0), ids[idx - 11])
             for idx in (10, 15, 18):
                 e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: idx})
-        for grp in (11, 100, -1):
+        for grp in (12, 100, -1):
             e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: 12})
         for grp in range(6):
             e.run('sampler_lfo_gate', 0x4005a6dc, regs={D[2]: grp, A[2]: 12})
 
     def test_amp_gate(self):
         e = emu()
-        for grp in (6, 7, 8, 9, 10):
+        for grp in (6, 7, 8, 9, 10, 11):
             e.run('sampler_amp_gate', 0x4005a6fc, regs={D[2]: grp})
             self.assertEqual(e.d(0), 0x4b)
         for grp in range(6):
@@ -227,16 +227,16 @@ class T4Gates(unittest.TestCase):
     def test_table_lookups(self):
         e = emu()
         exp_a = {i: 0x40a71540 + 76 * i for i in range(7)}
-        for i in range(7, 12):                      # Sampler, VA, drums: machine+1
+        for i in range(7, 13):                      # Sampler, VA, drums, PLAITS
             exp_a[i] = 0x40a71540 + 76
         for i, v in exp_a.items():
             e.run('table_lookup_a_fixed', stack=[i])
             self.assertEqual(e.d(0), v, i)
-        e.run('table_lookup_a_fixed', stack=[12])
+        e.run('table_lookup_a_fixed', stack=[13])
         self.assertEqual(e.d(0), (0x40a71540 - 76) & M32)       # stock: out of range
         for i in range(6):
             e.w8(0x401091b4 + i, i)
-        for i in range(11):
+        for i in range(12):
             e.run('table_lookup_b_fixed', stack=[i])
             self.assertEqual(e.d(0), 0x40a71540 + 76 * (i if i < 6 else 0), i)
 
@@ -465,7 +465,7 @@ class T7Static(unittest.TestCase):
 
     def test_build_patch_list(self):
         b = open(os.path.join(REPO, 'build.py')).read()
-        self.assertIn('MACH_MAX=10', b)
+        self.assertIn('MACH_MAX=11', b)
         for site in ('0x400147a5', '0x400148ab', '0x400148b3', '0x4005a79d', '0x400a25e1',
                      '0x4010e5e6'):
             self.assertRegex(b, re.escape(f"({site},'05',_M)"))
@@ -481,7 +481,10 @@ class T7Static(unittest.TestCase):
                            ('gen_drum_tables.py', ['src/drum_tables.inc']),
                            ('gen_drum_icons.py', icons),
                            ('gen_va_icons.py', ['src/va_icons/va_icon_A_48x33.bin',
-                                                'src/va_icons/va_icon_B_34x34.bin'])):
+                                                'src/va_icons/va_icon_B_34x34.bin']),
+                           ('gen_mi_tables.py', ['src/mi_tables.inc']),
+                           ('gen_mi_icons.py', ['src/va_icons/plaits_icon_A_48x33.bin',
+                                                'src/va_icons/plaits_icon_B_34x34.bin'])):
             old = [open(os.path.join(REPO, o), 'rb').read() for o in outs]
             subprocess.run([sys.executable, os.path.join(REPO, 'tools', tool)],
                            check=True, capture_output=True)
@@ -503,9 +506,9 @@ class T8FullBuild(unittest.TestCase):
         B = 0x40000400
         at = lambda a, n=1: img[a - B:a - B + n]
         for a in (0x400147a5, 0x400148ab, 0x400148b3, 0x4005a79d, 0x400a25e1, 0x4010e5e6):
-            self.assertEqual(at(a), b'\x0a', hex(a))               # machines 0..10
+            self.assertEqual(at(a), b'\x0b', hex(a))               # machines 0..11
         for a in (0x4001bbd3, 0x4001bbe5, 0x4001bbf3):
-            self.assertEqual(at(a), b'\x2c', hex(a))               # 11 longs
+            self.assertEqual(at(a), b'\x30', hex(a))               # 12 longs
         mpm = symbols(os.path.join(BUILD, '_b.elf'))['mp_markers']
         self.assertEqual(at(0x400a26a2, 10),                         # the marker loop:
                          b'\x4e\xb9' + struct.pack('>I', mpm) + b'\x60\x00\x00\x48')

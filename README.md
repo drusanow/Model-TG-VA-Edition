@@ -1,9 +1,16 @@
-# Model-TG VA Edition
+# Model-TG VA Edition - Plaits Edition
 
 **Unofficial firmware additions for the Elektron Model:Cycles (OS 1.13):
 a full Sampler machine, a two-oscillator VA synth machine, three analogue-
-style drum machines, four LFOs a track, a trig generator, resampling,
-beat-repeat with master FX, and more.**
+style drum machines, a Plaits-style macro machine with eight engines, four
+LFOs a track, a trig generator, resampling, beat-repeat with master FX, and
+more.**
+
+> **This branch (`plaits`) is the Plaits Edition**: everything in the VA
+> Edition plus **PLAITS**, a twelfth machine with eight engines after
+> Mutable Instruments Plaits ([docs/PLAITS.md](docs/PLAITS.md)). It builds
+> its own firmware; the VA Edition (branch `va-machine`) is unchanged, so
+> either can be installed and the other kept as a backup.
 
 This is a fork of [TinyGregAudio/Model-TG](https://github.com/TinyGregAudio/Model-TG)
 that adds four machines - **VA** (index 7) and **VA KICK**, **VA SNARE**,
@@ -34,6 +41,12 @@ keeps working.
   white noise, a noise mix, pitch drop and drive; and the TR-808's six
   detuned square waves for hats, with tone, spread, noise and drive. Low
   CPU, integer DSP; every knob p-locks and takes LFOs.
+- **PLAITS** (Plaits Edition), the twelfth machine: eight engines after
+  Mutable Instruments Plaits - waveshaping, 2-op FM, formants (grains),
+  phase distortion, a chiptune arpeggiator, filtered noise, particles and a
+  plucked string - on Plaits' four controls: Contour picks the engine,
+  Color / Shape / Sweep are HARMONICS / TIMBRE / MORPH, labelled per engine.
+  Integer remakes of Plaits' algorithms (MIT, credited in docs/PLAITS.md).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale

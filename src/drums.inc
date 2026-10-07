@@ -557,7 +557,27 @@ dr_punch:
     movel   %a0@(0,%d0:l:4),%d0
     subql   #DR_KICK,%d0
     cmpil   #2,%d0
-    bhiw    dp_out                | not a drum
+    blss    dp_dr
+    cmpil   #MI_MACH-DR_KICK,%d0
+    bnew    dp_out                | not a drum, nor PLAITS
+    | PLAITS: a clean x2 - the 6 dB the Sampler path is short of the stock
+    | machines' level - held at full scale
+    movea.l %sp@(4),%a1
+    moveq   #31,%d1
+dp_mi:
+    movel   %a1@,%d0
+    cmpil   #0x3fffffff,%d0
+    bles    1f
+    movel   #0x3fffffff,%d0
+1:  cmpil   #-0x3fffffff,%d0
+    bges    2f
+    movel   #-0x3fffffff,%d0
+2:  addl    %d0,%d0
+    movel   %d0,%a1@+
+    subql   #1,%d1
+    bpls    dp_mi
+    rts
+dp_dr:
     lea.l   dr_pgain,%a0
     movel   %a0@(0,%d0:l:4),%d0
     movel   %d2,%sp@-
@@ -705,5 +725,6 @@ dr_defaults:
     .word 48<<8, 40<<8, 24<<8, 40<<8   | KICK:  SWP 48  STM 40  SAT 24  CLK 40
     .word 64<<8, 32<<8, 88<<8, 16<<8   | SNARE: NOIS 64 PENV 32 TONE 88 SAT 16
     .word 80<<8, 64<<8, 16<<8, 0       | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 0
+    .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
     .include "drum_tables.inc"
     .align 2

@@ -105,6 +105,9 @@ These were each verified on hardware; they save a lot of rediscovery.
 - VA KICK / VA SNARE / VA HIHAT (indexes 8..10, VA Edition): the VA's route
   (va_pre, a Sampler voice to the stock dispatch, the shared tail) with
   dr_fill in place of va_fill. Everything else: [DRUMS.md](DRUMS.md)
+- PLAITS (index 11, Plaits Edition): the drums' route with mi_params /
+  mi_fill, eight engines picked by Contour. Everything else:
+  [PLAITS.md](PLAITS.md)
 - VA machine (index 7, VA Edition): two oscillators in place of the sample
   fill, then the Sampler's tail and the stock machines' Filter/Resonance. The
   audio dispatch is handed 6 for it, as for the Sampler; `trk_mach` tells

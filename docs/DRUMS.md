@@ -139,7 +139,8 @@ The code is in `src/drums.inc`, and the tables come from
   on the channel's 32 samples, the same cubic with a fixed gain per drum (×2
   kick, ×2.5 snare, ×4 hi-hat), held to ±32767 so `<< 16` never wraps. It
   makes up the 6 dB the Sampler path sits below the stock machines, and
-  compresses each hit's attack. Other machines are untouched.
+  compresses each hit's attack. PLAITS (Plaits Edition) gets a clean x2
+  here instead. Other machines are untouched.
 
 **Machine plumbing.** These are the sites listed in
 [VA.md](VA.md#machine-index-7-and-every-place-that-knows-the-count),

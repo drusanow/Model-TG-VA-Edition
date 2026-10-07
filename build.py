@@ -115,6 +115,7 @@ _txt=open(f"{proto}/{src}").read()
 _txt+="\n"+open(f"{proto}/va_synth.inc").read()
 _txt+="\n"+open(f"{proto}/drums.inc").read()
 _txt+="\n"+open(f"{proto}/lfo2.inc").read()
+_txt+="\n"+open(f"{proto}/plaits.inc").read()
 _txt+="\n"+open(f"{proto}/gen.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
 _pos={int(m) for m in _re.findall(r'lea\.l\s+%sp@\((\d+)\),%sp', _txt)}
@@ -135,10 +136,10 @@ print(f"  stack frames balanced ({sorted(_neg)})")
 # - take it from fx_buf / gf_dst / pk_dst / wf_dst, which start at +32). Every
 # reference in any register is counted, so none can slip past at +0.
 # The VA's va_fill writes the same window, the tenth; the drums' dr_fill the
-# eleventh.
+# eleventh; PLAITS' mi_fill the twelfth.
 _bufs=_re.findall(r'lea\.l\s+sampler_buf(\+32)?,%a[0-7]', _txt)
-if _bufs.count('') or len(_bufs)!=11:
-    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected eleven '+32')")
+if _bufs.count('') or len(_bufs)!=12:
+    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected twelve '+32')")
 print(f"  sampler_buf: fill, filter, granular, pluck, wavetable, lo-fi, tape, vinyl and VA all at +32")
 # Everything that renders a voice must reach the amp stage through amp_hook, or
 # it silently loses its attack. The six stock call sites are retargeted in the
@@ -191,7 +192,9 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'gen_n_num','gen_n_go','lfo34_w',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
-              'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels'}   # pointer tables (menu descriptors), not code
+              'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs',
+              'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -335,8 +338,8 @@ assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{R
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
-MACH_MAX=10                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
-                              # 8-10 VA KICK / VA SNARE / VA HIHAT
+MACH_MAX=11                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
+                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS
 _M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),
@@ -885,7 +888,9 @@ nres=(end-CACHE_BASE+CACHE_BLK-1)//CACHE_BLK     # blocks the blob occupies
 # 5 since samplerID (the retrig page's master FX); samplerHN-IC fit in 4.
 # 11 of 16 blocks stay the
 # filesystem's; our own sample loading reads the eMMC directly, not through it.
-assert 1<=nres<=6, f"blob spans {nres} cache blocks - too much of the cache"
+# The Plaits Edition's engines and tables take a seventh (9 of 16 stay the
+# filesystem's); up to eight are allowed.
+assert 1<=nres<=8, f"blob spans {nres} cache blocks - too much of the cache"
 # head = first entry we do NOT occupy; the prev-link loop starts one past it
 for addr,old,newv,what in ((0x400792f2, 0x401eb750, CACHE_ENTRY+20*nres,      'LRU head'),
                            (0x400792bc, 0x401eb774, CACHE_ENTRY+20*(nres+1)+16,'prev-link loop start')):
@@ -934,7 +939,7 @@ if args.modded_cycles:
     _at=f"0x{BASE+len(_st):08x}"
     _tail=_img[len(_st):]
     _tw={"id":"model-tg-va","order":30,
-         "name":f"Model-TG VA Edition {_ver}",
+         "name":f"Model-TG Plaits Edition {_ver}",
          "description":["Model-TG VA Edition: Model-TG (the Sampler machine, resampling, retrig and",
                         "master FX, and more) plus a two-oscillator VA synth machine.",
                         "Source, user guide and license: https://github.com/drusanow/model-tg-va-edition",
@@ -1008,7 +1013,7 @@ if args.flasher:
                              capture_output=True,text=True,check=True).stdout.strip()
     except Exception:
         _fver="unknown"
-    _fl={"format":1,"name":"Model-TG VA Edition","version":_fver,
+    _fl={"format":1,"name":"Model-TG Plaits Edition","version":_fver,
          "source":"https://github.com/drusanow/model-tg-va-edition",
          "license":"MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) drumkilla",
          "device":"Model:Cycles","device_id":0x11,"os":"1.13","section":3,

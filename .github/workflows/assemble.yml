@@ -25,7 +25,9 @@ jobs:
           python3 tools/gen_va_icons.py
           python3 tools/gen_drum_tables.py
           python3 tools/gen_drum_icons.py
-          git diff --exit-code src/granular_tables.inc src/va_tables.inc src/drum_tables.inc src/va_icons
+          python3 tools/gen_mi_tables.py
+          python3 tools/gen_mi_icons.py
+          git diff --exit-code src/granular_tables.inc src/va_tables.inc src/drum_tables.inc src/mi_tables.inc src/va_icons
       - name: Host tests (the blob on Unicorn's ColdFire V4e)
         run: |
           pip install unicorn numpy

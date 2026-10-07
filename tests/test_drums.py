@@ -299,12 +299,13 @@ class TPlumbing(unittest.TestCase):
 
     def test_lists_names_icons(self):
         e = emu(); s = e.sym
-        self.assertEqual([e.r32(s['page_machine_list'] + 4 * i) for i in range(11)],
-                         list(range(1, 12)))
-        names = [e.r32(s['sampler_name_table'] + 4 * i) for i in range(11)]
+        self.assertEqual([e.r32(s['page_machine_list'] + 4 * i) for i in range(12)],
+                         list(range(1, 13)))
+        names = [e.r32(s['sampler_name_table'] + 4 * i) for i in range(12)]
         rd = lambda a: bytes(e.uc.mem_read(a, 12)).split(b'\0')[0].decode()
-        self.assertEqual([rd(a) for a in names[7:]], ['VA', 'VA KICK', 'VA SNARE', 'VA HIHAT'])
-        # the icon vectors: eleven entries, ours at 6..10
+        self.assertEqual([rd(a) for a in names[7:]],
+                         ['VA', 'VA KICK', 'VA SNARE', 'VA HIHAT', 'PLAITS'])
+        # the icon vectors: twelve entries, ours at 6..11
         OLD_A, OLD_B, HEAP = SCRATCH + 0x50000, SCRATCH + 0x51000, SCRATCH + 0x52000
         e.w32(0x40fe32cc, OLD_A); e.w32(0x40fe32d0, OLD_A + 168)
         e.w32(0x40fe384c, OLD_B); e.w32(0x40fe3850, OLD_B + 168)
@@ -316,8 +317,8 @@ class TPlumbing(unittest.TestCase):
         e.run('build_sampler_icons')
         for vec, pix in ((0x40fe32cc, 'a'), (0x40fe384c, 'b')):
             base = e.r32(vec)
-            self.assertEqual(e.r32(vec + 4) - base, 11 * 28)
-            for i, n in ((7, 'va'), (8, 'kick'), (9, 'snare'), (10, 'hihat')):
+            self.assertEqual(e.r32(vec + 4) - base, 12 * 28)
+            for i, n in ((7, 'va'), (8, 'kick'), (9, 'snare'), (10, 'hihat'), (11, 'plaits')):
                 self.assertEqual(e.r32(base + 28 * i + 16), s[f'{n}_icon_{pix}_pixels'], (vec, n))
 
 
@@ -361,7 +362,7 @@ class TPunch(unittest.TestCase):
     def test_other_machines_untouched(self):
         e = emu()
         vals = [(i * 0x1234567) & M32 for i in range(32)]
-        for mach in (0, 5, 6, 7, 11):
+        for mach in (0, 5, 6, 7, 12):
             out = self.run_punch(e, mach, vals)
             self.assertEqual([o & M32 for o in out], vals, mach)
 
@@ -386,7 +387,7 @@ class TMarkers(unittest.TestCase):
             calls.clear()
             e.run('mp_markers', regs={D[2]: 0x5555, D[3]: sel, D[4]: 0x44, D[7]: 0x77})
             self.assertEqual((e.d(4), e.d(7)), (0x44, 0x77))          # kept
-            self.assertEqual(len(calls), 11)
+            self.assertEqual(len(calls), 12)
             for i, (kind, ctx, x0, y0, x1, y1, one) in enumerate(calls):
                 col, line = (i, 0) if i < 8 else (i - 8, 1)
                 x = 76 + 7 * col
