@@ -32,7 +32,7 @@ and sweeps down to it. It adds a short noise click and drive.
 |---|---|---|---|
 | **Color** | SWP | sweep depth: how far above the base the pitch starts. 0 = none (808-like); 48 is about 2.5x; 127 = 5x (a zap) | 48 |
 | **Shape** | STM | sweep time: how fast the pitch falls, 2 ms (0) to 150 ms (127) | 40 |
-| **Sweep** | SAT | drive: extra saturation before the envelope, from 0 (none) up to about 5x into a soft clip | 24 |
+| **Sweep** | SAT | drive: extra saturation before the envelope, from 0 (none) up to about 5x into a soft clip | 64 |
 | **Contour** | CLK | click: a 1.3 ms burst of noise at the start | 40 |
 
 ### VA SNARE
@@ -48,7 +48,7 @@ A dropping sine mixed with filtered white noise.
 | **Color** | NOIS | the mix: 0 = body only, 64 = half and half, 127 = noise only | 64 |
 | **Shape** | PENV | pitch drop: how far above 180 Hz the body starts. 0 = none, 127 = 3x | 32 |
 | **Sweep** | TONE | the noise's colour: low-pass from 300 Hz (dark) to 16 kHz (bright) | 88 |
-| **Contour** | SAT | drive, as the kick's | 16 |
+| **Contour** | SAT | drive, as the kick's | 48 |
 
 ### VA HIHAT
 
@@ -62,38 +62,45 @@ closed hat and a long one for open.
 | **Color** | TONE | the high-pass (two poles): 3 kHz (fuller) to 12 kHz (thin and sizzling) | 80 |
 | **Shape** | SPRD | spread: 64 = the 808's own frequencies. Lower pulls the six together (0 = one pitch, bell-like); higher spreads them (127 = twice as far, clangorous) | 64 |
 | **Sweep** | NOIS | white noise mixed in, for a washier hat | 16 |
-| **Contour** | SAT | drive | 0 |
+| **Contour** | SAT | drive | 48 |
 
 ### Level and punch
 
-All three are made loud on their own, with no knob needed. The VA and
-Sampler path only reaches half of a stock machine's level. So after the
-envelope each drum gets a fixed make-up gain:
+All three are loud and dense out of the box: no knob needs turning up.
 
-| drum | make-up gain |
-|---|---|
-| kick | ×2 (+6 dB) |
-| snare | ×2.5 (+8 dB) |
-| hi-hat | ×4 (+12 dB) |
+**The make-up gain.** The VA and Sampler path only reaches half of a stock
+machine's level. So after the envelope each drum gets a fixed make-up gain,
+into a smooth soft clip at full scale:
 
-The gain goes into a smooth soft clip at full scale, which works like an
-analogue mixer channel driven hard:
-- The loud start of each hit is rounded and dense: it punches through.
-- The decay stays clean.
+| drum | make-up gain | default SAT |
+|---|---|---|
+| kick | ×4 (+12 dB) | 64 |
+| snare | ×5 (+14 dB) | 48 |
+| hi-hat | ×10 (+20 dB) | 48 |
+
+**What the clip does.** It works like an analogue mixer channel driven
+hard:
+- It holds each hit's body up through its decay, where it used to fall
+  away, so the hit stays solid.
+- It adds the harmonics a 55 Hz kick needs to be heard on small speakers.
 - Nothing hard-clips or wraps.
 
-**SAT** adds character on top, before the envelope, and is now gentler (up
-to ~5x, a cubic curve that leaves quiet parts clean). For loudness alone,
-leave SAT low. Measured over the first 50 ms of a hit at default settings,
-against full scale:
+The SAT defaults add more character before the envelope. Turn SAT down for
+a cleaner drum, or up for more grit.
+
+**Before and after** (`tests/`, the emulator). Each hit is measured over its
+first 0.3 s, at the default settings, through an amp envelope (kick 250 ms,
+snare 180 ms, hi-hat 80 ms), against full scale:
 
 | drum | before | now |
 |---|---|---|
-| kick | -7.3 dB RMS | -2.5 dB RMS |
-| snare | -13.5 dB RMS | -6.2 dB RMS |
-| hi-hat | -32.4 dB RMS | -20.4 dB RMS |
+| kick | -1.1 dB RMS, 7% of energy above 150 Hz | -0.2 dB RMS, 15% above 150 Hz |
+| snare | -6.0 dB RMS, -14.4 dB at 150 ms | -2.0 dB RMS, -5.5 dB at 150 ms |
+| hi-hat | -23.4 dB RMS | -9.1 dB RMS |
 
-Peaks reach -1 to -2 dBFS.
+The kick was already at full scale. What makes it louder now is the denser
+body and its upper harmonics. Sounds saved before this version keep their
+own SAT values. The new defaults apply when a track is switched to a drum.
 
 ### Notes
 
@@ -136,8 +143,8 @@ The code is in `src/drums.inc`, and the tables come from
   `y = 1.5u - 0.5u³`. It is clean while quiet, rounds the peaks, and is full
   scale at most. Gain is 1 + dial/32; SAT = 0 bypasses it.
 - **Punch (`dr_punch`, from `amp_hook`):** after the amp envelope, at 48 kHz
-  on the channel's 32 samples, the same cubic with a fixed gain per drum (×2
-  kick, ×2.5 snare, ×4 hi-hat), held to ±32767 so `<< 16` never wraps. It
+  on the channel's 32 samples, the same cubic with a fixed gain per drum (×4
+  kick, ×5 snare, ×10 hi-hat), held to ±32767 so `<< 16` never wraps. It
   makes up the 6 dB the Sampler path sits below the stock machines, and
   compresses each hit's attack. PLAITS (Plaits Edition) gets a clean x2
   here instead. Other machines are untouched.

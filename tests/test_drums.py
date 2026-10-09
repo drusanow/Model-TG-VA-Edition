@@ -292,8 +292,8 @@ class TPlumbing(unittest.TestCase):
     def test_commit_defaults(self):
         e = emu()
         T = V.T6Commit()
-        for m, want in ((KICK, (48, 40, 24, 40)), (SNARE, (64, 32, 88, 16)),
-                        (HAT, (80, 64, 16, 0))):
+        for m, want in ((KICK, (48, 40, 64, 40)), (SNARE, (64, 32, 88, 48)),
+                        (HAT, (80, 64, 16, 48))):
             T._commit(e, m)
             self.assertEqual([e.r16(T.SOUND + 42 + 2 * i) >> 8 for i in range(4)], list(want))
 
@@ -344,7 +344,7 @@ class TPunch(unittest.TestCase):
     def test_gain_and_curve(self):
         e = emu()
         rnd = random.Random(4)
-        for mach, g in ((KICK, 2.0), (SNARE, 2.5), (HAT, 4.0)):
+        for mach, g in ((KICK, 4.0), (SNARE, 5.0), (HAT, 10.0)):
             vals = [rnd.randrange(-2 ** 31, 2 ** 31) for _ in range(28)] + \
                    [0, 100 << 16, -(100 << 16), 0x7fffffff]
             out = self.run_punch(e, mach, vals)

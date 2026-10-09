@@ -546,9 +546,11 @@ df_out:
 | From amp_hook, after the amp envelope and before the common Filter: the 32
 | output samples at 48 kHz, at the channel's scale. The render path the drums
 | share with the Sampler peaks at half the channel's full scale, where the
-| stock machines reach all of it, so a drum is made up here - x2 (kick),
-| x2.5 (snare), x4 (hi-hat) for small signals - through the same cubic soft
-| clip, at full scale. After the envelope, the loud start of each hit is
+| stock machines reach all of it, so a drum is made up here - x4 (kick),
+| x5 (snare), x10 (hi-hat) for small signals - through the same cubic soft
+| clip, at full scale: the clip holds each hit's body up through its decay
+| (dense, as the stock machines are) and adds the harmonics a 55 Hz kick
+| needs to be heard on small speakers. After the envelope, the loud start of each hit is
 | rounded and dense while its decay stays clean: an analogue channel driven
 | hard. Other machines: untouched. Keeps d2-d7/a2-a6.
 dr_punch:
@@ -717,14 +719,14 @@ dr_hph:    .space 6*6*4           | the hat's six phases
 dr_hinc:   .space 6*4             | this block's six hat increments
 dr_seed:   .long 0x1f123bb5       | the noise's LCG
 dr_gq:     .long 0                | this block's drive gain (dr_setgq)
-dr_pgain:  .long 5461, 6827, 10923 | dr_punch: x2, x2.5, x4, x 2/3 (Q12)
+dr_pgain:  .long 10923, 13653, 27307 | dr_punch: x4, x5, x10, x 2/3 (Q12)
 dr_trig:   .space 8               | a new note for the next block
 | Written over sound +42..+48 (k = 11..14) when a track becomes one of them,
 | by mc_commit_hook, as dial << 8.
 dr_defaults:
-    .word 48<<8, 40<<8, 24<<8, 40<<8   | KICK:  SWP 48  STM 40  SAT 24  CLK 40
-    .word 64<<8, 32<<8, 88<<8, 16<<8   | SNARE: NOIS 64 PENV 32 TONE 88 SAT 16
-    .word 80<<8, 64<<8, 16<<8, 0       | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 0
+    .word 48<<8, 40<<8, 64<<8, 40<<8   | KICK:  SWP 48  STM 40  SAT 64  CLK 40
+    .word 64<<8, 32<<8, 88<<8, 48<<8   | SNARE: NOIS 64 PENV 32 TONE 88 SAT 48
+    .word 80<<8, 64<<8, 16<<8, 48<<8   | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 48
     .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
     .include "drum_tables.inc"
     .align 2
