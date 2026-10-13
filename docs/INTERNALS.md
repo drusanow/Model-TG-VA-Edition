@@ -96,7 +96,8 @@ These were each verified on hardware; they save a lot of rediscovery.
   0x40017b48 (trig on/off) and 0x40016642 (trig note). Everything else:
   [GEN.md](GEN.md)
 - LFO 2, 3, 4 (VA Edition): LFO 2 in parameter words 28..32, LFO 3/4 in
-  Model-TG RAM, shown as pages 3/4 of the stock LFO menu through the track
+  Model-TG RAM per kit (saved in the kit record's unused +646..+699, carried
+  by whole-kit memcpy, reset with a track's sound), shown as pages 3/4 of the stock LFO menu through the track
   handle's get/set (vtable 0x400fd134 +28/+92); the stock LFO engine run once per LFO
   with its state swapped, slotOf remapped while the LFO menu shows LFO 2, and
   pattern lock rows given slots for words 23..32 (which also fixes

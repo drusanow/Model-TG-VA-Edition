@@ -250,8 +250,9 @@ rebuilt the table to twelve entries.
   on the middle of the next or previous engine's values.
 
 **Space.** The blob grows to ~113 KB: seven of the filesystem's sixteen
-16 KiB cache blocks, one more than the VA Edition. Nine stay the
-filesystem's.
+16 KiB cache blocks, one more than the VA Edition. LFO 3 and 4's
+per-pattern blocks ([LFO2.md](LFO2.md)) add 11.5 KB and take an eighth
+(~126 KB, 5 KB spare); eight stay the filesystem's.
 
 **CPU** (`tests/test_plaits.py`, `VA_TEST_VERBOSE=1`): the worst block of
 `mi_fill` (instructions), against the VA's ~3,700 and the drums' ~6,000:
@@ -367,7 +368,7 @@ Needs hardware:
      no noise burst from the other's leftovers.
 6. **CPU page:** six PLAITS tracks on PART (the heaviest) with no dropouts.
 7. **Saving:** sample loading and project saving still work normally, with
-   one less filesystem cache block.
+   two fewer filesystem cache blocks.
 
 ## Credits and licence
 

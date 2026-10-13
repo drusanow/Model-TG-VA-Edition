@@ -45,9 +45,9 @@ LFO_ENGINE = 0x40091ab2
 | ---- the block (replaces `jsr 0x40091ab2` at 0x400597c6) --------------------
 | args: sp@(4) = params (words at +14 + 66t + 2k), sp@(8) = tempo, sp@(12) =
 | the LFO trig mask. The caller pops them. Keeps d2-d7/a2-a6.
-| LFO 2 runs from the words k28..32, LFO 3 and 4 from lfo34_w (Model-TG
-| RAM, no p-locks), each through lfo_one; LFO 3 or 4 with no destination on
-| any track is not run at all. Then LFO 1, as stock.
+| LFO 2 runs from the words k28..32, LFO 3 and 4 from the playing pattern's
+| block (l34_blk: Model-TG RAM, no p-locks), each through lfo_one; LFO 3 or
+| 4 with no destination on any track is not run at all. Then LFO 1, as stock.
 lfo_run:
     lea.l   %sp@(-32),%sp
     moveml  %d2-%d5/%a2-%a5,%sp@
@@ -58,11 +58,14 @@ lfo_run:
     moveq   #66,%d3
     lea.l   lfo2_state,%a4
     bsr     lfo_one               | LFO 2
-    lea.l   lfo34_w,%a0
+    movel   CUR_KIT,%d0           | the playing pattern's LFO 3 and 4
+    bsr     l34_blk
     moveq   #10,%d3
     lea.l   lfo34_state,%a4
     bsr     lfo_one_if            | LFO 3
-    lea.l   lfo34_w+60,%a0
+    movel   CUR_KIT,%d0
+    bsr     l34_blk
+    lea.l   %a0@(60),%a0
     moveq   #10,%d3
     lea.l   lfo34_state+192,%a4
     bsr     lfo_one_if            | LFO 4
@@ -213,7 +216,7 @@ lfo2_ids:                         | in LFO 2's word order, k 28..32
 | Every menu starts at LFO 1, and nothing is remapped once it has gone.
 lfo_menu_new:
     clrl    lfo2_on
-    clrl    lfo_ate
+    clrl    lfo_pend
     clrl    lfo_page
     clrl    lfo_view
     moveq   #1,%d0
@@ -221,7 +224,7 @@ lfo_menu_new:
     jmp     0x40025798            | the constructor, with the caller's args
 lfo_menu_dtor:
     clrl    lfo2_on
-    clrl    lfo_ate
+    clrl    lfo_pend
     clrl    lfo_live
     clrl    lfo_page
     clrl    lfo_view
@@ -230,51 +233,54 @@ lfo_menu_dtor:
     jmp     0x400d97a2
 
 | ---- the LFO menu's key handler (View vtable 0x401016dc, slot +8) ------------
-| (view, event). Stock (0x40024e86 -> 0x40024e0c): the LFO key's press is
-| taken, its release closes the menu - except the release of the press that
-| opened it. Here a fresh LFO press moves LFO 1 -> 2 -> 3 -> 4 (redrawn, its
-| release swallowed); with LFO 4 showing the stock handling closes it. FUNC +
-| LFO (LFO Setup) and every other key are stock. Returns d0 = 1 when the key
-| was ours.
+| (view, event). Stock (0x40024e86 -> 0x40024e0c, on view - 56): the LFO key's
+| press is taken and clears the menu's hold flag (+604); a knob turned while
+| LFO is held sets it (the knob handler 0x40024db6) - that turn is the stock
+| "hold LFO + turn a knob" destination assignment; the release closes the menu
+| unless the flag is set (then it only clears it). Here a TAP moves LFO 1 ->
+| 2 -> 3 -> 4: the press is stock's, and if the flag is still clear when it
+| is released, the menu shows the next LFO instead of closing. A HOLD with a
+| knob turn keeps the LFO showing, so the destination lands on it; so does
+| any other key pressed meanwhile (the stock Clear LFO, 0x4001fb16, resets
+| the ids 0x1e..0x24 through 0x4000b274, so it clears the LFO showing; the
+| release is then stock's). With LFO 4 showing it is all stock, which closes
+| the menu on a tap. FUNC + LFO (LFO Setup) and every other key are stock.
+| Returns d0 = 1 when the key was ours.
 lfo_key_hook:
     movel   %sp@(8),%sp@-
     jsr     0x4007240c            | the key code
     addql   #4,%sp
     moveq   #8,%d1                | LFO
     cmpl    %d0,%d1
-    bnes    lk_stock
+    beqs    lk_lfo
+    clrl    lfo_pend              | another key while LFO is down: not a tap,
+    bra     lk_stock              | its release is stock's
+lk_lfo:
     movel   %sp@(8),%sp@-
     jsr     0x40072490            | FUNC held
     addql   #4,%sp
     tstb    %d0
-    bnes    lk_stock
+    bnew    lk_stock
     movel   %sp@(8),%sp@-
     jsr     0x40072470            | 1: a release
     addql   #4,%sp
     tstb    %d0
     beqs    lk_press
-    tstl    lfo_ate               | the release of the press that switched
-    beqs    lk_stock
-    clrl    lfo_ate
-    bras    lk_ours
-lk_press:
-    movea.l %sp@(8),%a0
-    btst    #3,%a0@(19)           | auto-repeat: not a fresh press
-    bnes    lk_ours
-    movel   lfo_page,%d0
-    moveq   #3,%d1
-    cmpl    %d0,%d1
-    beqs    lk_stock              | LFO 4 showing: stock, which closes on release
+    tstl    lfo_pend              | the release of a press we let through?
+    beqw    lk_stock              | no (the press that opened the menu): stock
+    clrl    lfo_pend
+    movea.l %sp@(4),%a0
+    tstb    %a0@(604-56)          | a knob turned while held: a hold - stock
+    bnew    lk_stock              | clears the flag, the LFO stays
+    movel   lfo_page,%d0          | a tap: the next LFO
     addql   #1,%d0
-    movel   %d0,lfo_page          | the next LFO
+    movel   %d0,lfo_page
     clrl    lfo2_on
     moveq   #1,%d1
     cmpl    %d0,%d1
     bnes    lk_n2
     movel   %d1,lfo2_on           | LFO 2: its words (slotOf)
 lk_n2:
-    moveq   #1,%d0
-    movel   %d0,lfo_ate
     movel   %sp@(4),%d0
     movel   %d0,lfo_view          | for lfo34_set's redraws
     movel   %d0,%sp@-             | redraw: the values and the number
@@ -283,6 +289,15 @@ lk_n2:
 lk_ours:
     moveq   #1,%d0
     rts
+lk_press:
+    movea.l %sp@(8),%a0
+    btst    #3,%a0@(19)           | auto-repeat: not a fresh press
+    bnes    lk_ours
+    moveq   #3,%d0
+    cmpl    lfo_page,%d0
+    beqw    lk_stock              | LFO 4 showing: all stock
+    moveq   #1,%d0
+    movel   %d0,lfo_pend          | decide at the release
 lk_stock:
     jmp     0x40024e86
 
@@ -402,7 +417,7 @@ lt_yes:
 | a0 = a track handle -> lfo_dbuf = the four LFOs' destinations for the
 | selected track, the one showing (lfo_page) zeroed: LFO 1's k4 and LFO 2's
 | k31 high bytes from the sound (as fine_hook finds it), LFO 3's and 4's
-| from lfo34_w. Clobbers d0/d1/a0/a1.
+| from the playing pattern's block. Clobbers d0/d1/a0/a1.
 lfo_dests:
     lea.l   lfo_dbuf,%a1
     clrl    %a1@
@@ -430,8 +445,11 @@ ld_34:
     cmpil   #MAX_TRK,%d0
     bccs    ld_pg
     mulu.w  #10,%d0
-    lea.l   lfo34_w+6,%a0         | the Destination words
-    adda.l  %d0,%a0
+    movel   %d0,%sp@-
+    movel   CUR_KIT,%d0
+    bsr     l34_blk
+    adda.l  %sp@+,%a0
+    addql   #6,%a0                | the Destination words
     lea.l   lfo_dbuf,%a1
     moveb   %a0@,%a1@(2)                  | LFO 3
     moveb   %a0@(60),%a1@(3)              | LFO 4
@@ -442,17 +460,20 @@ ld_pg:
     rts
 
 | ============== LFO 3 and LFO 4: the stock LFO menu, two more pages ==========
-| A sound has no words left for them, so their settings live in lfo34_w (per
-| track, in RAM: no p-locks, not saved). The stock LFO menu shows them as it
+| A sound has no words left for them, so their settings live in Model-TG RAM,
+| one block per pattern's kit (l34_blk, below: per track, no p-locks, saved
+| with the kit). The stock LFO menu shows them as it
 | shows LFO 1 and 2 - same rows, icon, values, DEST list, SPEED knob - because
 | every one of its edits goes through the track handle: vtable +28 reads a
 | parameter, +32 (0x4000b7d6) adjusts it by reading (+28), stepping (+0x14,
 | fine_hook) and storing (0x4000b274 -> +92, 0x4000ba7a). With LFO 3 or 4
 | showing, lfo34_get / lfo34_set answer +28 / +92 for the five LFO ids from
-| lfo34_w instead of the sound, and ask the menu to redraw (its own redraw
-| comes from the sound's observers, which never hear of lfo34_w). slotOf
-| answers -1 for those ids meanwhile, and a turn with a step held (the p-lock
-| editor, 0x40025e10) is ignored, so nothing can reach LFO 1's words.
+| the playing pattern's block instead of the sound, and ask the menu to redraw
+| (its own redraw comes from the sound's observers, which never hear of it).
+| The stock "hold LFO + turn a knob" destination (0x4001eb52) reads and
+| stores id 0x20 through the same +28 / 0x4000b274, so it lands here too.
+| slotOf answers -1 for those ids meanwhile, and a turn with a step held (the
+| p-lock editor, 0x40025e10) is ignored, so nothing can reach LFO 1's words.
 
 | (handle, id) -> d0 = the value (vtable +28, in place of 0x4000ae20)
 lfo34_get:
@@ -481,7 +502,7 @@ l34s_out:
 l34s_stock:
     jmp     0x4000ba7a
 
-| d0 = a parameter id -> Z clear and a0 = its word in lfo34_w (the LFO
+| d0 = a parameter id -> Z clear and a0 = its word in the block (the LFO
 | showing, the selected track) when LFO 3 or 4 shows and it is one of the
 | five LFO ids; Z set otherwise. Clobbers d0/d1/a0/a1.
 l34_ours:
@@ -489,7 +510,7 @@ l34_ours:
     cmpl    lfo_page,%d1
     bhis    l34o_no               | LFO 1 or 2
     lea.l   lfo2_ids,%a0          | Speed, Multiplier, Waveform, Dest, Depth:
-    moveq   #0,%d1                | lfo34_w's own order
+    moveq   #0,%d1                | the block's own order
 l34o_l:
     cmpl    %a0@+,%d0
     beqs    l34o_yes
@@ -515,8 +536,10 @@ l34o_t:
     movel   %sp@+,%d1
     addl    %d1,%d0
     addl    %d1,%d0               | + the word x 2
-    lea.l   lfo34_w,%a0
-    adda.l  %d0,%a0
+    movel   %d0,%sp@-
+    movel   CUR_KIT,%d0
+    bsr     l34_blk
+    adda.l  %sp@+,%a0
     moveq   #3,%d0
     cmpl    lfo_page,%d0
     bnes    l34o_p
@@ -539,7 +562,9 @@ llg_go:
 
 | ---- LFO 2's defaults, after the stock default fill (0x40061866) -------------
 | (sound, ?, group): it writes every word a parameter claims and zero for the
-| rest - LFO 2's included. Put LFO 1's own defaults in LFO 2's words. Its
+| rest - LFO 2's included. Put LFO 1's own defaults in LFO 2's words, and in
+| LFO 3's and 4's when the sound is a pattern's track (clearing a track, a new
+| kit, a sound that failed to load - every reset of a track's sound). Its
 | prologue `lea %sp@(-36),%sp ; moveml %d2-%d3/%a2-%a5,%sp@` is replayed
 | with our epilogue pushed as the return address, as snd_save1_hook does.
 lfo_init_hook:
@@ -555,6 +580,8 @@ lfo_init_post:
     beqs    lip_out
     movea.l %d1,%a0
     bsr     lfo2_defaults
+    movea.l %sp@,%a0              | a track's sound: its LFO 3 and 4 too
+    bsr     l34_snd_reset
 lip_out:
     lea.l   %sp@(12),%sp
     rts
@@ -583,88 +610,384 @@ lfo2_dflt:                        | param_table's defaults for 0x1d,0x1e,0x21,0x
 | lfo2_pack (a1 = sound, a0 = storage) / lfo2_unpack (a0 = storage, a1 =
 | sound): keep d0 and the address registers; clobber d1.
 lfo2_pack:
-    movel   %d2,%sp@-
     movel   %d0,%sp@-
+    movel   %a1,%sp@-
+    lea.l   %a1@(20+2*LFO2_K0),%a1
+    bsr     lfo_pk
+    movel   %d0,%a0@(88)
+    movea.l %sp@+,%a1
+    movel   %sp@+,%d0
+    rts
+
+lfo2_unpack:
+    movel   %d0,%sp@-
+    movel   %a1,%sp@-
+    movel   %a0@(88),%d0
+    lea.l   %a1@(20+2*LFO2_K0),%a1
+    bsr     lfo_upk
+    movea.l %sp@+,%a1
+    movel   %sp@+,%d0
+    rts
+
+| lfo_pk: a1 = an LFO's five words (Speed, Multiplier, Waveform, Destination,
+| Depth) -> d0 = them packed, as above. Clobbers d1.
+lfo_pk:
+    movel   %d2,%sp@-
     move.l  #0x80000000,%d2
-    mvzw    %a1@(20+2*LFO2_K0),%d0        | Speed
+    mvzw    %a1@,%d0              | Speed
     lsrl    #7,%d0
     andil   #0xff,%d0
     moveq   #22,%d1
     lsll    %d1,%d0
     orl     %d0,%d2
-    mvzw    %a1@(20+2*LFO2_K0+2),%d0      | Multiplier
+    mvzw    %a1@(2),%d0           | Multiplier
     lsrl    #8,%d0
     andil   #0x1f,%d0
     moveq   #17,%d1
     lsll    %d1,%d0
     orl     %d0,%d2
-    mvzw    %a1@(20+2*LFO2_K0+4),%d0      | Waveform
+    mvzw    %a1@(4),%d0           | Waveform
     lsrl    #8,%d0
     andil   #7,%d0
     moveq   #14,%d1
     lsll    %d1,%d0
     orl     %d0,%d2
-    mvzw    %a1@(20+2*LFO2_K0+6),%d0      | Destination
+    mvzw    %a1@(6),%d0           | Destination
     lsrl    #8,%d0
     andil   #0x3f,%d0
     lsll    #8,%d0
     orl     %d0,%d2
-    mvzw    %a1@(20+2*LFO2_K0+8),%d0      | Depth
+    mvzw    %a1@(8),%d0           | Depth
     lsrl    #7,%d0
     andil   #0xff,%d0
     orl     %d0,%d2
-    movel   %d2,%a0@(88)
-    movel   %sp@+,%d0
+    movel   %d2,%d0
     movel   %sp@+,%d2
     rts
 
-lfo2_unpack:
+| lfo_upk: d0 = a packed LFO -> a1's five words; without the tag, LFO 1's
+| defaults. Clobbers d0/d1.
+lfo_upk:
     movel   %d2,%sp@-
-    movel   %d0,%sp@-
-    movel   %a0@(88),%d2
-    movel   %d2,%d0
+    movel   %d0,%d2
     moveq   #30,%d1
     lsrl    %d1,%d0
     cmpil   #2,%d0
-    beqs    lu_go
-    movel   %a0,%sp@-             | no LFO 2 in this record: its defaults
-    movea.l %a1,%a0
-    movel   %a1,%sp@-
-    bsr     lfo2_defaults
-    movea.l %sp@+,%a1
+    beqs    lup_go
+    movel   %a0,%sp@-
+    lea.l   lfo2_dflt,%a0
+    movel   %a0@,%a1@
+    movel   %a0@(4),%a1@(4)
+    movew   %a0@(8),%a1@(8)
     movea.l %sp@+,%a0
-    bras    lu_out
-lu_go:
+    bras    lup_out
+lup_go:
     movel   %d2,%d0               | Speed
     moveq   #22,%d1
     lsrl    %d1,%d0
     andil   #0xff,%d0
     lsll    #7,%d0
-    movew   %d0,%a1@(20+2*LFO2_K0)
+    movew   %d0,%a1@
     movel   %d2,%d0               | Multiplier
     moveq   #17,%d1
     lsrl    %d1,%d0
     andil   #0x1f,%d0
     lsll    #8,%d0
-    movew   %d0,%a1@(20+2*LFO2_K0+2)
+    movew   %d0,%a1@(2)
     movel   %d2,%d0               | Waveform
     moveq   #14,%d1
     lsrl    %d1,%d0
     andil   #7,%d0
     lsll    #8,%d0
-    movew   %d0,%a1@(20+2*LFO2_K0+4)
+    movew   %d0,%a1@(4)
     movel   %d2,%d0               | Destination
     lsrl    #8,%d0
     andil   #0x3f,%d0
     lsll    #8,%d0
-    movew   %d0,%a1@(20+2*LFO2_K0+6)
+    movew   %d0,%a1@(6)
     movel   %d2,%d0               | Depth
     andil   #0xff,%d0
     lsll    #7,%d0
-    movew   %d0,%a1@(20+2*LFO2_K0+8)
-lu_out:
-    movel   %sp@+,%d0
+    movew   %d0,%a1@(8)
+lup_out:
     movel   %sp@+,%d2
+    rts
+
+| ============== LFO 3 and 4: one block per pattern, saved with its kit ========
+| All 96 patterns' kits sit in RAM (KIT_BASE + n x KIT_SIZE, model_tg.s), and
+| LFO 1 and 2 live in their track sounds - so they change with the pattern.
+| LFO 3 and 4 do the same from lfo34_kits: a 120-byte block per kit, laid out
+| [LFO 3, LFO 4][track 0..5] x {Speed, Multiplier, Waveform, Destination,
+| Depth}. Everything reads the playing kit's (*CUR_KIT). The block follows the
+| kit everywhere the kit goes:
+|   saved / loaded  kit_save_hook / kit_load_hook, into a gap of the kit's
+|                   storage record (below)
+|   reset           with its track's sound (l34_snd_reset, from the default
+|                   fill hook): clearing a track, a new kit, a new project
+|                   (whose kits 1..95 are copies of kit 0)
+|   copied          kit_memcpy: any memcpy of a whole kit - the new project's
+|                   copies, pattern copy / paste and undo, which keep the kit
+|                   in a buffer of their own
+L34_BLK   = 120                   | one kit's block
+L34_NBUF  = 4                     | kit buffers remembered (kit_memcpy)
+L34_ST    = 648                   | in the kit's storage record (below)
+L34_MAGIC = 0x4C463334            | "LF34"
+
+| d0 = a kit -> a0 = its block and d0 = its index; for anything not one of the
+| 96 kits, a0 = lfo34_w (a spare block) and d0 = -1. Clobbers d1.
+l34_blk:
+    movel   %d2,%sp@-
+    movel   %d0,%d2
+    subil   #KIT_BASE,%d0
+    bcss    lb_no
+    movel   #KIT_SIZE,%d1
+    divul   %d1,%d0
+    cmpil   #NPAT,%d0
+    bccs    lb_no
+    mulul   %d0,%d1               | exactly on a kit?
+    addil   #KIT_BASE,%d1
+    cmpl    %d2,%d1
+    bnes    lb_no
+    moveq   #L34_BLK,%d1
+    mulul   %d0,%d1
+    lea.l   lfo34_kits,%a0
+    adda.l  %d1,%a0
+    bras    lb_out
+lb_no:
+    lea.l   lfo34_w,%a0
+    moveq   #-1,%d0
+lb_out:
+    movel   %sp@+,%d2
+    rts
+
+| a0 = a sound: if it is track t's sound in one of the 96 kits, that kit's
+| LFO 3 and 4 of track t to LFO 1's defaults. Clobbers d0/d1/a0/a1.
+l34_snd_reset:
+    movel   %d2,%sp@-
+    movel   %a0,%d0
+    subil   #KIT_BASE,%d0
+    bcss    lsr_out
+    movel   %d0,%d2
+    movel   #KIT_SIZE,%d1
+    divul   %d1,%d0               | the kit
+    cmpil   #NPAT,%d0
+    bccs    lsr_out
+    mulul   %d0,%d1
+    subl    %d1,%d2               | the offset in it
+    subil   #KIT_SND,%d2
+    bcss    lsr_out
+    movea.l %d2,%a1
+    moveq   #SND_SIZE,%d1
+    divul   %d1,%d2               | the track
+    cmpil   #MAX_TRK,%d2
+    bccs    lsr_out
+    mulul   %d2,%d1               | exactly on its sound?
+    cmpl    %a1,%d1
+    bnes    lsr_out
+    moveq   #L34_BLK,%d1
+    mulul   %d0,%d1
+    lea.l   lfo34_kits,%a0
+    adda.l  %d1,%a0
+    mulu.w  #10,%d2
+    adda.l  %d2,%a0
+    lea.l   lfo2_dflt,%a1
+    movel   %a1@,%a0@             | LFO 3
+    movel   %a1@(4),%a0@(4)
+    movew   %a1@(8),%a0@(8)
+    movel   %a1@,%a0@(60)         | LFO 4
+    movel   %a1@(4),%a0@(64)
+    movew   %a1@(8),%a0@(68)
+lsr_out:
+    movel   %sp@+,%d2
+    rts
+
+| ---- in the kit's storage record --------------------------------------------
+| The kit save 0x4005b2ae (storage, kit, ?) writes the record a project file
+| holds per pattern (version 4): name, levels, the six sounds at +32, the FX
+| block at +632 - of which 0x4005b266 writes +632..+645 and +700..+707 - and
+| the pool at +708. Nothing writes +646..+699, and the kit load 0x4005d080
+| (kit, storage) reads nothing there (its FX part 0x4005b21a reads
+| +632..+645). LFO 3 and 4 go there: L34_MAGIC at +648, then the 12 LFOs at
+| +652..+699, packed as LFO 2's (lfo_pk). A record without the magic - every
+| older one, whatever the gap held - loads LFO 1's defaults. A kit that is
+| not one of the 96 saves the defaults.
+| Both functions' prologues (8 bytes) are replayed, with our epilogue pushed
+| as the return address and the arguments copied above it.
+kit_save_hook:
+    movel   %sp@(12),%sp@-
+    movel   %sp@(12),%sp@-
+    movel   %sp@(12),%sp@-
+    pea     kit_save_post
+    lea.l   %sp@(-28),%sp
+    moveml  %d2-%d3/%a2-%a6,%sp@
+    jmp     0x4005b2b6
+    | sp@(0) = storage, sp@(4) = kit, sp@(8) = the third; d0 = the result
+kit_save_post:
+    tstb    %d0
+    beqs    ksp_out               | nothing saved
+    lea.l   %sp@(-16),%sp
+    moveml  %d0/%d2-%d3/%a2,%sp@
+    movel   %sp@(20),%d0          | the kit
+    bsr     l34_blk
+    movea.l %a0,%a1
+    moveq   #10,%d2               | the next LFO's words
+    tstl    %d0
+    bpls    ksp_go
+    lea.l   lfo2_dflt,%a1         | not one of the 96: the defaults
+    moveq   #0,%d2
+ksp_go:
+    movea.l %sp@(16),%a2          | the storage
+    move.l  #L34_MAGIC,%d0
+    movel   %d0,%a2@(L34_ST)
+    lea.l   %a2@(L34_ST+4),%a2
+    moveq   #11,%d3
+ksp_l:
+    bsr     lfo_pk
+    movel   %d0,%a2@+
+    adda.l  %d2,%a1
+    subql   #1,%d3
+    bpls    ksp_l
+    moveml  %sp@,%d0/%d2-%d3/%a2
+    lea.l   %sp@(16),%sp
+ksp_out:
+    lea.l   %sp@(12),%sp
+    rts
+
+kit_load_hook:
+    movel   %sp@(8),%sp@-
+    movel   %sp@(8),%sp@-
+    pea     kit_load_post
+    lea.l   %sp@(-36),%sp
+    moveml  %d2-%d5/%a2-%a6,%sp@
+    jmp     0x4005d088
+    | sp@(0) = kit, sp@(4) = storage; d0 = the result
+kit_load_post:
+    tstb    %d0
+    beqs    klp_out               | not loaded
+    lea.l   %sp@(-16),%sp
+    moveml  %d0/%d2-%d3/%a2,%sp@
+    movel   %sp@(16),%d0          | the kit
+    bsr     l34_blk
+    tstl    %d0
+    bmis    klp_done              | not one of the 96
+    movea.l %a0,%a1
+    movea.l %sp@(20),%a2          | the storage
+    lea.l   %a2@(L34_ST+4),%a2
+    moveq   #4,%d2
+    move.l  #L34_MAGIC,%d0
+    cmpl    %a2@(-4),%d0
+    beqs    klp_go
+    lea.l   l34_zero,%a2          | no magic: untagged, so the defaults
+    moveq   #0,%d2
+klp_go:
+    moveq   #11,%d3
+klp_l:
+    movel   %a2@,%d0
+    adda.l  %d2,%a2
+    bsr     lfo_upk
+    lea.l   %a1@(10),%a1
+    subql   #1,%d3
+    bpls    klp_l
+klp_done:
+    moveml  %sp@,%d0/%d2-%d3/%a2
+    lea.l   %sp@(16),%sp
+klp_out:
+    addql   #8,%sp
+    rts
+
+| ---- kits copied whole: memcpy (0x4008f1f0) of KIT_SIZE bytes -----------------
+| (dst, src, n). Replaces memcpy's first two instructions `moveal %sp@(4),%a1
+| ; moveal %sp@(8),%a0` (8 bytes); every other size goes straight on. For a
+| kit's size, after the copy the source's block - a kit's, or a buffer's we
+| saw filled - goes to the destination's: a kit's, or else a buffer slot
+| (l34_bufk / l34_bufd, the last L34_NBUF buffers filled). An unknown source
+| leaves the destination's as it was.
+kit_memcpy:
+    movel   %sp@(12),%d0
+    cmpil   #KIT_SIZE,%d0
+    beqs    km_kit
+km_stock:
+    movea.l %sp@(4),%a1
+    movea.l %sp@(8),%a0
+    jmp     0x4008f1f8
+km_kit:
+    movel   %sp@(12),%sp@-
+    movel   %sp@(12),%sp@-
+    movel   %sp@(12),%sp@-
+    bsr     km_stock              | the copy itself
+    lea.l   %sp@(12),%sp
+    movel   %a2,%sp@-
+    movel   %sp@(12),%d0          | the source
+    bsr     l34_blk
+    tstl    %d0
+    bpls    km_src
+    movel   %sp@(12),%d0
+    bsr     l34_buf_find
+    movel   %a0,%d0
+    beqs    km_out                | unknown: nothing to carry
+km_src:
+    movea.l %a0,%a2
+    movel   %sp@(8),%d0           | the destination
+    bsr     l34_blk
+    tstl    %d0
+    bpls    km_cp
+    movel   %sp@(8),%d0
+    bsr     l34_buf_put
+km_cp:
+    moveq   #L34_BLK/4-1,%d1
+km_l:
+    movel   %a2@+,%a0@+
+    subql   #1,%d1
+    bpls    km_l
+km_out:
+    movea.l %sp@+,%a2
+    movel   %sp@(4),%d0           | memcpy's result: the destination
+    rts
+
+| d0 = a buffer -> a0 = its slot's block, or 0. Clobbers d0/d1.
+l34_buf_find:
+    movel   %d2,%sp@-
+    lea.l   l34_bufk,%a0
+    moveq   #0,%d1
+lbf_l:
+    cmpl    %a0@+,%d0
+    beqs    lbf_yes
+    addql   #1,%d1
+    moveq   #L34_NBUF,%d2
+    cmpl    %d1,%d2
+    bnes    lbf_l
+    suba.l  %a0,%a0
+    bras    lbf_out
+lbf_yes:
+    moveq   #L34_BLK,%d0
+    mulul   %d1,%d0
+    lea.l   l34_bufd,%a0
+    adda.l  %d0,%a0
+lbf_out:
+    movel   %sp@+,%d2
+    rts
+
+| d0 = a buffer -> a0 = its slot's block: the one it has, or else the oldest
+| slot, now its. Clobbers d0/d1.
+l34_buf_put:
+    movel   %d0,%sp@-
+    bsr     l34_buf_find
+    movel   %a0,%d0
+    bnes    lbp_out
+    movel   l34_bufn,%d1          | the oldest
+    lea.l   l34_bufk,%a0
+    movel   %sp@,%d0
+    movel   %d0,%a0@(0,%d1:l:4)
+    movel   %d1,%d0
+    addql   #1,%d0
+    andil   #L34_NBUF-1,%d0
+    movel   %d0,l34_bufn
+    moveq   #L34_BLK,%d0
+    mulul   %d1,%d0
+    lea.l   l34_bufd,%a0
+    adda.l  %d0,%a0
+lbp_out:
+    addql   #4,%sp
     rts
 
 | ---- p-locks in saved patterns: words past 22 ------------------------------
@@ -736,7 +1059,7 @@ str_lfo2:
 | ---- state ------------------------------------------------------------------
     .balign 4
 lfo2_on:    .long 0               | the LFO menu shows LFO 2: remap ids
-lfo_ate:    .long 0               | we took an LFO press: take its release
+lfo_pend:   .long 0               | an LFO press let through: tap or hold?
 lfo_live:   .long 0               | an LFO menu (stock, or LFO 3/4's) is up
 lfo_page:   .long 0               | the LFO it shows: 0..3 = LFO 1..4
 lfo_view:   .long 0               | the LFO menu's View, for redraws
@@ -744,10 +1067,15 @@ lfo_dbuf:   .long 0               | lfo_dests: the four destinations
 lfo2_state: .space 6*32           | the engine's state for LFO 2
 lfo34_state: .space 2*6*32        | ... for LFO 3 and LFO 4
 lfo2_buf:   .space 14+6*66+2      | the parameter block lfo_one builds
-| LFO 3 and 4's settings: [LFO][track] x {Speed, Multiplier, Waveform,
-| Destination, Depth}, words as the sound's (LFO 1's defaults to start)
+| LFO 3 and 4's spare block (l34_blk's answer for a kit not one of the 96),
+| laid out as lfo34_kits' (LFO 1's defaults to start)
 lfo34_w:    .rept 12
             .word 28672, 1024, 0, 0, 16384
             .endr
+lfo34_kits: .space NPAT*L34_BLK       | LFO 3 and 4 of each pattern's kit
+l34_bufk:   .long -1, -1, -1, -1      | kit_memcpy: the buffers remembered
+l34_bufn:   .long 0                   | ... the next slot to reuse
+l34_bufd:   .space L34_NBUF*L34_BLK   | ... and their blocks
+l34_zero:   .long 0                   | an untagged LFO: the defaults
 
     .align 2

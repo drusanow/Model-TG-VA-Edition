@@ -292,18 +292,23 @@ examples: [GEN.md](GEN.md).
 ## LFO 2, 3 and 4
 
 *VA Edition only.* Three more LFOs on every track. Press **LFO** to open the
-LFO menu as usual (LFO 1); press **LFO** again for LFO 2 (a **2** shows
+LFO menu as usual (LFO 1); tap **LFO** again for LFO 2 (a **2** shows
 under *LFO*), again for LFO 3, again for LFO 4, and once more to close. On
 LFO 2 the menu and the **LFO SPEED** knob edit LFO 2's Waveform, Multiplier,
 Destination, Depth and Speed, which p-lock and are saved like LFO 1's. LFO 3
-and 4 look and work the same, but **they cannot be p-locked and are not
-saved** (they keep their settings until power-off).
+and 4 look and work the same, but **they cannot be p-locked**; they are
+saved with the pattern (each pattern has its own, like LFO 1 and 2).
+
+- The LFO changes when you let go of a *tap*. Hold **LFO** and turn a knob
+  to make that knob's parameter the destination of the LFO showing - the
+  page stays. The stock *Clear LFO* clears the LFO showing.
+- Clearing a track's sound, clearing the pattern's sounds, and a new
+  project reset all four LFOs.
 
 - The LFOs never share a destination: scrolling DEST skips the ones the
   track's other LFOs use (*None* excepted).
 - LFO Setup (**FUNC** + **LFO**: Trig Mode, Fade, Start Phase) is shared by
   all of them; the Cycles has no room for more sets.
-- **Clear LFO** resets LFO 1 only.
 
 Details and limits: [LFO2.md](LFO2.md).
 
@@ -439,7 +444,8 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + **TRACK** | trig generator (Generate menu) |
 | anywhere | **SETTINGS** + return | master FX off |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
-| LFO menu | **LFO** (again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
+| LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
+| LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
 | grid | **SETTINGS** + trig key | slide trig on / off |
 | browser | pick a sample file | load it onto the Sampler track |
 | step held | **PRESET**, pick a sample | sample lock |

@@ -167,11 +167,13 @@ class TKeys(unittest.TestCase):
         on = lambda: e.r32(e.sym['lfo2_on'])
         self.assertEqual((on(), e.r32(e.sym['lfo_live'])), (0, 1))
         self.assertEqual(self.key(8, False), 'stock')       # the opening press's release
-        self.assertEqual(self.key(8, True), ('ours', 1))    # second press: LFO 2
+        self.assertEqual(self.key(8, True), 'stock')        # second press: stock takes it
+        self.assertEqual(on(), 0)                           # ... and nothing switches yet
+        self.assertEqual(self.key(8, False), ('ours', 1))   # a tap's release: LFO 2
         self.assertEqual(on(), 1)
         self.assertEqual(e.visits[0x40076082], 1)           # redrawn
-        self.assertEqual(self.key(8, False), ('ours', 1))   # its release: swallowed
-        self.assertEqual(self.key(8, True), ('ours', 1))    # third press: LFO 3
+        self.assertEqual(self.key(8, True), 'stock')        # third tap: LFO 3
+        self.assertEqual(self.key(8, False), ('ours', 1))
         self.assertEqual(on(), 0)                           # (TMenu34 has the rest)
         e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0x1234})
         self.assertEqual((on(), e.r32(e.sym['lfo_live'])), (0, 0))
@@ -388,19 +390,49 @@ class TMenu34(unittest.TestCase):
         self.assertEqual(page(), (0, 0))
         self.assertEqual(self.key(False), 'stock')          # the opening press's release
         for want in ((1, 1), (2, 0), (3, 0)):                # LFO 2, 3, 4
-            self.assertEqual(self.key(True), ('ours', 1))
+            self.assertEqual(self.key(True), 'stock')        # the press: stock's
+            self.assertEqual(e.r32(s['lfo_pend']), 1)
+            self.assertEqual(self.key(False), ('ours', 1))   # a tap: the next LFO
             self.assertEqual(page(), want)
-            self.assertEqual(self.key(False), ('ours', 1))   # its release swallowed
         self.assertEqual(e.visits[0x40076082], 3)
         self.assertEqual(e.r32(s['lfo_view']), SCRATCH + 0xa000)
         self.assertEqual(self.key(True, repeat=True), ('ours', 1))
         self.assertEqual(page(), (3, 0))
         self.assertEqual(self.key(True, func=True), 'stock') # LFO Setup
         self.assertEqual(self.key(True), 'stock')            # LFO 4: stock closes it
+        self.assertEqual(e.r32(s['lfo_pend']), 0)
         self.assertEqual(self.key(False), 'stock')
+        self.assertEqual(page(), (3, 0))
         e.run_to_any('lfo_menu_dtor', (0x400d97a2,), regs={A[2]: 0})
         self.assertEqual((e.r32(s['lfo_page']), e.r32(s['lfo_live']), e.r32(s['lfo_view'])),
                          (0, 0, 0))
+
+    def test_hold_keeps_the_lfo(self):
+        """Hold LFO and turn a knob: the stock knob handler sets the menu's
+        hold flag (view - 56 + 604); the release is then stock's and the LFO
+        showing stays, on every page."""
+        e = self.e; s = e.sym
+        VIEW = SCRATCH + 0xa000
+        e.run_to_any('lfo_menu_new', (0x40025798,), stack=[SCRATCH])
+        self.assertEqual(self.key(False), 'stock')          # the opening press's release
+        for page in range(3):
+            e.w32(s['lfo_page'], page); e.w32(s['lfo2_on'], int(page == 1))
+            self.assertEqual(self.key(True), 'stock')
+            e.w8(VIEW - 56 + 604, 0xff)                      # a knob turned while held
+            self.assertEqual(self.key(False), 'stock')       # stock: clears it, stays
+            self.assertEqual((e.r32(s['lfo_page']), e.r32(s['lfo2_on'])), (page, int(page == 1)))
+            self.assertEqual(e.r32(s['lfo_pend']), 0)
+            e.w8(VIEW - 56 + 604, 0)
+        e.w32(s['lfo_page'], 1); e.w32(s['lfo2_on'], 1)
+        self.assertEqual(self.key(True), 'stock')            # LFO + NO (Clear LFO):
+        self.assertEqual(self.key(True, kc=18), 'stock')     # another key while held
+        self.assertEqual(self.key(False, kc=18), 'stock')
+        self.assertEqual(self.key(False), 'stock')           # the release: stock's
+        self.assertEqual(e.r32(s['lfo_page']), 1)
+        e.w32(s['lfo_page'], 2); e.w32(s['lfo2_on'], 0)
+        self.assertEqual(self.key(True), 'stock')            # then a tap still moves on
+        self.assertEqual(self.key(False), ('ours', 1))
+        self.assertEqual(e.r32(s['lfo_page']), 3)
 
     def test_slot_answers(self):
         e = self.e; s = e.sym
@@ -476,6 +508,165 @@ class TMenu34(unittest.TestCase):
             else:
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(bytes(e.uc.mem_read(calls[0], 2)), want.encode() + b'\0')
+
+
+class TKits(unittest.TestCase):
+    """LFO 3 and 4 per pattern: one block per kit in RAM (l34_blk), read from
+    the playing kit, reset with a track's sound, saved in and loaded from the
+    gap of the kit's storage record, and carried by whole-kit copies."""
+    KIT_BASE, KIT_SIZE, NPAT = 0x409C9C80, 7094, 96
+    CUR_KIT = 0x40a78888
+    STO = SCRATCH + 0x10000                       # a kit storage record
+
+    def setUp(self):
+        self.e = emu()
+        self.s = self.e.sym
+        # the fill's body stands in as its own epilogue (TLfo2's test_default_fill_hook)
+        self.e.uc.mem_write(0x4006186e, bytes.fromhex('4fef00244e75'))
+
+    def save(self, kit, ok=1, regs=None):
+        """kit_save_hook with the stock body (0x4005b2b6) standing in as
+        `moveq #ok,d0` and its epilogue: drop the 28-byte frame, return"""
+        e = self.e
+        e.uc.mem_write(0x4005b2b6, bytes.fromhex('70%02x4fef001c4e75' % ok))
+        args = e.run('kit_save_hook', stack=[self.STO, kit, 0], regs=regs)
+        self.assertEqual(e.sp(), args)                      # balanced
+        return e.d(0)
+
+    def load(self, kit, ok=1):
+        e = self.e
+        e.uc.mem_write(0x4005d088, bytes.fromhex('70%02x4fef00244e75' % ok))
+        args = e.run('kit_load_hook', stack=[kit, self.STO])
+        self.assertEqual(e.sp(), args)
+        return e.d(0)
+
+    def kit(self, n):
+        return self.KIT_BASE + n * self.KIT_SIZE
+
+    def blk(self, n):
+        return self.s['lfo34_kits'] + 120 * n
+
+    def words(self, a, n=60):
+        return [self.e.r16(a + 2 * i) for i in range(n)]
+
+    def fill(self, a, seed):
+        rnd = random.Random(seed)
+        vals = []
+        for i in range(60):
+            f = i % 5                                # Speed Mult Wave Dest Depth
+            v = [rnd.randrange(256) << 7, rnd.randrange(32) << 8, rnd.randrange(8) << 8,
+                 rnd.randrange(33) << 8, rnd.randrange(256) << 7][f]
+            vals.append(v)
+            self.e.w16(a + 2 * i, v)
+        return vals
+
+    def test_block_of_a_kit(self):
+        e = self.e
+        for n in (0, 1, 47, 95):
+            e.run('l34_blk', regs={D[0]: self.kit(n), D[2]: 0x2222})
+            self.assertEqual((e.d(0), e.a(0), e.d(2)), (n, self.blk(n), 0x2222))
+        for a in (0, self.kit(0) - 1, self.kit(3) + 28, self.kit(96), SCRATCH):
+            e.run('l34_blk', regs={D[0]: a})
+            self.assertEqual((s32(e.d(0)), e.a(0)), (-1, self.s['lfo34_w']))
+
+    def test_playing_kit_answers(self):
+        e = self.e; s = self.s
+        code(e, 0x40012412, '7004 4e75')                    # the selected track: 4
+        e.w32(self.CUR_KIT, self.kit(9))
+        e.w32(s['lfo_page'], 3)                              # LFO 4
+        e.w16(self.blk(9) + 60 + 40 + 6, 0x1100)             # its track 4 Destination
+        e.run_to_any('lfo34_get', (0x4000ae20, RET), stack=[0, 0x20])
+        self.assertEqual(e.d(0), 0x1100)
+        e.run_to_any('lfo34_set', (0x4000ba7a, RET), stack=[0, 0x24, 777, 0, 0])
+        self.assertEqual(e.r16(self.blk(9) + 60 + 40 + 8), 777)
+        e.w32(self.CUR_KIT, self.kit(10))                    # another pattern
+        e.run_to_any('lfo34_get', (0x4000ae20, RET), stack=[0, 0x20])
+        self.assertEqual(e.d(0), 0)
+
+    def test_save_load_round_trip(self):
+        e = self.e; s = self.s
+        vals = self.fill(self.blk(5), 1)
+        self.assertEqual(self.save(self.kit(5), regs={D[2]: 7, D[3]: 8, A[2]: 9}), 1)
+        self.assertEqual((e.d(2), e.d(3), e.a(2)), (7, 8, 9))
+        self.assertEqual(e.r32(self.STO + 648), 0x4C463334)
+        self.assertEqual(self.load(self.kit(60)), 1)
+        self.assertEqual(self.words(self.blk(60)), vals)
+        self.assertEqual(self.words(self.blk(5)), vals)       # the source untouched
+
+    def test_nothing_else_in_the_record(self):
+        e = self.e
+        self.fill(self.blk(2), 2)
+        e.uc.mem_write(self.STO, b'\xa5' * 7108)
+        self.save(self.kit(2), ok=1)
+        got = bytes(e.uc.mem_read(self.STO, 7108))
+        changed = [i for i in range(7108) if got[i] != 0xa5]
+        self.assertTrue(changed and min(changed) >= 648 and max(changed) <= 699, changed[:4])
+
+    def test_failed_save_or_load_untouched(self):
+        e = self.e
+        e.uc.mem_write(self.STO, b'\xa5' * 7108)
+        self.save(self.kit(2), ok=0)
+        self.assertEqual(bytes(e.uc.mem_read(self.STO, 7108)), b'\xa5' * 7108)
+        vals = self.fill(self.blk(3), 3)
+        self.load(self.kit(3), ok=0)
+        self.assertEqual(self.words(self.blk(3)), vals)
+
+    def test_old_record_loads_defaults(self):
+        e = self.e
+        for gap in (b'\0' * 52, b'\xff' * 52, bytes(range(52))):
+            self.fill(self.blk(4), 4)
+            e.uc.mem_write(self.STO + 648, gap)
+            self.load(self.kit(4), ok=1)
+            self.assertEqual(self.words(self.blk(4)), DFLT * 12)
+
+    def test_scratch_kit_saves_defaults(self):
+        e = self.e
+        self.save(SCRATCH + 0x20000, ok=1)
+        self.load(self.kit(8), ok=1)
+        self.assertEqual(self.words(self.blk(8)), DFLT * 12)
+        vals = self.fill(self.blk(8), 8)                      # loading into a scratch
+        self.load(SCRATCH + 0x20000, ok=1)
+        self.assertEqual(self.words(self.blk(8)), vals)       # kit touches no block
+
+    def test_track_reset(self):
+        e = self.e
+        vals = self.fill(self.blk(7), 7)
+        e.run('lfo_init_hook', stack=[self.kit(7) + 28 + 3 * 100, 3, -1])
+        want = list(vals)
+        for lfo in (0, 1):
+            want[30 * lfo + 15:30 * lfo + 20] = DFLT        # track 3's LFO 3 and 4
+        self.assertEqual(self.words(self.blk(7)), want)
+        for snd in (self.kit(7) + 28 + 6 * 100,              # the pool's first
+                    self.kit(7) + 28 + 2 * 100 + 2,          # not a sound's start
+                    self.kit(7) + 10, SCRATCH + 0x5000):
+            e.run('lfo_init_hook', stack=[snd, 0, -1])
+            self.assertEqual(self.words(self.blk(7)), want)
+
+    def test_memcpy_other_sizes(self):
+        e = self.e
+        for n in (0, 16, 100, 7093, 7095, 30710):
+            st = e.run_to_any('kit_memcpy', (0x4008f1f8,), stack=[0x1111, 0x2222, n])
+            self.assertEqual((st, e.a(1), e.a(0)), (0x4008f1f8, 0x1111, 0x2222))
+
+    def test_memcpy_carries_the_block(self):
+        e = self.e; s = self.s
+        vals = self.fill(self.blk(0), 10)
+        e.run('kit_memcpy', stack=[self.kit(1), self.kit(0), self.KIT_SIZE],
+              regs={D[2]: 2, D[3]: 3, A[2]: 0x2a2a})
+        self.assertEqual((e.d(0), e.d(2), e.d(3), e.a(2)), (self.kit(1), 2, 3, 0x2a2a))
+        self.assertEqual(self.words(self.blk(1)), vals)       # kit -> kit
+        BUF = SCRATCH + 0x30000
+        e.run('kit_memcpy', stack=[BUF, self.kit(1), self.KIT_SIZE])   # copy
+        self.fill(self.blk(1), 11)                            # edited meanwhile
+        e.run('kit_memcpy', stack=[self.kit(20), BUF, self.KIT_SIZE])  # paste
+        self.assertEqual(self.words(self.blk(20)), vals)
+        later = self.fill(self.blk(21), 12)
+        e.run('kit_memcpy', stack=[self.kit(21), SCRATCH + 0x38000, self.KIT_SIZE])
+        self.assertEqual(self.words(self.blk(21)), later)     # unknown source: kept
+        for i in range(6):                                     # oldest buffers forgotten
+            e.run('kit_memcpy', stack=[SCRATCH + 0x40000 + 0x2000 * i, self.kit(i), self.KIT_SIZE])
+        e.run('kit_memcpy', stack=[self.kit(30), SCRATCH + 0x40000 + 0x2000 * 5, self.KIT_SIZE])
+        self.assertEqual(self.words(self.blk(30)), self.words(self.blk(5)))
 
 
 @unittest.skipUnless(os.environ.get('MODEL_CYCLES_STOCK'), "set MODEL_CYCLES_STOCK for the real-engine test")

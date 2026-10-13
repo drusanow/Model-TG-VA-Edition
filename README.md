@@ -51,11 +51,13 @@ keeps working.
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale
   and octave range, and random velocities in a range.
-- **Three more LFOs** (this fork) on every track: press **LFO** again for
-  LFO 2, 3 and 4. Same waves, sync and destinations as the stock LFO, never
+- **Three more LFOs** (this fork) on every track: tap **LFO** again for
+  LFO 2, 3 and 4; hold **LFO** and turn a knob to set the destination of
+  the LFO showing. Same waves, sync and destinations as the stock LFO, never
   two on one destination; they share LFO 1's Setup (Trig Mode, Fade,
-  Phase). LFO 2 p-locks and is saved; LFO 3 and 4 are not saved and do not
-  p-lock (the Cycles' storage is full).
+  Phase). All four are saved with the pattern and reset with the track's
+  sound; LFO 2 p-locks, LFO 3 and 4 do not (the Cycles' sound storage is
+  full - they are kept in a spare part of the pattern's kit record).
   Also fixes Model-TG's Attack/Filter/Resonance p-locks, which landed on
   the wrong parameters after a pattern was saved and reloaded.
 - **A Sampler machine**, the seventh machine on any track. It plays samples

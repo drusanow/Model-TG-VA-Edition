@@ -1,8 +1,8 @@
 # LFO 2, 3 and 4: more LFOs on every track
 
 *VA Edition only.* Every track gets three more LFOs, each the stock LFO's
-twin. LFO 2 is a full LFO: p-lockable and saved. LFO 3 and LFO 4 are
-lighter: no p-locks, and kept only until power-off (see
+twin. LFO 2 is a full LFO: p-lockable and saved with the sound. LFO 3 and
+LFO 4 are lighter: no p-locks, saved with the pattern (see
 [LFO 3 and LFO 4](#lfo-3-and-lfo-4)).
 
 **Status: verified on the host only (see [Verification](#verification)).
@@ -11,10 +11,16 @@ Not yet tested on hardware: back up first.**
 ## Using it
 
 - Press **LFO** as usual: the LFO menu opens on **LFO 1**.
-- Press **LFO** again: the same menu now edits **LFO 2**, and a **2** appears
+- Tap **LFO** again: the same menu now edits **LFO 2**, and a **2** appears
   under the word *LFO* on the left of the screen.
-- Press **LFO** a third time for **LFO 3**, a fourth for **LFO 4**, and a
+- Tap **LFO** a third time for **LFO 3**, a fourth for **LFO 4**, and a
   fifth to close (or leave any other way). The menu always opens on LFO 1.
+- **Tap or hold.** The LFO changes when you let go of **LFO**, and only if
+  you did nothing else while it was down. Hold **LFO** and turn a knob (the
+  stock way to set the destination to that knob's parameter) and the LFO
+  showing gets it and stays showing. Pressing another key while **LFO** is
+  down counts as a hold too: the stock *Clear LFO* clears the LFO showing,
+  and the release then does what it does on stock.
 - On LFO 2, the menu and the **LFO SPEED** knob edit LFO 2's Waveform,
   Multiplier, Destination, Depth and Speed. They work exactly as LFO 1's do:
   same waves, tempo sync and destinations. Each value can be p-locked: hold a
@@ -31,18 +37,27 @@ Not yet tested on hardware: back up first.**
 
 ### LFO 3 and LFO 4
 
-- Press **LFO** on LFO 2 for **LFO 3** (a **3** under *LFO*), again for
+- Tap **LFO** on LFO 2 for **LFO 3** (a **3** under *LFO*), again for
   **LFO 4**, and once more to close. It is the same LFO menu: the same rows
   (Wav, Mul, Dst, Dep), icon and values, and the **LFO SPEED** knob sets the
   LFO showing, exactly as on LFO 1 and LFO 2.
 - **No p-locks.** With LFO 3 or 4 showing, turning a value while holding a
   step does nothing (it never touches LFO 1's or 2's locks).
-- **Not saved.** The Cycles' sound and pattern storage is full (LFO 2 used the
-  last free space), so LFO 3 and 4 live in Model-TG's memory, per track. They
-  keep their settings across pattern and project changes until power-off,
-  then start again with LFO 1's defaults (destination *None*).
-- They belong to the **track**, not the pattern or sound: changing patterns
-  keeps them running as set.
+- **Saved with the pattern.** The sound record has no room left (LFO 2 took
+  the last of it), so LFO 3 and 4 belong to the pattern's **kit**, per
+  track: each of the 96 patterns has its own, they change when the pattern
+  changes (as LFO 1 and 2 do, being in the track sounds), and they are
+  saved in the project, in a part of each pattern's kit record the Cycles
+  leaves unused. Projects saved before this version load them at LFO 1's
+  defaults (destination *None*); projects saved with them still load on the
+  stock OS or older Model-TG, which ignore them.
+- **Reset like LFO 1.** Clearing a track's sound, clearing a pattern's
+  sounds, a new project, and *Clear LFO* (on the LFO showing) put them back
+  to LFO 1's defaults. Pattern copy / paste and undo carry them with the
+  pattern.
+- They are not part of the sound: loading a preset or pasting a copied
+  sound does not carry them, and undoing a sound clear does not bring them
+  back.
 - They share LFO Setup (Trig Mode, Fade, Start Phase) with LFO 1, like LFO 2.
 - An LFO 3 or 4 with no destination on any track costs no CPU at all.
 
@@ -57,7 +72,8 @@ whichever LFO the menu was on.
 
 ### Other limits
 
-- **Clear LFO** (the stock command) resets LFO 1 only.
+- **Clear LFO** (the stock command) clears the LFO the menu shows.
+  Fade, Start Phase and Trig Mode, shared by all four, are cleared with it.
 - LFO 2's Speed and Depth are saved with the sound to half a displayed
   step; anything finer is rounded down when the sound is saved. Pattern
   p-locks keep full precision.
@@ -68,7 +84,7 @@ whichever LFO the menu was on.
 
 ## How it works
 
-The fork patches nine stock sites, each asserted byte for byte by
+The fork patches the stock sites below, each asserted byte for byte by
 `build.py`. The code is in `src/lfo2.inc`.
 
 | what | where (OS 1.13) | change |
@@ -77,10 +93,13 @@ The fork patches nine stock sites, each asserted byte for byte by
 | audio | `jsr 0x40091ab2` at 0x400597c6 | `lfo_run`: the stock LFO engine runs twice, first for LFO 2, then for LFO 1 |
 | UI | slotOf 0x4005a4e8 | while LFO 2 shows, ids 0x1d/0x1e/0x21/0x20/0x24 map to words 28..32 |
 | menu | constructor call 0x4001c3dc, destructor 0x400d979a | every menu starts on LFO 1; nothing stays remapped after it closes |
-| key | LFO menu View vtable +8 (0x401016e4) | a second LFO press switches to LFO 2, and its release is swallowed |
+| key | LFO menu View vtable +8 (0x401016e4) | a tap of LFO switches to the next LFO at its release; a hold (the stock menu's knob-while-held flag, view - 56 + 604, or another key) leaves it to stock |
 | draw | LFO menu View vtable +0x10 (0x401016ec) | stock draw, then "2" on the second title line |
 | DEST | `fine_hook` (track handle slot 0x14) for id 0x20 | skips the other LFO's destination |
-| defaults | default fill 0x40061866 | LFO 2 gets LFO 1's defaults after a sound init |
+| defaults | default fill 0x40061866 | LFO 2, and for a pattern's track sound LFO 3 and 4, get LFO 1's defaults after a sound init |
+| LFO 3/4 | handle get/set (vtable 0x400fd134 +28/+92), p-lock editor 0x40025e10 | pages 3 and 4 of the LFO menu (below) |
+| kit | kit save 0x4005b2ae, kit load 0x4005d080 | LFO 3/4 into and out of the kit record's unused +646..+699 |
+| copies | memcpy 0x4008f1f0 | a whole kit's copy (7094 bytes) carries its LFO 3/4 |
 | save/load | `snd_save_post` / `snd_load_post` | packed into the sound record's free long at +88 |
 | locks | pattern lock save 0x4005b9c6, load 0x4005aa1a | slot numbers for words 23..32 (see below) |
 
@@ -128,14 +147,32 @@ the loader maps them back for tracks 0-5:
 Stock words keep their stock slots (0..23, slot 18 unused), and the FX row
 (track 6) is untouched.
 
+**LFO 3 and 4 per pattern.** All 96 kits sit in RAM at `0x409C9C80 + n x
+7094` (track sounds at +28 + 100t; `*0x40a78888` is the playing one).
+`lfo34_kits` holds a 120-byte block per kit: LFO 3 then LFO 4, tracks 0-5,
+five words each. Audio and the menu use the playing kit's block
+(`l34_blk`). The kit's storage record (the per-pattern record in the
+project file) is written by `0x4005b2ae`: name, levels, sounds at +32, the
+FX block at +632 (of which `0x4005b266` writes +632..+645 and +700..+707)
+and the sound pool at +708. Nothing writes or reads +646..+699, so
+`kit_save_hook` puts `"LF34"` at +648 and the 12 LFOs packed as LFO 2's at
++652..+699; `kit_load_hook` reads them back, or LFO 1's defaults when the
+magic is missing. A whole-kit memcpy - the new project's kits 1-95 copied
+from kit 0, pattern copy / paste / undo through their buffers - carries
+the block: from a kit or a buffer seen filled (the last four are
+remembered) to a kit or a buffer. The blocks take 11.5 KB of Model-TG's
+memory; the blob now uses 8 of the filesystem cache's 16 blocks.
+
 ## Verification
 
 Host verified (`tests/test_lfo2.py`, Unicorn ColdFire V4e):
 
 - slotOf remaps only the five ids, and only while LFO 2 shows.
 - The key sequence LFO → LFO → LFO → LFO → LFO opens LFO 1, switches to LFO
-  2, 3 and 4 (each redrawn, its release swallowed), then closes through the
-  stock handling. Repeats are ignored, FUNC + LFO stays stock, and the
+  2, 3 and 4 at each tap's release (each redrawn), then closes through the
+  stock handling. A press held while a knob turns (the stock flag set), or
+  while another key is pressed, keeps the LFO showing and leaves the
+  release to stock. Repeats are ignored, FUNC + LFO stays stock, and the
   number under *LFO* is "2", "3" or "4" as it should be.
 - DEST skips every other LFO's destination on the selected track (three in
   a row if need be), for each of the four pages, not another track's, and
@@ -154,6 +191,14 @@ Host verified (`tests/test_lfo2.py`, Unicorn ColdFire V4e):
 - Sound pack/unpack round-trips, untagged records load defaults, and the
   default-fill hook writes defaults with a balanced stack.
 - Lock rows: every word 0..32 maps to a slot and back, and 26/27 are dropped.
+- LFO 3/4 per kit: each of the 96 kits maps to its block and nothing else
+  does; the menu reads and writes the playing kit's; a kit saves and loads
+  back exactly (to the packing's precision), writing nothing outside
+  +648..+699 of the record, and nothing on a failed save or load; a record
+  without the magic loads defaults; a scratch kit saves defaults and loads
+  into no block; a track's sound reset resets that track's LFO 3 and 4 only;
+  memcpy of other sizes is untouched, and a kit's copy carries its block
+  kit to kit and through a buffer, but not from an unknown source.
 - **On the real stock engine** (with `MODEL_CYCLES_STOCK` set): LFO 2
   matches LFO 1 sample for sample on every wave except RND, which shares the
   RNG. LFO 3 and LFO 4 match LFO 1 too. LFO 1's output under `lfo_run` is
@@ -177,6 +222,14 @@ Needs hardware:
 8. CPU page with six tracks with all four LFOs running: no dropouts.
 9. LFO, LFO, LFO, LFO, LFO: pages 1-4 ("2", "3", "4" under LFO), the same
    rows and icon on each, then closed. LFO SPEED sets the LFO showing.
+   On each page, hold LFO and turn a knob: that LFO gets the destination,
+   and the page stays when LFO is let go.
 10. LFO 3/4 values look like LFO 1's (wave names, multipliers, destination
     names); DST skips the other three LFOs' destinations.
 11. LFO 3 on Pitch and LFO 4 on Filter alongside LFO 1 and 2: all four move.
+12. Set LFO 3/4 on two patterns differently; switch patterns: each plays its
+    own. Save the project, power off, load it: both come back.
+13. Clear a track's sound, clear a pattern's sounds, and start a new
+    project: LFO 3 and 4 at defaults. Copy a pattern and paste it: its LFO 3
+    and 4 come along. Load a project saved by the previous firmware: LFO 3
+    and 4 at defaults.

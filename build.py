@@ -205,7 +205,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'va_swap','va_det_tab',
               'lfo2_ids','lfo2_dflt','lk_ext_slot','lk_ext_word',
               'gen_desc','gen_items','gen_n_mod','gen_n_key','gen_n_scl','gen_masks',
-              'gen_n_num','gen_n_go','lfo34_w',
+              'gen_n_num','gen_n_go','lfo34_w','lfo34_kits','l34_bufk','l34_bufd','l34_zero',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
@@ -575,13 +575,35 @@ for _a,_old,_new,_what in (
     (0x400fd190,'4000ba7a',_p('lfo34_set'),'track handle set'),
     # the LFO menu's p-lock editor: lea sp@(-16),sp ; movel a2,sp@-
     (0x40025e10,'4feffff02f0a','4ef9'+_p('lfo34_lock_gate'),'LFO p-lock editor'),
+    # LFO 3/4 saved with the kit: the kit save (storage, kit, ?) and load (kit,
+    # storage), whose prologues `lea sp@(-28),sp ; moveml d2-d3/a2-a6,sp@` and
+    # `lea sp@(-36),sp ; moveml d2-d5/a2-a6,sp@` the hooks replay
+    (0x4005b2ae,'4fefffe448d77c0c','4ef9'+_p('kit_save_hook')+'4e71','kit save'),
+    (0x4005d080,'4fefffdc48d77c3c','4ef9'+_p('kit_load_hook')+'4e71','kit load'),
+    # ...and copied with it: memcpy's moveal sp@(4),a1 ; moveal sp@(8),a0
+    (0x4008f1f0,'226f0004206f0008','4ef9'+_p('kit_memcpy')+'4e71','memcpy'),
     ):
     _o=_a-BASE; _ob=bytes.fromhex(_old); _nb=bytes.fromhex(_new)
     assert len(_ob)==len(_nb), (_what, len(_ob), len(_nb))
     assert bytes(d[_o:_o+len(_ob)])==_ob, (_what, hex(_a), bytes(d[_o:_o+len(_ob)]).hex())
     d[_o:_o+len(_nb)]=_nb
 print("  LFO 2-4: engine call, slotOf, LFO menu (new/key/draw/delete), default fill, lock rows,"
-      " handle get/set, p-lock editor")
+      " handle get/set, p-lock editor, kit save/load, memcpy")
+# What lfo2.inc's kit-record gap rests on: the FX block save 0x4005b266 writes
+# +0..+3 and the 13 mapped words (map 0x4010ee04..0x4010ee38: slots 0..4, so
+# +4..+13), then 8 zero bytes at +68 - nothing at +14..+67 (kit +646..+699);
+# the FX load 0x4005b21a reads +0 and +4..+12 only; the kits sit where
+# model_tg.s's KIT_BASE says (the UI's pattern/kit pairs, 0x4002019e); and the
+# "hold LFO + turn a knob" destination stores id 0x20 through 0x4000b274.
+for _a,_hex in ((0x4005b278,'41f94010ee04 2018 5480 35990a00 b1fc4010ee38 66f0 48780008 42a7 486a0044'),
+                (0x4005b22a,'4a91 6634 30a90004 71280008 316900060012 316900080014 3169000a0016 3169000c0018'),
+                (0x4002019e,'0681409c9c80'),
+                (0x4001ebe8,'2f02 48780020 2f00 4e94'),
+                ):
+    _b=bytes.fromhex(_hex.replace(' ',''))
+    assert bytes(d[_a-BASE:_a-BASE+len(_b)])==_b, (hex(_a), bytes(d[_a-BASE:_a-BASE+len(_b)]).hex())
+_m=[struct.unpack('>i',bytes(d[_x-BASE:_x-BASE+4]))[0] for _x in range(0x4010ee04,0x4010ee38,4)]
+assert max(_m)+2<=6, _m          # the FX save's highest word: +4 + 2 x 4 = +12
 # Start/End waveform: slot 0x90 of the parameter view's vtable, the value popup
 # 0x4001d818, goes through wf_popup (stock for everything but Sampler Start/End).
 assert struct.unpack('>I',bytes(d[0x401005bc-BASE:0x401005c0-BASE]))[0]==0x4001d818, \
@@ -917,7 +939,8 @@ nres=(end-CACHE_BASE+CACHE_BLK-1)//CACHE_BLK     # blocks the blob occupies
 # 11 of 16 blocks stay the
 # filesystem's; our own sample loading reads the eMMC directly, not through it.
 # The Plaits Edition's engines and tables take a seventh (9 of 16 stay the
-# filesystem's); up to eight are allowed.
+# filesystem's), and LFO 3/4's per-pattern blocks an eighth (8 of 16); up to
+# eight are allowed.
 assert 1<=nres<=8, f"blob spans {nres} cache blocks - too much of the cache"
 # head = first entry we do NOT occupy; the prev-link loop starts one past it
 for addr,old,newv,what in ((0x400792f2, 0x401eb750, CACHE_ENTRY+20*nres,      'LRU head'),
