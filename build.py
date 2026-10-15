@@ -650,6 +650,17 @@ if not os.environ.get('NO_TWEAKS'):
         assert struct.unpack('>I',bytes(d[_o-BASE:_o-BASE+4]))[0]==_old, hex(_o)
         d[_o-BASE:_o-BASE+4]=struct.pack('>I',sym[_sym])
     print("  quick mute: queued pads, applied on close")
+# Track solo: SETTINGS + a pad on the main page. Its PadHandler vtable entry
+# (the thunk 0x4001d3d4 to the pad handler 0x4001d180) goes through qm_pad
+# (src/mutesolo.inc). The quantised mutes ride on mq_apply above, and on the
+# stock step counter 0x40a78840 / play flag 0x40a7883c, which the sequencer
+# tick 0x40054c1e advances after it has built a step's trigs.
+assert struct.unpack('>I',bytes(d[0x401002b0-BASE:0x401002b4-BASE]))[0]==0x4001d3d4, 'main page pad entry moved'
+assert bytes(d[0x4001d3d4-BASE:0x4001d3de-BASE])==bytes.fromhex('70f0d1af00046000fda4'), 'pad thunk moved'
+assert bytes(d[0x40055610-BASE:0x40055626-BASE])==bytes.fromhex('2239 40a78840 7c01 33c1 40a78846 5281 23c1 40a78840'.replace(' ','')), \
+    'step counter update moved'
+d[0x401002b0-BASE:0x401002b4-BASE]=struct.pack('>I',sym['qm_pad'])
+print(f"  main page pads -> qm_pad 0x{sym['qm_pad']:08x} (SETTINGS + pad: solo)")
 # Transfer identity (CYC / SMP): the identity reply builder in 0x40084ade. Its
 # list copy (from `pea 0x22`) goes through id_hook, the product number
 # (`moveq #27,%d1 ; lea %sp@(40),%sp`) through id_hook2, and its name `pea`

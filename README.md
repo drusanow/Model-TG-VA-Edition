@@ -60,6 +60,10 @@ keeps working.
   full - they are kept in a spare part of the pattern's kit record).
   Also fixes Model-TG's Attack/Filter/Resonance p-locks, which landed on
   the wrong parameters after a pattern was saved and reloaded.
+- **Quantised mute and track solo** (this fork): mutes wait for the next
+  bar (or the pattern's top, or happen at once: Device Config > Mute Q), and
+  **SETTINGS** + a pad solos that track, on the bar too. See
+  [docs/MUTESOLO.md](docs/MUTESOLO.md).
 - **A Sampler machine**, the seventh machine on any track. It plays samples
   from the Cycles' internal storage, a different sample per pattern, with
   p-lockable per-step sample locks.

@@ -407,6 +407,16 @@ upload samples, including stereo WAVs. Every power-on starts at CYC.
 **In SMP, use Transfer for samples only, and never accept an OS update from
 it.**
 
+## Quantised mute and track solo
+
+*Plaits Edition.* With the sequencer playing, mutes from mute mode (**FUNC** +
+pads, or latched mute mode) change on the first step of the next bar instead
+of at once. **SETTINGS** + a pad solos that track, on the next bar too; the same
+chord on the soloed track brings back the mutes from before (**SOLO OFF**).
+**Device Config > Mute Q** chooses **1BAR** (the default), **PTN** (when the
+pattern comes round) or **OFF** (at once, as stock). Stopped, everything
+happens at once. Details: [MUTESOLO.md](MUTESOLO.md).
+
 ## The System page
 
 **Device Config > System** shows the audio CPU load (now and at its worst)
@@ -447,6 +457,8 @@ are included (build with `--no-tweaks` to leave them out):
 | LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
 | grid | **SETTINGS** + trig key | slide trig on / off |
+| main page | **SETTINGS** + pad | solo that track (again: back), on the next bar |
+| mute mode | pads | mute / unmute on the next bar (Device Config > Mute Q) |
 | browser | pick a sample file | load it onto the Sampler track |
 | step held | **PRESET**, pick a sample | sample lock |
 | slice editor | **PUNCH** | arm or stop tap slicing |

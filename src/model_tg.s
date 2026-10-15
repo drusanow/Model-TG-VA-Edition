@@ -11722,6 +11722,7 @@ tick_hook:
     jsr     nm_tick
     jsr     sys_tick
     jsr     rs_watch
+    jsr     qm_poll               | quantised mutes (mutesolo.inc)
     moveml  %sp@,%d0-%d7/%a0-%a3
     lea.l   %sp@(48),%sp
     rts
@@ -14992,6 +14993,10 @@ cfg_hook:
     movel   %a2,%sp@-
     jsr     lm_add_row
     addql   #8,%sp
+    pea     qm_row                | and Mute Q (mutesolo.inc)
+    movel   %a2,%sp@-
+    jsr     lm_add_row
+    addql   #8,%sp
     moveml  %sp@,%d0-%d1/%a0-%a1
     lea.l   %sp@(16),%sp
     moveml  %sp@(24),%d2-%d6/%a2-%fp
@@ -15376,13 +15381,12 @@ mq_toggle:
 mqt_out:
     rts
 
-| (kit, track): what the pad should show - muted, flipped if pending
+| (kit, track): what the pad should show - muted once the quantised changes
+| are made (qm_fut), flipped if pending
 mq_muted:
-    movel   %sp@(8),%sp@-         | track
-    movel   %sp@(8),%sp@-         | kit
-    jsr     0x4001263c
-    addql   #8,%sp
-    andil   #0xff,%d0
+    jsr     qm_fut
+    movel   %sp@(8),%d1           | track
+    btst    %d1,%d0
     sne     %d0
     andil   #1,%d0                | 1 = muted
     movel   %d2,%sp@-
@@ -15405,15 +15409,8 @@ mqa_l:
     movel   mq_pending,%d0
     btst    %d2,%d0
     beqs    mqa_n
-    jsr     0x400cf866
-    movel   %d0,%sp@-
-    jsr     0x4000eb90
-    addql   #4,%sp
-    pea     1                     | with the CC, as the stock pad did
-    movel   %d2,%sp@-
-    movel   %d0,%sp@-
-    jsr     0x40013904            | toggle
-    lea.l   %sp@(12),%sp
+    movel   %d2,%d0               | quantised: at the next bar, or the
+    jsr     qm_flip               | pattern's top (mutesolo.inc)
 mqa_n:
     addql   #1,%d2
     cmpil   #MAX_TRK,%d2
@@ -19509,6 +19506,7 @@ led_hook:
     jsr     sys_tick
     jsr     rs_watch
     jsr     sld_tick              | slide trigs double-blink
+    jsr     qm_poll               | quantised mutes (mutesolo.inc)
     lea.l   ld_busy,%a0
     clrl    %a0@
 lh_out:
@@ -20852,6 +20850,8 @@ msg_buf:    .space 64
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2
     .include "lfo2.inc"
+    .align 2
+    .include "mutesolo.inc"
     .align 2
     .include "gen.inc"
 
