@@ -1,7 +1,7 @@
 {
  "format": 1,
  "name": "Model-TG Plaits Edition",
- "version": "ab75989-dirty",
+ "version": "5654d67",
  "source": "https://github.com/drusanow/model-tg-va-edition",
  "license": "MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) drumkilla",
  "device": "Model:Cycles",
