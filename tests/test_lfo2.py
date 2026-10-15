@@ -544,7 +544,7 @@ class TKits(unittest.TestCase):
         return self.KIT_BASE + n * self.KIT_SIZE
 
     def blk(self, n):
-        return self.s['lfo34_kits'] + 120 * n
+        return self.s['lfo34_kits'] + 124 * n                # 120 of LFOs, the send FX types
 
     def words(self, a, n=60):
         return [self.e.r16(a + 2 * i) for i in range(n)]
@@ -600,7 +600,7 @@ class TKits(unittest.TestCase):
         self.save(self.kit(2), ok=1)
         got = bytes(e.uc.mem_read(self.STO, 7108))
         changed = [i for i in range(7108) if got[i] != 0xa5]
-        self.assertTrue(changed and min(changed) >= 648 and max(changed) <= 699, changed[:4])
+        self.assertTrue(changed and min(changed) >= 646 and max(changed) <= 699, changed[:4])
 
     def test_failed_save_or_load_untouched(self):
         e = self.e

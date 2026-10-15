@@ -417,7 +417,10 @@ These were each verified on hardware; they save a lot of rediscovery.
   after 10.9 s (one turn of the delay's ring) with no track sounding and
   both effects silent, delay and reverb are skipped entirely - frozen, their
   outputs silence - until the next sound, from which they carry on as if
-  paused. Idle: the output stage fell from ~24% to ~13% of the CPU
+  paused. Idle: the output stage fell from ~24% to ~13% of the CPU.
+  Each send can carry another effect instead (Plaits Edition,
+  [SENDFX.md](SENDFX.md)): the stock one then runs on silence and ours
+  writes its output
 - Silent tracks cost less: a stock track with no note sounding and no
   pulse this block skips its parameter function (it runs on the trigger
   block), and an idle Sampler track skips its per-voice update and render

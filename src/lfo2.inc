@@ -716,7 +716,7 @@ lup_out:
 | ============== LFO 3 and 4: one block per pattern, saved with its kit ========
 | All 96 patterns' kits sit in RAM (KIT_BASE + n x KIT_SIZE, model_tg.s), and
 | LFO 1 and 2 live in their track sounds - so they change with the pattern.
-| LFO 3 and 4 do the same from lfo34_kits: a 120-byte block per kit, laid out
+| LFO 3 and 4 do the same from lfo34_kits: a 124-byte block per kit, laid out
 | [LFO 3, LFO 4][track 0..5] x {Speed, Multiplier, Waveform, Destination,
 | Depth}. Everything reads the playing kit's (*CUR_KIT). The block follows the
 | kit everywhere the kit goes:
@@ -728,7 +728,8 @@ lup_out:
 |   copied          kit_memcpy: any memcpy of a whole kit - the new project's
 |                   copies, pattern copy / paste and undo, which keep the kit
 |                   in a buffer of their own
-L34_BLK   = 120                   | one kit's block
+L34_BLK   = 124                   | one kit's block: 120 of LFOs, then the send
+                                  | effects' types (sendfx.inc)
 L34_NBUF  = 4                     | kit buffers remembered (kit_memcpy)
 L34_ST    = 648                   | in the kit's storage record (below)
 L34_MAGIC = 0x4C463334            | "LF34"
@@ -847,6 +848,19 @@ ksp_l:
     adda.l  %d2,%a1
     subql   #1,%d3
     bpls    ksp_l
+    moveq   #0,%d0                | the send effects' types (sendfx.inc): a1
+    tstl    %d2                   | is now on them, or stock for a kit not
+    beqs    ksp_t                 | one of the 96
+    moveb   %a1@,%d0
+    moveq   #0,%d1
+    moveb   %a1@(1),%d1
+    lsll    #4,%d1
+    orl     %d1,%d0
+ksp_t:
+    movea.l %sp@(16),%a2
+    moveb   %d0,%a2@(SFX_ST)
+    notl    %d0
+    moveb   %d0,%a2@(SFX_ST+1)
     moveml  %sp@,%d0/%d2-%d3/%a2
     lea.l   %sp@(16),%sp
 ksp_out:
@@ -863,7 +877,7 @@ kit_load_hook:
     | sp@(0) = kit, sp@(4) = storage; d0 = the result
 kit_load_post:
     tstb    %d0
-    beqs    klp_out               | not loaded
+    beqw    klp_out               | not loaded
     lea.l   %sp@(-16),%sp
     moveml  %d0/%d2-%d3/%a2,%sp@
     movel   %sp@(16),%d0          | the kit
@@ -888,6 +902,31 @@ klp_l:
     lea.l   %a1@(10),%a1
     subql   #1,%d3
     bpls    klp_l
+    movea.l %sp@(20),%a2          | the send effects' types (sendfx.inc), a1
+    moveq   #0,%d0                | now on them: stock unless their complement
+    moveb   %a2@(SFX_ST),%d0      | follows
+    moveq   #0,%d1
+    moveb   %a2@(SFX_ST+1),%d1
+    eorl    %d0,%d1
+    cmpil   #0xff,%d1
+    beqs    klp_t
+    moveq   #0,%d0
+klp_t:
+    moveq   #15,%d1
+    andl    %d0,%d1
+    lsrl    #4,%d0
+    moveq   #SFX_ND,%d2
+    cmpl    %d2,%d1
+    bcss    klp_d
+    moveq   #0,%d1
+klp_d:
+    moveq   #SFX_NR,%d2
+    cmpl    %d2,%d0
+    bcss    klp_r
+    moveq   #0,%d0
+klp_r:
+    moveb   %d1,%a1@
+    moveb   %d0,%a1@(1)
 klp_done:
     moveml  %sp@,%d0/%d2-%d3/%a2
     lea.l   %sp@(16),%sp
@@ -1072,6 +1111,7 @@ lfo2_buf:   .space 14+6*66+2      | the parameter block lfo_one builds
 lfo34_w:    .rept 12
             .word 28672, 1024, 0, 0, 16384
             .endr
+            .long 0                   | the send effects: stock
 lfo34_kits: .space NPAT*L34_BLK       | LFO 3 and 4 of each pattern's kit
 l34_bufk:   .long -1, -1, -1, -1      | kit_memcpy: the buffers remembered
 l34_bufn:   .long 0                   | ... the next slot to reuse

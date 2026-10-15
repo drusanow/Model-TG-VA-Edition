@@ -251,8 +251,9 @@ rebuilt the table to twelve entries.
 
 **Space.** The blob grows to ~113 KB: seven of the filesystem's sixteen
 16 KiB cache blocks, one more than the VA Edition. LFO 3 and 4's
-per-pattern blocks ([LFO2.md](LFO2.md)) add 11.5 KB and take an eighth
-(~126 KB, 5 KB spare); eight stay the filesystem's.
+per-pattern blocks ([LFO2.md](LFO2.md)) add 11.5 KB and take an eighth;
+quantised mute and the alternative send effects ([SENDFX.md](SENDFX.md))
+fill it (~131 KB, ~250 bytes spare). Eight stay the filesystem's.
 
 **CPU** (`tests/test_plaits.py`, `VA_TEST_VERBOSE=1`): the worst block of
 `mi_fill` (instructions), against the VA's ~3,700 and the drums' ~6,000:

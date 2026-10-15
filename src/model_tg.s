@@ -4318,6 +4318,7 @@ KEY_PRESET = 5
 KEY_PATTERN= 3         | measured: Track 2, Pattern 3, Preset 5, FUNC 1, PAGE 15
 KEY_OPTS   = 6         | measured: the options button (samplerEU's probe)
 KEY_RESAMPLE = 9       | measured: samplerFG's probe; the user's pick
+KEY_PAGE   = 15        | measured: Settings + Page opens the Send FX menu
 KEY_RETRIG = 4         | measured: samplerHJ's probe (F9 held, F16 released)
 KEY_ATKMOD = KEY_PRESET | the modifier the attack dial uses. Track was
                         | taken (it copies a dial to every track) and
@@ -4750,6 +4751,8 @@ kh_rs:
 kh_rs_nt:
     cmpil   #KEY_RETRIG,%d0
     beqw    kh_rt
+    cmpil   #KEY_PAGE,%d0         | Settings + Page: the Send FX menu (sendfx.inc)
+    beqw    kh_sfx
     cmpil   #MM_KEY_RETURN,%d0
     beqw    kh_rx
     cmpil   #KEY_RESAMPLE,%d0
@@ -4843,6 +4846,40 @@ kh_t_new:
     tstl    %a1@
     beqw    kh_out
     lea.l   kh_eaten4,%a1
+    moveq   #1,%d1
+    movel   %d1,%a1@
+    movel   %d1,mod_used
+    movel   %a0@(16),%d1
+    oril    #8,%d1
+    movel   %d1,%a0@(16)
+    braw    kh_eat
+
+    | ---- Settings + Page: the Send FX menu, its press and release swallowed ----
+kh_sfx:
+    movel   %a0@(16),%d1
+    lea.l   kh_eaten7,%a1
+    btst    #0,%d1
+    bnes    kh_f_down
+    tstl    %a1@
+    beqw    kh_out
+    clrl    %a1@
+    braw    kh_eat
+kh_f_down:
+    btst    #3,%d1                | a fresh press opens, even if an old flag
+    beqs    kh_f_new              | was left behind
+    tstl    %a1@
+    bnew    kh_eat
+    braw    kh_out
+kh_f_new:
+    movel   %a0,%sp@-
+    movel   %d0,%sp@-
+    jsr     sfx_menu_open
+    movel   %sp@+,%d0
+    movea.l %sp@+,%a0
+    lea.l   mm_opened,%a1
+    tstl    %a1@
+    beqw    kh_out
+    lea.l   kh_eaten7,%a1
     moveq   #1,%d1
     movel   %d1,%a1@
     movel   %d1,mod_used
@@ -9396,6 +9433,7 @@ kh_eaten3:     .long 0   | a resample test press swallowed by the chord
 kh_eaten4:     .long 0   | a Retrig press swallowed by the chord
 kh_eaten5:     .long 0   | a Return press swallowed by Settings + Return
 kh_eaten2:     .long 0   | an options-menu press swallowed by the chord
+kh_eaten7:     .long 0   | a Page press swallowed by Settings + Page
 loop_mode:     .long 0,0,0,0,0,0,0   | per track, 1 = loop; one-shot is default
 msg_loop:      .asciz "Loop"
 msg_slice:     .asciz "Slice"
@@ -9851,7 +9889,9 @@ dbh_pass:
     MK_BASE     = UI_BUF - 0x2300 | manual slices: 64 x {hash, n, 32 starts,
                                   | changed}
     SLD_BASE    = MK_BASE - 0x800 | slide trigs: armed and running glides
-    PCM_TOP     = SLD_BASE        | samples and takes stay below this
+    SFX_DBUF    = SLD_BASE - 0x80000 | the send effects' delay lines (sendfx.inc)
+    SFX_RBUF    = SFX_DBUF - 0x20000 | ... and the spring's
+    PCM_TOP     = SFX_RBUF        | samples and takes stay below this
     PCM_CACHED  = 0x4C000000      | from here up the data cache holds it (ACR1,
                                   | set in boot_extra_hook): files go here
                                   | first. Below, the 16 MiB block shared with
@@ -14659,7 +14699,7 @@ fxa_w:
     tstw    %d0
     bnes    fxa_w
 fxa_go:
-    jmp     0x40057488
+    jmp     sfx_dly               | the delay, or its slot's other effect (sendfx.inc)
 fx_zero:                          | a0: 32 stereo frames of silence
     moveq   #31,%d0
     moveq   #0,%d1
@@ -14679,7 +14719,7 @@ fx_b:
 fxb_run:
     movel   %sp@+,%d0             | the caller's stack, exactly, for the reverb
     movel   %d0,fx_ret
-    jsr     0x400579c4
+    jsr     sfx_rev               | the reverb, or its slot's other effect (sendfx.inc)
     movel   fx_ret,%d0
     movel   %d0,%sp@-
     tstl    fx_insil              | nothing in, nothing out: count toward off
@@ -20852,6 +20892,7 @@ msg_buf:    .space 64
     .include "lfo2.inc"
     .align 2
     .include "mutesolo.inc"
+    .include "sendfx.inc"
     .align 2
     .include "gen.inc"
 

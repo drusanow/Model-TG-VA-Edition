@@ -64,6 +64,11 @@ keeps working.
   bar (or the pattern's top, or happen at once: Device Config > Mute Q), and
   **SETTINGS** + a pad solos that track, on the bar too. See
   [docs/MUTESOLO.md](docs/MUTESOLO.md).
+- **Alternative send effects** (this fork): **SETTINGS** + **PAGE** opens
+  Send FX, which puts a ping-pong, tape or chorus/flanger in the delay's
+  place, and a phaser, spring, ring modulator or distortion in the reverb's.
+  The FX page's knobs drive them, and each pattern keeps its own. See
+  [docs/SENDFX.md](docs/SENDFX.md).
 - **A Sampler machine**, the seventh machine on any track. It plays samples
   from the Cycles' internal storage, a different sample per pattern, with
   p-lockable per-step sample locks.

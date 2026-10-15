@@ -149,8 +149,9 @@ Stock words keep their stock slots (0..23, slot 18 unused), and the FX row
 
 **LFO 3 and 4 per pattern.** All 96 kits sit in RAM at `0x409C9C80 + n x
 7094` (track sounds at +28 + 100t; `*0x40a78888` is the playing one).
-`lfo34_kits` holds a 120-byte block per kit: LFO 3 then LFO 4, tracks 0-5,
-five words each. Audio and the menu use the playing kit's block
+`lfo34_kits` holds a 124-byte block per kit: LFO 3 then LFO 4, tracks 0-5,
+five words each, then the send effects' two types ([SENDFX.md](SENDFX.md),
+saved at +646..+647). Audio and the menu use the playing kit's block
 (`l34_blk`). The kit's storage record (the per-pattern record in the
 project file) is written by `0x4005b2ae`: name, levels, sounds at +32, the
 FX block at +632 (of which `0x4005b266` writes +632..+645 and +700..+707)

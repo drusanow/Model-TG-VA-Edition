@@ -210,7 +210,10 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
               'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg',
-              'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn'}   # pointer tables (menu descriptors), not code
+              'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
+              'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
+              'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
+              'sfx_rwp','sfx_ok','sfx_rate','sfx_apc'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -582,13 +585,16 @@ for _a,_old,_new,_what in (
     (0x4005d080,'4fefffdc48d77c3c','4ef9'+_p('kit_load_hook')+'4e71','kit load'),
     # ...and copied with it: memcpy's moveal sp@(4),a1 ; moveal sp@(8),a0
     (0x4008f1f0,'226f0004206f0008','4ef9'+_p('kit_memcpy')+'4e71','memcpy'),
+    # the send effects' types back to stock with the kit's FX defaults (the
+    # FX default fill 0x40061318: lea sp@(-28),sp ; moveml d2/a2-a4,sp@)
+    (0x40061318,'4fefffe448d71c04','4ef9'+_p('sfx_fxd')+'4e71','FX default fill'),
     ):
     _o=_a-BASE; _ob=bytes.fromhex(_old); _nb=bytes.fromhex(_new)
     assert len(_ob)==len(_nb), (_what, len(_ob), len(_nb))
     assert bytes(d[_o:_o+len(_ob)])==_ob, (_what, hex(_a), bytes(d[_o:_o+len(_ob)]).hex())
     d[_o:_o+len(_nb)]=_nb
 print("  LFO 2-4: engine call, slotOf, LFO menu (new/key/draw/delete), default fill, lock rows,"
-      " handle get/set, p-lock editor, kit save/load, memcpy")
+      " handle get/set, p-lock editor, kit save/load, memcpy, FX default fill")
 # What lfo2.inc's kit-record gap rests on: the FX block save 0x4005b266 writes
 # +0..+3 and the 13 mapped words (map 0x4010ee04..0x4010ee38: slots 0..4, so
 # +4..+13), then 8 zero bytes at +68 - nothing at +14..+67 (kit +646..+699);
@@ -950,8 +956,8 @@ nres=(end-CACHE_BASE+CACHE_BLK-1)//CACHE_BLK     # blocks the blob occupies
 # 11 of 16 blocks stay the
 # filesystem's; our own sample loading reads the eMMC directly, not through it.
 # The Plaits Edition's engines and tables take a seventh (9 of 16 stay the
-# filesystem's), and LFO 3/4's per-pattern blocks an eighth (8 of 16); up to
-# eight are allowed.
+# filesystem's), and LFO 3/4's per-pattern blocks an eighth (8 of 16), which
+# quantised mute and the send effects fill; up to eight are allowed.
 assert 1<=nres<=8, f"blob spans {nres} cache blocks - too much of the cache"
 # head = first entry we do NOT occupy; the prev-link loop starts one past it
 for addr,old,newv,what in ((0x400792f2, 0x401eb750, CACHE_ENTRY+20*nres,      'LRU head'),

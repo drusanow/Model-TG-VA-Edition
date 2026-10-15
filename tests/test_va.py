@@ -483,6 +483,7 @@ class T7Static(unittest.TestCase):
                            ('gen_va_icons.py', ['src/va_icons/va_icon_A_48x33.bin',
                                                 'src/va_icons/va_icon_B_34x34.bin']),
                            ('gen_mi_tables.py', ['src/mi_tables.inc']),
+                           ('gen_sfx_tables.py', ['src/sfx_tables.inc']),
                            ('gen_mi_icons.py', ['src/va_icons/plaits_icon_A_48x33.bin',
                                                 'src/va_icons/plaits_icon_B_34x34.bin'] +
                             [f'src/va_icons/mi_{n}_B_34x34.bin' for n in

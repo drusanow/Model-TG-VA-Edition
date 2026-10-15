@@ -417,6 +417,21 @@ chord on the soloed track brings back the mutes from before (**SOLO OFF**).
 pattern comes round) or **OFF** (at once, as stock). Stopped, everything
 happens at once. Details: [MUTESOLO.md](MUTESOLO.md).
 
+## Alternative send effects
+
+*Plaits Edition.* **SETTINGS** + **PAGE** opens **Send FX**. Turn **DATA** on
+its rows:
+
+- **Delay**: **DELAY** (stock), **PING** (ping-pong), **TAPE** (tape echo) or
+  **CHORUS** (chorus, flanger past half Feedback).
+- **Reverb**: **REVERB** (stock), **PHASER**, **SPRING**, **RING** (ring
+  modulator) or **DIST** (distortion).
+
+The sends work as before. The FX page's Delay Time / Feedback and Reverb
+Size / Tone drive the chosen effect: echo time and repeats, LFO speed and
+depth, decay and brightness, carrier and shape, drive and tone. Each pattern
+keeps its own choice, saved with it. Details: [SENDFX.md](SENDFX.md).
+
 ## The System page
 
 **Device Config > System** shows the audio CPU load (now and at its worst)
@@ -453,6 +468,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + **RETRIG** | retrig page and master FX |
 | anywhere | **SETTINGS** + **TRACK** | trig generator (Generate menu) |
 | anywhere | **SETTINGS** + return | master FX off |
+| anywhere | **SETTINGS** + **PAGE** | Send FX: the delay's and reverb's effects |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
 | LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
