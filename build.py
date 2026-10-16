@@ -213,7 +213,9 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
               'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
-              'sfx_rwp','sfx_ok','sfx_rate','sfx_apc'}   # pointer tables (menu descriptors), not code
+              'sfx_rwp','sfx_ok','sfx_rate','sfx_apc',
+              'lcc_st','lcc_mask','lcc_tick','lcc_rr','lcc_ld','lcc_dirty','lcc_zero','lcc_name',
+              'lcc_last','lcc_msg','lcc_num','lcc_val','lcc_sent','lcc_tk','lcc_lof'}   # pointer tables (menu descriptors), not code
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
@@ -956,8 +958,9 @@ nres=(end-CACHE_BASE+CACHE_BLK-1)//CACHE_BLK     # blocks the blob occupies
 # 11 of 16 blocks stay the
 # filesystem's; our own sample loading reads the eMMC directly, not through it.
 # The Plaits Edition's engines and tables take a seventh (9 of 16 stay the
-# filesystem's), and LFO 3/4's per-pattern blocks an eighth (8 of 16), which
-# quantised mute and the send effects fill; up to eight are allowed.
+# filesystem's), and LFO 3/4's per-pattern blocks an eighth (8 of 16); those
+# blocks have since moved to the sample region (L34_KITS), leaving room for
+# the features after them. Up to eight are allowed.
 assert 1<=nres<=8, f"blob spans {nres} cache blocks - too much of the cache"
 # head = first entry we do NOT occupy; the prev-link loop starts one past it
 for addr,old,newv,what in ((0x400792f2, 0x401eb750, CACHE_ENTRY+20*nres,      'LRU head'),

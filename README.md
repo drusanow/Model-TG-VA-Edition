@@ -69,6 +69,10 @@ keeps working.
   place, and a phaser, spring, ring modulator or distortion in the reverb's.
   The FX page's knobs drive them, and each pattern keeps its own. See
   [docs/SENDFX.md](docs/SENDFX.md).
+- **LFOs to MIDI CC** (this fork): a **MIDI CC** row in the LFO menu sends
+  any of the four LFOs of a track to a CC on that track's MIDI channel, as
+  well as (or instead of) its Destination. See
+  [docs/LFOCC.md](docs/LFOCC.md).
 - **A Sampler machine**, the seventh machine on any track. It plays samples
   from the Cycles' internal storage, a different sample per pattern, with
   p-lockable per-step sample locks.

@@ -9891,7 +9891,9 @@ dbh_pass:
     SLD_BASE    = MK_BASE - 0x800 | slide trigs: armed and running glides
     SFX_DBUF    = SLD_BASE - 0x80000 | the send effects' delay lines (sendfx.inc)
     SFX_RBUF    = SFX_DBUF - 0x20000 | ... and the spring's
-    PCM_TOP     = SFX_RBUF        | samples and takes stay below this
+    L34_KITS    = SFX_RBUF - 0x3000 | LFO 3/4 and the send FX of each kit
+                                  | (lfo2.inc: lfo34_kits, cleared at boot)
+    PCM_TOP     = L34_KITS        | samples and takes stay below this
     PCM_CACHED  = 0x4C000000      | from here up the data cache holds it (ACR1,
                                   | set in boot_extra_hook): files go here
                                   | first. Below, the 16 MiB block shared with
@@ -19547,6 +19549,7 @@ led_hook:
     jsr     rs_watch
     jsr     sld_tick              | slide trigs double-blink
     jsr     qm_poll               | quantised mutes (mutesolo.inc)
+    jsr     lcc_poll              | LFOs to MIDI CCs (lfocc.inc)
     lea.l   ld_busy,%a0
     clrl    %a0@
 lh_out:
@@ -20893,6 +20896,7 @@ msg_buf:    .space 64
     .align 2
     .include "mutesolo.inc"
     .include "sendfx.inc"
+    .include "lfocc.inc"
     .align 2
     .include "gen.inc"
 

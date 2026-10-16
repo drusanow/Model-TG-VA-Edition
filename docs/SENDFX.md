@@ -58,7 +58,8 @@ the stock delay and reverb.
   is chosen, so that switching back is clean. The new effect's cost comes
   on top of theirs (see below).
 - Sample memory is 640 KB smaller: the delay's lines (512 KB) and the
-  spring's (128 KB) sit at the top of the sample region.
+  spring's (128 KB) sit at the top of the sample region. LFO 3/4's
+  per-pattern blocks take another 12 KB there.
 
 ## How it works
 
@@ -125,9 +126,8 @@ The code is in `src/sendfx.inc`.
   SETTINGS + PAGE (key 15) is handled in `key_hook` like the other
   SETTINGS chords (`kh_sfx`). It sets `mod_used`, so SETTINGS' release
   opens no Config menu.
-- **Space.** The code takes the last of the eighth cache block (about
-  250 bytes are left). Its state lives in the sample region, past the
-  spring's lines.
+- **Space.** The code fits in the eighth cache block. Its state lives in
+  the sample region, past the spring's lines.
 
 ## Verification
 

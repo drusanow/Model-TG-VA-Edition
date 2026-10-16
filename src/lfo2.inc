@@ -62,18 +62,33 @@ lfo_run:
     bsr     l34_blk
     moveq   #10,%d3
     lea.l   lfo34_state,%a4
+    movel   lcc_mask,%d0          | sent as a CC (lfocc.inc): run it anyway
+    btst    #2,%d0
+    beqs    lr_3
+    bsr     lfo_one
+    bras    lr_3d
+lr_3:
     bsr     lfo_one_if            | LFO 3
+lr_3d:
     movel   CUR_KIT,%d0
     bsr     l34_blk
     lea.l   %a0@(60),%a0
     moveq   #10,%d3
     lea.l   lfo34_state+192,%a4
+    movel   lcc_mask,%d0
+    btst    #3,%d0
+    beqs    lr_4
+    bsr     lfo_one
+    bras    lr_4d
+lr_4:
     bsr     lfo_one_if            | LFO 4
+lr_4d:
     movel   %d5,%sp@-             | LFO 1, as stock
     movel   %d4,%sp@-
     movel   %a5,%sp@-
     jsr     LFO_ENGINE
     lea.l   %sp@(12),%sp
+    jsr     lcc_calc              | the LFOs sent as MIDI CCs (lfocc.inc)
     moveml  %sp@,%d2-%d5/%a2-%a5
     lea.l   %sp@(32),%sp
     rts
@@ -221,8 +236,18 @@ lfo_menu_new:
     clrl    lfo_view
     moveq   #1,%d0
     movel   %d0,lfo_live
-    jmp     0x40025798            | the constructor, with the caller's args
+    movel   %sp@(12),%sp@-        | the constructor, with the caller's args
+    movel   %sp@(12),%sp@-
+    movel   %sp@(12),%sp@-
+    jsr     0x40025798
+    lea.l   %sp@(12),%sp
+    movel   %d0,%sp@-
+    movel   %sp@(8),%d0           | then the MIDI CC row (lfocc.inc)
+    jsr     lcc_row_add
+    movel   %sp@+,%d0
+    rts
 lfo_menu_dtor:
+    jsr     lcc_save              | a MIDI CC changed: the file (lfocc.inc)
     clrl    lfo2_on
     clrl    lfo_pend
     clrl    lfo_live
@@ -1112,7 +1137,12 @@ lfo34_w:    .rept 12
             .word 28672, 1024, 0, 0, 16384
             .endr
             .long 0                   | the send effects: stock
-lfo34_kits: .space NPAT*L34_BLK       | LFO 3 and 4 of each pattern's kit
+| LFO 3 and 4 of each pattern's kit: in the sample region (model_tg.s,
+| L34_KITS), not the blob, which they would fill; the boot clear (phase1.s)
+| zeroes them before anything reads them.
+    .globl  lfo34_kits, lfo34_kits_end
+lfo34_kits = L34_KITS
+lfo34_kits_end = L34_KITS + NPAT*L34_BLK
 l34_bufk:   .long -1, -1, -1, -1      | kit_memcpy: the buffers remembered
 l34_bufn:   .long 0                   | ... the next slot to reuse
 l34_bufd:   .space L34_NBUF*L34_BLK   | ... and their blocks

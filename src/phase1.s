@@ -63,6 +63,14 @@ do_clear:
     lea.l   16(%a0),%a0
     bras    clear_loop
 clear_done:
+    | LFO 3/4's per-pattern blocks (lfo2.inc), kept in the sample region: zero,
+    | as they were when they sat in the blob
+    lea.l   lfo34_kits,%a0
+l34_clear:
+    moveml  %d4-%d7,%a0@
+    lea.l   16(%a0),%a0
+    cmpal   #lfo34_kits_end,%a0
+    bcss    l34_clear
     moveml  %sp@,%d4-%d7
     lea.l   %sp@(16),%sp
 

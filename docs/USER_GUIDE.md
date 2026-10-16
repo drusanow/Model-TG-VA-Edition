@@ -312,6 +312,25 @@ saved with the pattern (each pattern has its own, like LFO 1 and 2).
 
 Details and limits: [LFO2.md](LFO2.md).
 
+### LFOs to MIDI CC
+
+*Plaits Edition.* The LFO menu has a fifth row, **MIDI CC**. Scroll down to
+it and turn **DATA** to pick a CC number (0 to 127), or **OFF**. That LFO of
+that track then sends its movement as that CC, on the track's MIDI channel,
+to whatever is plugged into MIDI OUT or USB. Each of the four LFOs of each
+track has its own CC.
+
+- It goes out as well as to the LFO's **Destination**. For an LFO that only
+  moves the external gear, set Destination to **None**.
+- **Depth** sets how far it sweeps: 0 sends a steady 64, full Depth the whole
+  0 to 127, centred on 64. A negative Depth turns it upside down.
+- The CC numbers are a setting of the machine, like the tracks' MIDI
+  channels. They are not saved with the pattern, but they are kept when you
+  power off.
+- A track whose MIDI channel is OFF sends nothing.
+
+Details: [LFOCC.md](LFOCC.md).
+
 ## The drum machines: VA KICK, VA SNARE, VA HIHAT
 
 *VA Edition only.* Three analogue-style drum machines after the VA. Pitch
@@ -457,6 +476,7 @@ are included (build with `--no-tweaks` to leave them out):
 |---|---|
 | `/Resampled/<name>` | takes saved with **SAV** |
 | `/Slices/<id>` | manual slice markers, one small file per sample |
+| `/lfo_cc.bin` | the LFOs' MIDI CC numbers (Plaits Edition) |
 
 ## Button reference
 
@@ -472,6 +492,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
 | LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
+| LFO menu | **MIDI CC** row, turn **DATA** | the CC the LFO showing sends (OFF, 0-127) |
 | grid | **SETTINGS** + trig key | slide trig on / off |
 | main page | **SETTINGS** + pad | solo that track (again: back), on the next bar |
 | mute mode | pads | mute / unmute on the next bar (Device Config > Mute Q) |
