@@ -90,12 +90,23 @@ class Base(unittest.TestCase):
         return a[1]
 
     def blk(self):
-        return self.s['lfo34_kits'] + 124 * self.KIT
+        return self.s['lfo34_kits'] + 172 * self.KIT
 
-    def num(self, lfo, t, cc):
+    def area(self, kit=None):
+        """A kit's MIDI CC settings: the numbers (0 OFF, CC + 1), then the
+        bases ^ 64."""
+        return self.s['lfo34_kits'] + 172 * (self.KIT if kit is None else kit) + 124
+
+    def num(self, lfo, t, cc, kit=None):
         """LFO lfo of track t sends CC cc (None: OFF)."""
-        self.e.w8(self.s['lcc_num'] + 6 * lfo + t, 0 if cc is None else cc + 1)
-        self.e.run('lcc_remask')
+        self.e.w8(self.area(kit) + 6 * lfo + t, 0 if cc is None else cc + 1)
+        self.e.run('lcc_remask', regs={A[0]: self.area()})
+
+    def base(self, lfo, t, v, kit=None):
+        self.e.w8(self.area(kit) + 24 + 6 * lfo + t, v ^ 64)
+
+    def rbase(self, lfo, t):
+        return self.e.r8(self.area() + 24 + 6 * lfo + t) ^ 64
 
     def state(self, lfo, t):
         return [LFO_STATE, self.s['lfo2_state'], self.s['lfo34_state'],
@@ -119,7 +130,7 @@ class Base(unittest.TestCase):
         w, d = self.words(lfo, t)
         self.e.w16(w, wave << 8)
         self.e.w16(d, 16384 + depth_steps * 256)
-        self.e.w8(self.s['lcc_base'] + 6 * lfo + t, base)
+        self.base(lfo, t, base)
 
     def val(self, lfo, t):
         return self.e.r8(self.s['lcc_val'] + 6 * lfo + t)
@@ -230,7 +241,6 @@ class TCalc(Base):
 class TSend(Base):
     def setUp(self):
         super().setUp()
-        self.e.w32(self.s['lcc_ld'], 1)                         # no file to read
 
     def poll(self, n=1):
         for _ in range(n):
@@ -317,7 +327,7 @@ class TMenu(Base):
     def test_cc_taken_on_the_press(self):
         e = self.e
         e.w32(self.s['lfo_page'], 2)                            # LFO 3
-        i = self.s['lcc_num'] + 12 + self.TRACK
+        i = self.area() + 12 + self.TRACK
         self.turn('lcc_rot', 1)                                  # not editing: nothing
         self.assertEqual(e.r8(i), 0)
         self.press()                                             # into the edit
@@ -329,7 +339,6 @@ class TMenu(Base):
         self.press()                                             # the press: taken
         self.assertEqual(self.toggles, [1, 0])
         self.assertEqual((e.r8(i), e.r32(self.s['lcc_mask'])), (75, 0b100))
-        self.assertEqual(e.r32(self.s['lcc_dirty']), 1)
         self.assertEqual(self.shows('lcc_value'), '74')
         self.press()                                             # again, turned to OFF
         for _ in range(80):
@@ -342,7 +351,7 @@ class TMenu(Base):
     def test_unpressed_edit_takes_nothing(self):
         e = self.e
         e.uc.mem_write(0x400d97a2, bytes.fromhex('588f4e75'))
-        i = self.s['lcc_num'] + self.TRACK
+        i = self.area() + self.TRACK
         self.press()
         self.turn('lcc_rot', 1)
         self.turn('lcc_rot', 1)
@@ -352,7 +361,7 @@ class TMenu(Base):
 
     def test_clamps(self):
         e = self.e
-        i = self.s['lcc_num'] + self.TRACK
+        i = self.area() + self.TRACK
         self.press()
         for _ in range(200):
             self.turn('lcc_rot', 1)
@@ -362,23 +371,22 @@ class TMenu(Base):
     def test_base(self):
         e = self.e
         e.w32(self.s['lfo_page'], 1)
-        i = self.s['lcc_base'] + 6 + self.TRACK
-        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (64, '64'))
+        b = lambda: self.rbase(1, self.TRACK)
+        self.assertEqual((b(), self.shows('lcc_valueb')), (64, '64'))   # a cleared kit: 64
         for _ in range(14):
             self.turn('lcc_rotb', -1)
-        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (50, '50'))
+        self.assertEqual((b(), self.shows('lcc_valueb')), (50, '50'))
         for _ in range(100):
             self.turn('lcc_rotb', 1)
-        self.assertEqual(e.r8(i), 127)
+        self.assertEqual(b(), 127)
         for _ in range(200):
             self.turn('lcc_rotb', -1)
-        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (0, '0'))
-        self.assertEqual(e.r32(self.s['lcc_dirty']), 1)
+        self.assertEqual((b(), self.shows('lcc_valueb')), (0, '0'))
 
     def test_shows(self):
         e = self.e
         e.w32(self.s['lfo_page'], 1)
-        i = self.s['lcc_num'] + 6 + self.TRACK
+        i = self.area() + 6 + self.TRACK
         for n, want in ((0, 'OFF'), (1, '0'), (8, '7'), (11, '10'), (75, '74'),
                         (100, '99'), (101, '100'), (128, '127')):
             e.w8(i, n)
@@ -413,55 +421,116 @@ class TMenu(Base):
             self.assertEqual(m[5:7], (M32, 8))
 
 
-class TFile(Base):
-    def test_round_trip(self):
+def fnv(b):
+    h = 0x811c9dc5
+    for x in b:
+        h = ((h ^ x) * 16777619) & M32
+    return h or 1
+
+
+class TPattern(Base):
+    """The settings belong to each pattern's kit: the playing one is used,
+    saved with the kit (a hash at +700 of its record, the settings in a file
+    named by it), loaded back, copied and cleared with it."""
+    STO = SCRATCH + 0x10000
+
+    def kit(self, n):
+        return KIT_BASE + n * KIT_SIZE
+
+    def save(self, n, fill=0):
         e = self.e
-        self.num(0, 0, 74)
-        self.num(3, 5, 0)
-        e.w8(self.s['lcc_base'] + 7, 33)
-        e.w32(self.s['lcc_dirty'], 1)
-        e.uc.mem_write(0x400d97a2, bytes.fromhex('588f4e75'))  # the stock rest: pop a2
-        e.run('lfo_menu_dtor')                                 # the menu closes: posted
-        self.assertEqual(len(self.posted), 1)
-        self.assertEqual(e.r32(self.s['lcc_dirty']), 0)
+        e.uc.mem_write(self.STO, bytes([fill]) * 7108)
+        e.uc.mem_write(0x4005b2b6, bytes.fromhex('70014fef001c4e75'))
+        args = e.run('kit_save_hook', stack=[self.STO, self.kit(n), 0])
+        self.assertEqual(e.sp(), args)
+
+    def load(self, n):
+        e = self.e
+        e.uc.mem_write(0x4005d088, bytes.fromhex('70014fef00244e75'))
+        args = e.run('kit_load_hook', stack=[self.kit(n), self.STO])
+        self.assertEqual(e.sp(), args)
+
+    def settings(self, kit):
+        return bytes(self.e.uc.mem_read(self.area(kit), 48))
+
+    def test_each_pattern_its_own(self):
+        e = self.e
+        T = self.TRACK
+        self.num(0, T, 10, kit=4)
+        self.num(0, T, 20, kit=5)
+        self.base(0, T, 30, kit=5)
+        self.assertEqual(TMenu.shows(self, 'lcc_value'), '10')   # kit 4 playing
+        e.w32(CUR_KIT, self.kit(5))                              # the next pattern
+        self.assertEqual(TMenu.shows(self, 'lcc_value'), '20')
+        self.assertEqual(TMenu.shows(self, 'lcc_valueb'), '30')
+        self.setup(0, T, 0, 0, 30)                               # Depth 0: the base
+        self.phase(0, T, 0.3)
+        self.calc()
+        e.run('lcc_poll')
+        self.assertEqual(self.sent[-1], (T + 2, 20, 30))         # kit 5's CC and base
+
+    def test_saved_and_loaded(self):
+        e = self.e
+        self.num(0, 0, 74, kit=4)
+        self.num(3, 5, 0, kit=4)
+        self.base(1, 1, 33, kit=4)
+        want = self.settings(4)
+        self.save(4, fill=0)
+        rec = bytes(e.uc.mem_read(self.STO + 700, 8))
+        h = fnv(want)
+        self.assertEqual(rec[:5], bytes([0x43]) + h.to_bytes(4, 'big'))
+        self.assertEqual(len(self.posted), 1)                   # its file: a message
         e.run('lcc_write', stack=[0, 0])
-        f = self.files['/lfo_cc.bin']
-        self.assertEqual(len(f), 56)
-        self.assertEqual(f[:4], b'LCC2')
-        self.assertEqual((f[4], f[4 + 23], f[28 + 7], f[28]), (75, 1, 33, 64))
-        for i in range(24):                                     # forgotten, then read
-            e.w8(self.s['lcc_num'] + i, 0)
-            e.w8(self.s['lcc_base'] + i, 64)
-        e.run('lcc_remask')
+        name = '/LFOCC/%08X' % h
+        self.assertEqual(self.files, {name: want})
+        e.uc.mem_write(self.area(9), b'\x11' * 48)               # into kit 9
+        self.load(9)
+        self.assertEqual(self.settings(9), bytes(48))           # cleared, then...
+        self.assertEqual(e.r32(self.s['lcc_lpn']), 1)
         e.run('lcc_poll')
-        self.assertEqual(e.r32(self.s['lcc_ld']), 1)
-        self.assertEqual((e.r8(self.s['lcc_num']), e.r8(self.s['lcc_num'] + 23)), (75, 1))
-        self.assertEqual(e.r8(self.s['lcc_base'] + 7), 33)
-        self.assertEqual(e.r32(self.s['lcc_mask']), 0b1001)
+        self.assertEqual(self.settings(9), want)                # ...read on the UI clock
+        e.run('lcc_poll')
+        self.assertEqual(e.r32(self.s['lcc_lpn']), 0)
 
-    def test_older_file(self):
+    def test_all_off_writes_nothing(self):
         e = self.e
-        self.files['/lfo_cc.bin'] = b'LCC1' + bytes([11] + [0] * 23) + bytes(4)
-        e.run('lcc_poll')
-        self.assertEqual((e.r8(self.s['lcc_num']), e.r8(self.s['lcc_base'])), (11, 64))
-
-    def test_no_file_or_a_bad_one(self):
-        e = self.e
-        e.run('lcc_poll')
-        self.assertEqual(e.r32(self.s['lcc_mask']), 0)
-        self.files['/lfo_cc.bin'] = b'LCC2' + bytes(28)
-        e.w32(self.s['lcc_ld'], 0)
-        e.run('lcc_poll')
-        self.assertEqual(e.r32(self.s['lcc_mask']), 0)
-        self.files['/lfo_cc.bin'] = b'LCC1' + bytes([200] + [3] * 23) + bytes(4)
-        e.w32(self.s['lcc_ld'], 0)
-        e.run('lcc_poll')
-        self.assertEqual((e.r8(self.s['lcc_num']), e.r8(self.s['lcc_num'] + 1)), (0, 3))
-
-    def test_closing_unchanged_writes_nothing(self):
-        self.e.uc.mem_write(0x400d97a2, bytes.fromhex('588f4e75'))
-        self.e.run('lfo_menu_dtor')
+        self.save(4, fill=0xa5)
+        self.assertEqual(bytes(e.uc.mem_read(self.STO + 646, 2)), bytes([0, 0xff]))
+        self.assertEqual(bytes(e.uc.mem_read(self.STO + 700, 8)), b'\xa5' * 8)
         self.assertEqual(self.posted, [])
+
+    def test_older_or_odd_records_load_off(self):
+        e = self.e
+        for rec in (bytes(8), b'\x43\x12\x34\x56\x78\x00\x00\x00', b'\x44' + bytes(7)):
+            e.uc.mem_write(self.area(6), b'\x22' * 48)
+            e.uc.mem_write(self.STO + 700, rec)
+            self.load(6)
+            self.assertEqual(self.settings(6), bytes(48))
+            self.assertEqual(e.r32(self.s['lcc_lh'] + 4 * 6), 0)
+
+    def test_missing_or_wrong_file(self):
+        e = self.e
+        self.num(0, 0, 9, kit=4)
+        self.save(4)
+        e.run('lcc_write', stack=[0, 0])
+        name = list(self.files)[0]
+        for content in (None, b'\x01' * 48, b'\x00' * 40):
+            if content is None:
+                del self.files[name]
+            else:
+                self.files[name] = content
+            self.load(7)
+            e.run('lcc_poll')
+            self.assertEqual(self.settings(7), bytes(48), content)
+
+    def test_copied_and_cleared_with_the_kit(self):
+        e = self.e
+        self.num(2, 3, 50, kit=4)
+        want = self.settings(4)
+        e.run('kit_memcpy', stack=[self.kit(30), self.kit(4), KIT_SIZE])
+        self.assertEqual(self.settings(30), want)
+        e.run_to_any('sfx_fxd', (0x40061320,), stack=[self.kit(30) + 628])
+        self.assertEqual(self.settings(30), bytes(48))
 
 
 if __name__ == '__main__':

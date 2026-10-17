@@ -996,6 +996,7 @@ sfx_fxd:
     tstl    %d0
     bmis    sfd_go
     clrw    %a0@(SFX_DT)          | both types
+    jsr     lcc_kclr              | and the LFOs' MIDI CC settings (lfocc.inc)
 sfd_go:
     lea.l   %sp@(-28),%sp
     moveml  %d2/%a2-%a4,%sp@

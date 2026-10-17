@@ -247,7 +247,6 @@ lfo_menu_new:
     movel   %sp@+,%d0
     rts
 lfo_menu_dtor:
-    jsr     lcc_save              | a MIDI CC changed: the file (lfocc.inc)
     clrl    lcc_ed                | ...and an edit left unpressed takes nothing
     clrl    lfo2_on
     clrl    lfo_pend
@@ -743,7 +742,7 @@ lup_out:
 | ============== LFO 3 and 4: one block per pattern, saved with its kit ========
 | All 96 patterns' kits sit in RAM (KIT_BASE + n x KIT_SIZE, model_tg.s), and
 | LFO 1 and 2 live in their track sounds - so they change with the pattern.
-| LFO 3 and 4 do the same from lfo34_kits: a 124-byte block per kit, laid out
+| LFO 3 and 4 do the same from lfo34_kits: a 172-byte block per kit, laid out
 | [LFO 3, LFO 4][track 0..5] x {Speed, Multiplier, Waveform, Destination,
 | Depth}. Everything reads the playing kit's (*CUR_KIT). The block follows the
 | kit everywhere the kit goes:
@@ -755,8 +754,9 @@ lup_out:
 |   copied          kit_memcpy: any memcpy of a whole kit - the new project's
 |                   copies, pattern copy / paste and undo, which keep the kit
 |                   in a buffer of their own
-L34_BLK   = 124                   | one kit's block: 120 of LFOs, then the send
-                                  | effects' types (sendfx.inc)
+L34_BLK   = 172                   | one kit's block: 120 of LFOs, the send
+                                  | effects' types (sendfx.inc, +120), and the
+                                  | LFOs' MIDI CC settings (lfocc.inc, +124)
 L34_NBUF  = 4                     | kit buffers remembered (kit_memcpy)
 L34_ST    = 648                   | in the kit's storage record (below)
 L34_MAGIC = 0x4C463334            | "LF34"
@@ -776,7 +776,7 @@ l34_blk:
     addil   #KIT_BASE,%d1
     cmpl    %d2,%d1
     bnes    lb_no
-    moveq   #L34_BLK,%d1
+    movel   #L34_BLK,%d1
     mulul   %d0,%d1
     lea.l   lfo34_kits,%a0
     adda.l  %d1,%a0
@@ -812,7 +812,7 @@ l34_snd_reset:
     mulul   %d2,%d1               | exactly on its sound?
     cmpl    %a1,%d1
     bnes    lsr_out
-    moveq   #L34_BLK,%d1
+    movel   #L34_BLK,%d1
     mulul   %d0,%d1
     lea.l   lfo34_kits,%a0
     adda.l  %d1,%a0
@@ -888,6 +888,9 @@ ksp_t:
     moveb   %d0,%a2@(SFX_ST)
     notl    %d0
     moveb   %d0,%a2@(SFX_ST+1)
+    movel   %sp@(20),%d0          | the LFOs' MIDI CC settings (lfocc.inc)
+    bsr     l34_blk
+    jsr     lcc_ksave
     moveml  %sp@,%d0/%d2-%d3/%a2
     lea.l   %sp@(16),%sp
 ksp_out:
@@ -954,6 +957,10 @@ klp_d:
 klp_r:
     moveb   %d1,%a1@
     moveb   %d0,%a1@(1)
+    movel   %sp@(16),%d0          | the LFOs' MIDI CC settings (lfocc.inc)
+    bsr     l34_blk
+    movea.l %sp@(20),%a2
+    jsr     lcc_kload
 klp_done:
     moveml  %sp@,%d0/%d2-%d3/%a2
     lea.l   %sp@(16),%sp
@@ -1025,7 +1032,7 @@ lbf_l:
     suba.l  %a0,%a0
     bras    lbf_out
 lbf_yes:
-    moveq   #L34_BLK,%d0
+    movel   #L34_BLK,%d0
     mulul   %d1,%d0
     lea.l   l34_bufd,%a0
     adda.l  %d0,%a0
@@ -1048,7 +1055,7 @@ l34_buf_put:
     addql   #1,%d0
     andil   #L34_NBUF-1,%d0
     movel   %d0,l34_bufn
-    moveq   #L34_BLK,%d0
+    movel   #L34_BLK,%d0
     mulul   %d1,%d0
     lea.l   l34_bufd,%a0
     adda.l  %d0,%a0
@@ -1139,6 +1146,7 @@ lfo34_w:    .rept 12
             .word 28672, 1024, 0, 0, 16384
             .endr
             .long 0                   | the send effects: stock
+            .space 48                 | MIDI CC: all OFF, bases 64
 | LFO 3 and 4 of each pattern's kit: in the sample region (model_tg.s,
 | L34_KITS), not the blob, which they would fill; the boot clear (phase1.s)
 | zeroes them before anything reads them.

@@ -55,7 +55,7 @@ class Base(unittest.TestCase):
             uc.mem_write(inp, b'\x77' * 256)        # its input buffer
 
     def blk(self, n=None):
-        return self.s['lfo34_kits'] + 124 * (self.KIT if n is None else n)
+        return self.s['lfo34_kits'] + 172 * (self.KIT if n is None else n)
 
     def types(self, d=None, r=None):
         if d is not None:

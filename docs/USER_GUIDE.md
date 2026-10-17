@@ -336,9 +336,9 @@ LFOs of each track has its own CC and Base.
   holds a new value each cycle.
 - It goes out as well as to the LFO's **Destination**. For an LFO that only
   moves the external gear, set Destination to **None**.
-- The CC numbers and Bases are a setting of the machine, like the tracks'
-  MIDI channels. They are not saved with the pattern, but they are kept when
-  you power off.
+- The CC numbers and Bases belong to the pattern, like the rest of the LFO:
+  each pattern has its own, saved when you save the pattern or project
+  (kept in small files in the `/LFOCC/` folder).
 - Very fast LFOs come out stepped: each LFO sends at most about 120 values a
   second.
 - A track whose MIDI channel is OFF sends nothing.
@@ -492,7 +492,7 @@ are included (build with `--no-tweaks` to leave them out):
 |---|---|
 | `/Resampled/<name>` | takes saved with **SAV** |
 | `/Slices/<id>` | manual slice markers, one small file per sample |
-| `/lfo_cc.bin` | the LFOs' MIDI CC numbers (Plaits Edition) |
+| `/LFOCC/<id>` | the LFOs' MIDI CC settings of saved patterns, one small file per different set (Plaits Edition) |
 
 ## Button reference
 

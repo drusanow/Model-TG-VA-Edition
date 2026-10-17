@@ -47,12 +47,18 @@ Base.
 
 ## Limits
 
-- **The settings belong to the machine, not the pattern.** The CC numbers
-  and Bases work like the tracks' MIDI channels: one setting for every
-  pattern and project. They are kept when you power off, in a small file,
-  `/lfo_cc.bin`, written when you close the LFO menu after changing one.
-  The LFO itself (its Speed, Depth and the rest) is still saved with the
-  pattern. A pattern's record has no room left for the settings.
+- **The settings belong to the pattern**, like the LFO's own settings:
+  - Each pattern has its own CC numbers and Bases.
+  - They are saved when you save the pattern or the project, as for any
+    other change. A pattern you haven't saved keeps them only until power
+    off.
+  - A pattern's saved record has no room for them, so it holds a short
+    fingerprint. The settings themselves go in a small file in the
+    `/LFOCC/` folder, named after that fingerprint. Patterns with the same
+    settings share one file, so the folder stays small.
+  - Copying a pattern copies them. Earlier builds kept one machine-wide
+    set in `/lfo_cc.bin`, which this build no longer reads, so set them
+    again on the patterns that use them.
 - **It sends only when the value changes**, and at most about 120 messages
   a second per LFO. That is smooth for most sweeps, and leaves plenty of
   the MIDI cable for notes. Fast LFOs (tens of Hz) come out stepped.
@@ -64,17 +70,29 @@ Base.
 
 The code is in `src/lfocc.inc`.
 
-- **The settings** are two bytes per LFO and track (index LFO x 6 + track):
-  - `lcc_num`: 0 means OFF, n + 1 means CC n.
-  - `lcc_base`: 0 to 127, 64 to start.
-  - `lcc_mask` has bit l set when some track sends LFO l.
-  - The file holds "LCC2", the 24 numbers, the 24 bases and 4 spare bytes.
-    The older "LCC1" (numbers only) still loads, with every base at 64. A
-    missing or odd file leaves everything OFF; an out-of-range number reads
-    as OFF and an out-of-range base as 64.
-  - The file is read the first time the UI clock runs. It is written by a
-    UI-task message, posted from the LFO menu's destructor when a setting
-    changed; the write sequence is the one the slice markers' files use.
+- **The settings** are 48 bytes per pattern, at +124 of each kit's LFO 3/4
+  block. The block is now 172 bytes, and `L34_KITS` is 20 KB in the sample
+  region. Index is LFO x 6 + track.
+  - **Numbers:** 24 bytes. 0 means OFF, n + 1 means CC n.
+  - **Bases:** 24 bytes, 0 to 127, stored ^ 64 so a cleared block reads 64.
+  - **The playing pattern's** settings are used everywhere (`lcc_cur`): the
+    sending, the value, the menu. `lcc_mask`, the LFOs some track sends, is
+    worked out from them every block.
+  - The block goes wherever a kit goes: copied by `kit_memcpy`, cleared
+    with the kit's FX defaults (`sfx_fxd` → `lcc_kclr`: a new kit, a new
+    project).
+- **Saving.** The kit record's +700..+707 are free: the FX save writes
+  zeros there and the FX load never reads them.
+  - `lcc_ksave`, from `kit_save_post`, writes "C", the settings' FNV-1a
+    hash and a check byte there. It queues the kit, and a UI-task message
+    (`lcc_write`, as the slice files are written) writes the 48 bytes to
+    `/LFOCC/` plus the hash in 8 hex digits, making the folder if needed.
+  - All OFF and 64 (all zero) writes nothing, so the record keeps the stock
+    zeros. An older record, or a bad check, loads all OFF.
+  - `lcc_kload`, from `kit_load_post`, clears the kit's settings and notes
+    the hash (`lcc_lh`). `lcc_poll` then reads one such file a block on the
+    UI clock (`lcc_fread`), never during the load itself. It keeps the file
+    only if its size and hash match.
 - **The value.** `lfo_run` calls `lcc_calc` once its four LFOs have run.
   For each LFO with a CC:
   - **Phase:** from the engine's state +0 (0 to 1382400000 a cycle, so
@@ -153,13 +171,17 @@ Host verified (`tests/test_lfocc.py`):
   - CC Base: turns at once, 0 to 127, 64 to start.
   - Both rows are added to the LFO menu with their closures, the turn's data
     being the menu, and the constructor's result is kept.
-- **The file:**
-  - Closing the menu after a change posts the write; closing it otherwise
-    posts nothing.
-  - The write produces the 56-byte "LCC2" file, and reading it back
-    restores the numbers, the bases and the mask.
-  - An older "LCC1" file loads its numbers with bases at 64.
-  - A missing file, a wrong magic or an out-of-range byte reads as OFF.
+- **Per pattern:**
+  - Two patterns hold different CCs and Bases. The menu and the sending
+    follow the playing one.
+  - Saving writes "C" and the hash at +700, and posts the file's write.
+    The file holds exactly the 48 bytes, under its hash's name.
+  - Loading into another kit clears it, then the UI clock reads the file
+    back into it.
+  - All OFF saves nothing (+700..+707 untouched) and posts nothing.
+  - Old or odd records load all OFF. So do a missing file and a wrong or
+    short one.
+  - Copying a kit carries them, and the FX defaults clear them.
 - **Against the real stock LFO engine** (run in the emulator from the built
   image): Base 50, Depth -15 gives 35 to 50 for all seven waves, and each
   Multiplier step halves the CC's period.
@@ -175,5 +197,8 @@ Needs hardware:
    LFO 1 → CC 74, Destination None, Base 50, Depth -15. It moves between
    50 and 35. Multiplier 1 bar against x16: clearly slower.
 4. Two LFOs on two tracks at once, plus notes: no stuck or late notes.
-5. Power off and on: the CC numbers and bases are still there.
-6. A track with its MIDI channel OFF sends nothing.
+5. **Per pattern:** set different CCs on two patterns and switch between
+   them. Each sends its own.
+6. Save the project, power off and on, and load it: each pattern's CCs and
+   bases are back.
+7. A track with its MIDI channel OFF sends nothing.

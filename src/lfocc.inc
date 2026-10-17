@@ -8,12 +8,12 @@
 | anything - and CC Base, the value it sweeps from. It goes out as well as to
 | the LFO's Destination, so Destination NONE makes it a CC-only LFO.
 |
-| THE SETTINGS are two bytes per LFO and track (i = LFO x 6 + track):
-| lcc_num (0 OFF, n + 1 for CC n) and lcc_base (0..127, 64 to start), a
-| setting of the machine like the tracks' MIDI channels, not of the pattern:
-| a pattern's kit record has no room left. They are kept in a file, LCC_PATH,
-| read once after boot and written (a UI-task message, as the slice markers'
-| are) when an LFO menu that changed one closes.
+| THE SETTINGS are two bytes per LFO and track (i = LFO x 6 + track), per
+| pattern: 48 bytes at LCC_OFF of each kit's LFO 3/4 block (lfo2.inc) - the
+| numbers (0 OFF, n + 1 for CC n), then the bases (0..127, stored ^ 64 so a
+| cleared block reads 64). The playing pattern's are used (lcc_cur). Saved
+| with the kit: its record has no room for 48 bytes, so a hash of them goes
+| at +700 and the bytes in a small file named by it (below).
 |
 | THE VALUE is Base + Depth x the wave, the wave from 0 to 1: Depth -15 from
 | Base 50 sweeps 50 down to 35, and +15 up to 65 (Depth in the menu's own
@@ -36,30 +36,34 @@
 
 LCC_N     = 24                    | 4 LFOs x 6 tracks
 LCC_GAP   = 12                    | blocks between two sends of one LFO (8 ms)
-LCC_MAGIC1 = 0x4C434331           | "LCC1": the numbers only (older)
-LCC_SIZE1 = 4 + LCC_N + 4
-LCC_MAGIC = 0x4C434332            | "LCC2": the numbers, then the bases
-LCC_SIZE  = 4 + 2*LCC_N + 4
+LCC_OFF   = 124                   | in a kit's LFO 3/4 block (lfo2.inc): the
+                                  | numbers (0 OFF, CC + 1), then the bases
+                                  | (stored ^ 64, so a cleared block is 64)
+LCC_SZ    = 2*LCC_N               | ... 48 bytes
+LCC_REC   = 700                   | in the kit's storage record: "C", the
+                                  | settings' hash (4 bytes), a check byte
+LCC_TAG   = 0x43
 LCC_CYC   = 1382400000            | the engine's phase, a cycle
 
     .align 2
 | lcc_calc(a5 = the parameter block), at the end of lfo_run: lcc_val. Keeps
 | d2-d7/a2-a6.
 lcc_calc:
+    bsr     lcc_cur               | the playing pattern's settings: its mask
+    bsr     lcc_remask
     tstl    lcc_mask
     beqw    lcc_x
     lea.l   %sp@(-28),%sp
     moveml  %d2-%d6/%a2-%a3,%sp@
-    movel   CUR_KIT,%d0           | LFO 3 and 4: the playing pattern's block
-    jsr     l34_blk
+    movel   CUR_KIT,%d0           | LFO 3 and 4, and the settings: the playing
+    jsr     l34_blk               | pattern's block
     movea.l %a0,%a3
     moveq   #0,%d2                | i
     moveq   #0,%d3                | the LFO
 lcc_lfo:
     moveq   #0,%d4                | the track
 lcc_trk:
-    lea.l   lcc_num,%a0
-    tstb    %a0@(0,%d2:l)
+    tstb    %a3@(LCC_OFF,%d2:l)
     beqw    lcc_next
     lea.l   lcc_st,%a0            | its engine state
     movea.l %a0@(0,%d3:l:4),%a2
@@ -183,9 +187,10 @@ lcc_f:
     asrl    #8,%d0
     asrl    #8,%d0
     asrl    #8,%d0
-    lea.l   lcc_base,%a0          | from the Base
+    lea.l   %a3@(LCC_OFF+LCC_N),%a0   | from the Base
     moveq   #0,%d1
     moveb   %a0@(0,%d2:l),%d1
+    eoril   #64,%d1
     addl    %d1,%d0
     bpls    lcc_lo
     moveq   #0,%d0
@@ -212,18 +217,31 @@ lcc_next:
 lcc_x:
     rts
 
-| lcc_remask: lcc_mask = bit l for each LFO l that some track sends. Keeps
-| everything but d0/d1/a0.
+| lcc_cur -> a0 = the playing pattern's settings (its kit's block + LCC_OFF:
+| the numbers, then the bases ^ 64). Keeps everything else.
+lcc_cur:
+    lea.l   %sp@(-8),%sp
+    moveml  %d0-%d1,%sp@
+    movel   CUR_KIT,%d0
+    jsr     l34_blk
+    lea.l   %a0@(LCC_OFF),%a0
+    moveml  %sp@,%d0-%d1
+    lea.l   %sp@(8),%sp
+    rts
+
+| lcc_remask(a0 = the settings): lcc_mask = bit l for each LFO l that some
+| track sends. Keeps everything but d0/d1.
 lcc_remask:
     movel   %d2,%sp@-
-    lea.l   lcc_num,%a0
+    movel   %a1,%sp@-
+    lea.l   lcc_lof,%a1
     moveq   #0,%d0                | the mask
     moveq   #0,%d1                | i
 lrm_l:
     tstb    %a0@(0,%d1:l)
     beqs    lrm_n
     moveq   #0,%d2
-    moveb   %a0@(LCC_N*4,%d1:l),%d2   | lcc_lof (lcc_num + 96): its LFO
+    moveb   %a1@(0,%d1:l),%d2     | its LFO
     bset    %d2,%d0
 lrm_n:
     addql   #1,%d1
@@ -231,23 +249,25 @@ lrm_n:
     cmpl    %d1,%d2
     bnes    lrm_l
     movel   %d0,lcc_mask
+    movea.l %sp@+,%a1
     movel   %sp@+,%d2
     rts
 
 | lcc_poll, on the UI clock (led_hook): the file the first time, then at most
 | one CC. Keeps d2-d7/a2-a6.
 lcc_poll:
-    tstl    lcc_ld
-    bnes    lcp_go
-    moveq   #1,%d0
-    movel   %d0,lcc_ld
-    bsr     lcc_load
+    tstl    lcc_lpn               | patterns loaded with settings to read
+    beqs    lcp_go
+    bsr     lcc_fread
 lcp_go:
     addql   #1,lcc_tick
+    bsr     lcc_cur
+    bsr     lcc_remask
     tstl    lcc_mask
     beqw    lcp_x
-    lea.l   %sp@(-16),%sp
-    moveml  %d2-%d5,%sp@
+    lea.l   %sp@(-20),%sp
+    moveml  %d2-%d5/%a2,%sp@
+    movea.l %a0,%a2               | the playing pattern's settings
     movel   lcc_rr,%d2
     moveq   #LCC_N-1,%d3
 lcp_l:
@@ -257,9 +277,8 @@ lcp_l:
     bhis    lcp_i
     moveq   #0,%d2
 lcp_i:
-    lea.l   lcc_num,%a0
     moveq   #0,%d4
-    moveb   %a0@(0,%d2:l),%d4     | its CC + 1
+    moveb   %a2@(0,%d2:l),%d4     | its CC + 1
     beqs    lcp_n
     lea.l   lcc_val,%a0
     moveq   #0,%d5
@@ -305,8 +324,8 @@ lcp_n:
     subql   #1,%d3
     bplw    lcp_l
 lcp_out:
-    moveml  %sp@,%d2-%d5
-    lea.l   %sp@(16),%sp
+    moveml  %sp@,%d2-%d5/%a2
+    lea.l   %sp@(20),%sp
 lcp_x:
     rts
 
@@ -374,7 +393,7 @@ lcc_value:
     lea.l   lcc_s_off,%a0
     tstl    %d0
     bmis    lv_txt
-    lea.l   lcc_num,%a0
+    bsr     lcc_cur
     moveq   #0,%d1
     moveb   %a0@(0,%d0:l),%d1
     tstl    lcc_ed                | being edited: the pending one
@@ -398,9 +417,10 @@ lcc_valueb:
     lea.l   lcc_s_off,%a0
     tstl    %d0
     bmis    lv_txt
-    lea.l   lcc_base,%a0
+    bsr     lcc_cur
     moveq   #0,%d1
-    moveb   %a0@(0,%d0:l),%d1
+    moveb   %a0@(LCC_N,%d0:l),%d1
+    eoril   #64,%d1
     bsr     lcc_fmt
     bras    lv_txt
 
@@ -455,15 +475,16 @@ lcc_rotb:
     bsr     lcc_i
     tstl    %d0
     bmis    lr_out
-    lea.l   lcc_base,%a0
+    bsr     lcc_cur
+    lea.l   %a0@(LCC_N),%a0
     adda.l  %d0,%a0
     moveq   #0,%d1
     moveb   %a0@,%d1
+    eoril   #64,%d1
     moveq   #127,%d0
     bsr     lcc_step
+    eoril   #64,%d1
     moveb   %d1,%a0@
-    moveq   #1,%d1
-    movel   %d1,lcc_dirty
     bras    lr_draw
 
 | MIDI CC's press (closure, item): the stock edit toggle (new_slot2_invoker),
@@ -485,7 +506,7 @@ lcc_press:
     cmpl    lcc_ei,%d0
     bnes    lp_tog
     clrl    lcc_ed
-    lea.l   lcc_num,%a0
+    bsr     lcc_cur
     movel   lcc_pv,%d1
     cmpb    %a0@(0,%d0:l),%d1
     beqs    lp_tog                | unchanged
@@ -495,13 +516,12 @@ lcc_press:
     moveb   %d1,%a0@(0,%d0:l)
     lea.l   lcc_val,%a0
     moveb   %d1,%a0@(0,%d0:l)
-    moveq   #1,%d1
-    movel   %d1,lcc_dirty
+    bsr     lcc_cur
     bsr     lcc_remask
     bras    lp_tog
 lp_in:
     movel   %d0,lcc_ei            | entering it
-    lea.l   lcc_num,%a0
+    bsr     lcc_cur
     moveq   #0,%d1
     moveb   %a0@(0,%d0:l),%d1
     movel   %d1,lcc_pv
@@ -595,85 +615,257 @@ lra_free:
     unlk    %fp
     rts
 
-| ---- the file -------------------------------------------------------------
-| lcc_load: the settings from LCC_PATH, if it is a good one (as mk_read reads
-| a slice file): "LCC2", or the older "LCC1" with the numbers only. Keeps
-| d2-d7/a2-a6.
-lcc_load:
-    linkw   %fp,#-80
+| ---- saved with the pattern -------------------------------------------------
+| A kit's storage record has no room for 48 bytes, but +700..+707 are free
+| (the FX save writes zeros there, the FX load never reads them). There go
+| "C", the FNV-1a hash of the kit's settings and a check byte; the settings
+| themselves go in a file named by the hash, LCC_DIR + 8 hex digits - the
+| same settings, the same small file, whichever patterns and projects have
+| them. Settings all OFF and 64 (all zero, as stored) write nothing: an
+| older record (zeros there) loads them.
+|   saving   lcc_ksave, from kit_save_post: the tag, and the kit queued for its
+|            file, written by a UI-task message once the save is done
+|            (lcc_write, as the slice markers' files are written)
+|   loading  lcc_kload, from kit_load_post: the kit's settings cleared, and
+|            its hash noted (lcc_lh); lcc_poll reads one such file a block
+|            on the UI clock (lcc_fread) - none during the load itself
+
+| lcc_area(d0 = a kit's index) -> a0 = its settings. Clobbers d1.
+lcc_area:
+    movel   #L34_BLK,%d1
+    mulul   %d0,%d1
+    lea.l   lfo34_kits+LCC_OFF,%a0
+    adda.l  %d1,%a0
+    rts
+
+| lcc_hash(a0 = settings) -> d0 = their FNV-1a hash, 0 when all zero (1 for
+| a real 0). Clobbers d1/a1.
+lcc_hash:
     movel   %d2,%sp@-
+    movea.l %a0,%a1
+    movel   #0x811c9dc5,%d0
+    moveq   #0,%d2                | any set?
+    moveq   #LCC_SZ-1,%d1
+lhh_l:
+    movel   %d1,%sp@-
+    moveq   #0,%d1
+    moveb   %a1@+,%d1
+    orl     %d1,%d2
+    eorl    %d1,%d0
+    movel   #16777619,%d1
+    mulsl   %d1,%d0
+    movel   %sp@+,%d1
+    subql   #1,%d1
+    bpls    lhh_l
+    tstl    %d2
+    bnes    lhh_set
+    moveq   #0,%d0
+    bras    lhh_out
+lhh_set:
+    tstl    %d0
+    bnes    lhh_out
+    moveq   #1,%d0
+lhh_out:
+    movel   %sp@+,%d2
+    rts
+
+| lcc_ksave(d0 = the kit's index, or -1; a2 = the storage record). Keeps
+| d2-d7/a2-a6.
+lcc_ksave:
+    tstl    %d0
+    bmis    lks_out
+    movel   %d0,%sp@-
+    bsr     lcc_area
+    bsr     lcc_hash
+    movel   %sp@+,%d1
+    tstl    %d0
+    beqs    lks_out               | nothing set: the stock zeros
+    lea.l   lcc_wq,%a0            | its file, once the save is done
+    adda.l  %d1,%a0
+    moveq   #1,%d1
+    moveb   %d1,%a0@
+    lea.l   %a2@(LCC_REC),%a0
+    moveq   #LCC_TAG,%d1
+    moveb   %d1,%a0@+
+    movel   %d2,%sp@-
+    moveq   #24,%d1               | the hash, high byte first
+lks_b:
+    movel   %d0,%d2
+    lsrl    %d1,%d2
+    moveb   %d2,%a0@+
+    subql   #8,%d1
+    bpls    lks_b
+    movel   %sp@+,%d2
+    bsr     lcc_chk
+    moveb   %d1,%a0@
+    bsr     lcc_post
+lks_out:
+    rts
+
+| lcc_chk(d0 = a hash) -> d1 = its check byte. Keeps d0.
+lcc_chk:
+    movel   %d0,%d1
+    movel   %d2,%sp@-
+    movel   %d0,%d2
+    lsrl    #8,%d2
+    eorl    %d2,%d1
+    lsrl    #8,%d2
+    eorl    %d2,%d1
+    lsrl    #8,%d2
+    eorl    %d2,%d1
+    movel   %sp@+,%d2
+    eoril   #0x5a,%d1
+    andil   #0xff,%d1
+    rts
+
+| lcc_kload(d0 = the kit's index, a2 = the storage record): its settings
+| cleared, and their hash noted for lcc_fread. Keeps d2-d7/a2-a6.
+lcc_kload:
+    movel   %d2,%sp@-
+    movel   %d0,%d2
+    bsr     lcc_area
+    moveq   #LCC_SZ/4-1,%d1
+lkl_c:
+    clrl    %a0@+
+    subql   #1,%d1
+    bpls    lkl_c
+    lea.l   lcc_lh,%a1
+    lea.l   %a1@(0,%d2:l:4),%a1
+    clrl    %a1@
+    lea.l   %a2@(LCC_REC),%a0
+    moveq   #LCC_TAG,%d0
+    cmpb    %a0@+,%d0
+    bnes    lkl_out
+    moveq   #0,%d0
+    moveq   #3,%d1
+lkl_h:
+    lsll    #8,%d0
+    moveb   %a0@+,%d0
+    subql   #1,%d1
+    bpls    lkl_h
+    movel   %d0,%sp@-
+    bsr     lcc_chk
+    movel   %sp@+,%d0
+    moveq   #0,%d2
+    moveb   %a0@,%d2
+    cmpl    %d1,%d2
+    bnes    lkl_out
+    tstl    %d0
+    beqs    lkl_out
+    movel   %d0,%a1@
+    moveq   #1,%d0
+    movel   %d0,lcc_lpn
+lkl_out:
+    movel   %sp@+,%d2
+    rts
+
+| lcc_kclr(d0 = the kit's index, or -1): its settings back to OFF and 64 (a
+| new kit). Keeps d2-d7/a2-a6.
+lcc_kclr:
+    tstl    %d0
+    bmis    lkc_out
+    lea.l   lcc_lh,%a0
+    clrl    %a0@(0,%d0:l:4)
+    bsr     lcc_area
+    moveq   #LCC_SZ/4-1,%d1
+lkc_c:
+    clrl    %a0@+
+    subql   #1,%d1
+    bpls    lkc_c
+lkc_out:
+    rts
+
+| lcc_path(d0 = a hash) -> a0 = LCC_DIR + its 8 hex digits, in lcc_pbuf.
+| Clobbers d0/d1/a1.
+lcc_path:
+    lea.l   lcc_pbuf,%a0
+    lea.l   lcc_dir,%a1
+lp_d:
+    moveb   %a1@+,%a0@+
+    bnes    lp_d
+    subql   #1,%a0
+    movel   %d2,%sp@-
+    moveq   #28,%d1
+lp_x:
+    movel   %d0,%d2
+    lsrl    %d1,%d2
+    andil   #15,%d2
+    addil   #48,%d2
+    cmpil   #58,%d2
+    bcss    lp_dig
+    addql   #7,%d2                | A..F
+lp_dig:
+    moveb   %d2,%a0@+
+    subql   #4,%d1
+    bpls    lp_x
+    movel   %sp@+,%d2
+    clrb    %a0@
+    lea.l   lcc_pbuf,%a0
+    rts
+
+| lcc_fread, on the UI clock while lcc_lpn: the first kit with a hash noted -
+| its file, if it is there and right, into its settings. Keeps d2-d7/a2-a6.
+lcc_fread:
+    linkw   %fp,#-72
+    lea.l   %sp@(-12),%sp
+    moveml  %d2-%d3/%a2,%sp@
+    lea.l   lcc_lh,%a2
+    moveq   #0,%d2
+lfr_f:
+    movel   %a2@(0,%d2:l:4),%d3
+    bnes    lfr_go
+    addql   #1,%d2
+    cmpil   #NPAT,%d2
+    bcss    lfr_f
+    clrl    lcc_lpn               | none left
+    bras    lfr_out
+lfr_go:
+    clrl    %a2@(0,%d2:l:4)
+    movel   %d3,%d0
+    bsr     lcc_path
     pea     %fp@(-16)             | fh
     pea     0x40126ce4            | "r"
-    pea     lcc_path
+    movel   %a0,%sp@-
     jsr     0x4007bc5e
     lea.l   %sp@(12),%sp
     tstl    %d0
-    bnew    ll_out                | no file: every one OFF
+    bnes    lfr_out               | not there: OFF and 64
     pea     %fp@(-16)
-    pea     LCC_SIZE
-    pea     %fp@(-76)
+    pea     LCC_SZ
+    pea     %fp@(-64)
     jsr     0x4007baaa
     lea.l   %sp@(12),%sp
-    movel   %d0,%d2
+    movel   %d0,%sp@-
     pea     %fp@(-16)
     jsr     0x4007bc1c
     addql   #4,%sp
-    lea.l   %fp@(-76),%a0
-    movel   %a0@+,%d0
-    moveq   #LCC_SIZE1,%d1
-    cmpl    %d1,%d2
-    bnes    ll_2
-    cmpil   #LCC_MAGIC1,%d0
-    beqs    ll_num
-    bras    ll_out
-ll_2:
-    moveq   #LCC_SIZE,%d1
-    cmpl    %d1,%d2
-    bnes    ll_out
-    cmpil   #LCC_MAGIC,%d0
-    bnes    ll_out
-    lea.l   lcc_base,%a1          | the bases, after the numbers
-    lea.l   %a0@(LCC_N),%a0
-    moveq   #LCC_N-1,%d1
-ll_b:
-    moveq   #0,%d0
-    moveb   %a0@+,%d0
-    cmpil   #127,%d0
-    blss    ll_bo
-    moveq   #64,%d0
-ll_bo:
-    moveb   %d0,%a1@+
+    movel   %sp@+,%d0
+    moveq   #LCC_SZ,%d1
+    cmpl    %d0,%d1
+    bnes    lfr_out
+    lea.l   %fp@(-64),%a0         | the right file?
+    bsr     lcc_hash
+    cmpl    %d3,%d0
+    bnes    lfr_out
+    movel   %d2,%d0
+    bsr     lcc_area
+    lea.l   %fp@(-64),%a1
+    moveq   #LCC_SZ/4-1,%d1
+lfr_c:
+    movel   %a1@+,%a0@+
     subql   #1,%d1
-    bpls    ll_b
-    lea.l   %fp@(-72),%a0
-ll_num:
-    lea.l   lcc_num,%a1
-    moveq   #LCC_N-1,%d1
-ll_c:
-    moveq   #0,%d0
-    moveb   %a0@+,%d0
-    cmpil   #128,%d0
-    blss    ll_ok
-    moveq   #0,%d0
-ll_ok:
-    moveb   %d0,%a1@+
-    subql   #1,%d1
-    bpls    ll_c
-    bsr     lcc_remask
-ll_out:
-    movel   %sp@+,%d2
+    bpls    lfr_c
+lfr_out:
+    moveml  %sp@,%d2-%d3/%a2
     unlk    %fp
     rts
 
-| lcc_save: from the LFO menu's destructor, when a number changed - posts the
-| UI-task message that writes the file (as mk_post). Clobbers d0/d1/a0/a1.
-lcc_save:
-    tstl    lcc_dirty
-    beqs    lsv_out
-    clrl    lcc_dirty
+| lcc_post: the UI-task message that writes the queued kits' files (as
+| mk_post). Clobbers d0/d1/a0/a1.
+lcc_post:
     lea.l   lcc_msg,%a0
     tstl    %a0@(0x18)
-    bnes    lsv_out               | queued already: that one will do
+    bnes    lpo_out               | queued already: that one will do
     movel   %a0,%sp@-
     pea     1
     jsr     ALLOC
@@ -694,46 +886,65 @@ lcc_save:
     pea     MQ_MAIN
     jsr     0x40001fba
     addql   #8,%sp
-lsv_out:
+lpo_out:
     rts
 
-| lcc_write (closure, arg), in the UI task: LCC_PATH replaced, as mk_write
-| writes a slice file (the root needs no folder made).
+| lcc_write (closure, arg), in the UI task: each queued kit's file, named by
+| its settings' hash now, written (as mk_write writes a slice file, its
+| folder made if it is not there).
 lcc_write:
-    linkw   %fp,#-80
-    lea.l   %fp@(-76),%a1
-    movel   #LCC_MAGIC,%a1@+
-    lea.l   lcc_num,%a0
-    moveq   #LCC_N-1,%d1
-lw_c:
-    moveb   %a0@+,%a1@+
-    subql   #1,%d1
-    bpls    lw_c
-    lea.l   lcc_base,%a0
-    moveq   #LCC_N-1,%d1
-lw_b:
-    moveb   %a0@+,%a1@+
-    subql   #1,%d1
-    bpls    lw_b
-    clrl    %a1@
-    pea     lcc_path
+    linkw   %fp,#-40
+    lea.l   %sp@(-12),%sp
+    moveml  %d2-%d3/%a2,%sp@
+    moveq   #0,%d2
+lw_k:
+    lea.l   lcc_wq,%a0
+    tstb    %a0@(0,%d2:l)
+    beqw    lw_n
+    clrb    %a0@(0,%d2:l)
+    movel   %d2,%d0
+    bsr     lcc_area
+    movea.l %a0,%a2
+    bsr     lcc_hash
+    tstl    %d0
+    beqw    lw_n
+    bsr     lcc_path
+    movel   %a0,%sp@-
     jsr     0x4007c18e
+    movel   %sp@,%d0
+    movel   %d0,%sp@-
+    jsr     0x40095284            | its folder
     addql   #4,%sp
+    tstl    %d0
+    beqs    lw_open
+    pea     %fp@(-17)
+    movel   %d0,%sp@-
+    pea     %fp@(-24)
+    jsr     0x400f980c            | as a String
+    lea.l   %sp@(12),%sp
+    pea     %fp@(-24)
+    jsr     0x4007c262            | made, if it is not there
+    addql   #4,%sp
+    pea     %fp@(-24)
+    jsr     0x400f7d5c
+    addql   #4,%sp
+lw_open:
+    movel   %sp@+,%d3             | the path
     pea     %fp@(-16)
     pea     0x401272db            | "w"
-    pea     lcc_path
+    movel   %d3,%sp@-
     jsr     0x4007bc5e
     lea.l   %sp@(12),%sp
     tstl    %d0
-    bnes    lw_out
-    pea     LCC_SIZE
+    bnes    lw_n
+    pea     LCC_SZ
     clrl    %sp@-
     pea     %fp@(-16)
     jsr     0x4007bb76
     lea.l   %sp@(12),%sp
     pea     %fp@(-16)
-    pea     LCC_SIZE
-    pea     %fp@(-76)
+    pea     LCC_SZ
+    movel   %a2,%sp@-
     jsr     0x4007bb0a
     lea.l   %sp@(12),%sp
     pea     %fp@(-16)
@@ -742,7 +953,11 @@ lw_b:
     pea     %fp@(-16)
     jsr     0x4007bc1c
     addql   #4,%sp
-lw_out:
+lw_n:
+    addql   #1,%d2
+    cmpil   #NPAT,%d2
+    bcsw    lw_k
+    moveml  %sp@,%d2-%d3/%a2
     unlk    %fp
     rts
 
@@ -752,8 +967,9 @@ lcc_mask:   .long 0               | bit l: LFO l sends a CC on some track
 lcc_tick:   .long LCC_GAP         | led_hook's blocks (from LCC_GAP: the first
                                   | send waits for nothing)
 lcc_rr:     .long LCC_N-1         | the last LFO looked at
-lcc_ld:     .long 0               | the file has been read
-lcc_dirty:  .long 0               | a number changed since the file was written
+lcc_lpn:    .long 0               | some kit's settings are still to read
+lcc_lh:     .space 4*NPAT         | each kit's settings' hash, still to read
+lcc_wq:     .space NPAT           | kits whose settings' file is to write
 lcc_zero:   .long 0
 lcc_name:   .long 0               | the row's text, for gm_val
 lcc_ed:     .long 0               | MIDI CC is being edited...
@@ -767,7 +983,6 @@ lcc_pp:     .space 2*LCC_N        | RND: the phase last block
 lcc_rv:     .space 2*LCC_N        | RND: the value held
 lcc_last:   .space 4*LCC_N        | lcc_tick at each one's last send
 lcc_msg:    .space 0x1c           | the UI-task message that writes the file
-lcc_num:    .space LCC_N          | i = LFO x 6 + track: 0 OFF, CC + 1
 lcc_val:    .rept LCC_N           | the values to send; 0xff: none yet
             .byte 0xff
             .endr
@@ -776,11 +991,9 @@ lcc_sent:   .rept LCC_N           | the values sent; 0xff: none yet
             .endr
 lcc_tk:     .byte 0,1,2,3,4,5, 0,1,2,3,4,5, 0,1,2,3,4,5, 0,1,2,3,4,5
 lcc_lof:    .byte 0,0,0,0,0,0, 1,1,1,1,1,1, 2,2,2,2,2,2, 3,3,3,3,3,3
-lcc_base:   .rept LCC_N           | the values the LFOs sweep from
-            .byte 64
-            .endr
 lcc_vbuf:   .space 4
-lcc_path:   .asciz "/lfo_cc.bin"
+lcc_dir:    .asciz "/LFOCC/"
+lcc_pbuf:   .space 16
 lcc_s_lab:  .asciz "MIDI CC"
 lcc_s_labb: .asciz "CC Base"
 lcc_s_off:  .asciz "OFF"

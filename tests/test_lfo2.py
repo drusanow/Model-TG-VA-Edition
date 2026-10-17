@@ -544,7 +544,7 @@ class TKits(unittest.TestCase):
         return self.KIT_BASE + n * self.KIT_SIZE
 
     def blk(self, n):
-        return self.s['lfo34_kits'] + 124 * n                # 120 of LFOs, the send FX types
+        return self.s['lfo34_kits'] + 172 * n                # 120 of LFOs, the send FX types
 
     def words(self, a, n=60):
         return [self.e.r16(a + 2 * i) for i in range(n)]
