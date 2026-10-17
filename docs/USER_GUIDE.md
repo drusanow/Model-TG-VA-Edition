@@ -459,8 +459,8 @@ reverb's. Turn **DATA** to change them:
 - **Delay**: **DELAY** (stock), **PING** (ping-pong), **TAPE** (tape echo) or
   **CHORUS** (chorus, flanger past half Feedback).
 - **Reverb**: **REVERB** (stock), **PHASER**, **SPRING**, **RING** (ring
-  modulator), **DIST** (distortion) or **CLOUD** (a light granular cloud:
-  Size sets the grain length, Tone the feedback).
+  modulator), **DIST** (distortion) or **RESO** (a tuned resonator: Size
+  sets the pitch, Tone how long and bright it rings).
 
 The sends work as before. The FX page's Delay Time / Feedback and Reverb
 Size / Tone drive the chosen effect: echo time and repeats, LFO speed and

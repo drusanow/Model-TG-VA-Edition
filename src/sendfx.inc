@@ -36,18 +36,17 @@
 SFX_DT    = 120               | in a kit's LFO 3/4 block: the delay's type
 SFX_RT    = 121               | ... and the reverb's
 SFX_ND    = 4                 | DELAY, PING, TAPE, CHORUS
-SFX_NR    = 6                 | REVERB, PHASER, SPRING, RING, DIST, CLOUD
+SFX_NR    = 6                 | REVERB, PHASER, SPRING, RING, DIST, RESO
 SFX_ST    = 646               | in the kit's storage record: the types (delay
                               | low nibble, reverb high), +647 their complement
 SFX_DMASK = 0x1ffff           | a delay line: 131072 samples
-SFX_RSZ   = 0x30000             | the spring's lines (8 x 4096 samples), then
-                                | CLOUD's (65536 samples at +0x10000)
-SFX_CBUF  = SFX_RBUF + 0x10000   | CLOUD's line: the last 1.37 s, mono
-SFX_CMASK = 0xffff
+SFX_RSZ   = 0x14000             | the spring's lines (8 x 4096 samples), then
+                                | RESO's two (4096 samples each, at +0x10000)
+SFX_QBUF  = SFX_RBUF + 0x10000   | RESO's lines: left, then right at +8192
 | past them in SFX_RBUF, cleared once (sfx_init): the stock effects' silent
 | input, the delay loop's scratch, and the reverb's state (cleared at every
 | change of its type)
-SFX_ZERO  = SFX_RBUF + 0x3f000   | 256 bytes of silence
+SFX_ZERO  = SFX_RBUF + 0x1f000   | 256 bytes of silence
 sfx_st    = SFX_ZERO + 256        | the delay loop's scratch (S_*)
 sfx_rs    = SFX_ZERO + 512        | the reverb's state:
 sfx_rph   = sfx_rs                | the phaser's LFO / the ring's carrier
@@ -56,10 +55,10 @@ sfx_phr   = sfx_rs + 56
 sfx_splp  = sfx_rs + 108          | the spring's combs' lowpasses, left
 sfx_sprp  = sfx_rs + 116          | ... right
 sfx_rlp   = sfx_rs + 124          | DIST's lowpasses
-sfx_cw    = sfx_rs + 132          | CLOUD: its line's write point
-sfx_cg    = sfx_rs + 136          | ... its 4 grains: {read point, samples
-                                  | left, length, envelope step}
-SFX_RSN   = 50                    | longs of it
+sfx_qw    = sfx_rs + 132          | RESO: its lines' write point
+sfx_qlp   = sfx_rs + 136          | ... its two loop lowpasses
+sfx_qdc   = sfx_rs + 144          | ... and its outputs' DC
+SFX_RSN   = 38                    | longs of it
 SFX_CHUNK = 0x4000            | cleared a block
 SFX_DMAX  = 130000            | PING / TAPE: the longest time, samples
 SFX_WOW   = 1717987           | TAPE: wow at 0.6 Hz and flutter at 7 Hz,
@@ -581,7 +580,7 @@ sfx_rdsp:
     subql   #1,%d0
     beqw    sr_ring
     subql   #1,%d0
-    bnew    sr_cld
+    bnew    sr_res
     | DIST: Size the drive (x1 .. x200), Tone a lowpass after it (dark to
     | open), -6 dB
     lsrl    #8,%d4
@@ -765,131 +764,108 @@ sr_out:
     lea.l   %sp@(44),%sp
     rts
 
-    | CLOUD: a light granular cloud, after Mutable Instruments Clouds. The
-    | input (mono) is written into a 1.37 s line; four grains read it back,
-    | each a stretch of the last 0.7 s under a triangle window, two leaning
-    | left and two right, each starting again elsewhere as it ends. Size is
-    | the grains' length (21 ms .. 360 ms, each up to half as long again,
-    | at random); Tone feeds the cloud back into the line (0 .. 0.9) for a
-    | longer, denser tail.
-sr_cld:
-    movel   %d4,%d0               | the grains' length: 1024 + Size / 2
-    lsrl    #1,%d0
-    addil   #1024,%d0
-    movel   %d0,sfx_clen
-    movel   #14745,%d0            | the feedback, Q14
-    mulsl   %d0,%d5
-    asrl    #8,%d5
-    asrl    #7,%d5
-    lea.l   SFX_CBUF,%a4
-    movel   sfx_cw,%d6
+    | RESO: a tuned resonator - two damped comb filters (Karplus-Strong
+    | style) fed the input in mono, left and right a few cents apart. Size is
+    | the pitch, C1 (32.7 Hz) .. ~6.5 kHz (sfx_per); Tone the ring: dark and
+    | short to bright and long (the lowpass in the loop 0.3 .. 1, the
+    | feedback 0.8 .. 0.995).
+sr_res:
+    lsrl    #8,%d4                | the left comb's period, Q8 samples
+    lea.l   sfx_per,%a0
+    movel   %a0@(0,%d4:l:4),%d4
+    movel   %d4,%d0               | the right's: 1/128 longer
+    lsrl    #7,%d0
+    addl    %d4,%d0
+    movel   %d0,sfx_qpr
+    movel   #11468,%d0            | the loop's lowpass, Q14
+    mulul   %d5,%d0
+    moveq   #15,%d1
+    lsrl    %d1,%d0
+    addil   #4915,%d0
+    movel   %d0,sfx_qa
+    movel   #3195,%d2             | its feedback, Q14
+    mulul   %d2,%d5
+    lsrl    %d1,%d5
+    addil   #13107,%d5
+    movel   %d5,sfx_qfb
+    movel   sfx_qw,%d6
     movea.l %sp@(52),%a0
     movea.l %sp@(48),%a1
     moveq   #32,%d7
-src_l:
-    lea.l   sfx_cg,%a2
-    bsr     src_g                 | grain 0 and 2 lean left, 1 and 3 right
-    movel   %d0,%d3
-    bsr     src_g
-    movel   %d0,%d4
-    bsr     src_g
-    addl    %d0,%d3
-    bsr     src_g
-    addl    %d0,%d4
-    movel   %d3,%d0               | left: its two, and half the others
-    movel   %d4,%d1
-    asrl    #1,%d1
-    addl    %d1,%d0
-    asrl    #1,%d0
-    movel   %d0,%sp@-
-    movel   %d4,%d0               | right
-    movel   %d3,%d1
-    asrl    #1,%d1
-    addl    %d1,%d0
-    asrl    #1,%d0
-    movel   %d0,%sp@-
-    movel   %a0@+,%d0             | into the line: the input in mono, and
-    swap    %d0                   | the cloud fed back
+srq_l:
+    movel   %a0@+,%d3             | the input, mono, a quarter
+    swap    %d3
+    extl    %d3
+    movel   %a0@+,%d0
+    swap    %d0
     extl    %d0
-    movel   %a0@+,%d1
-    swap    %d1
-    extl    %d1
-    addl    %d1,%d0
-    asrl    #1,%d0
-    addl    %d4,%d3
-    asrl    #1,%d3
-    mulsl   %d5,%d3
-    asrl    #7,%d3
-    asrl    #7,%d3
-    addl    %d3,%d0
-    bsr     sfx_c16
-    movew   %d0,%a4@(0,%d6:l:2)
+    addl    %d0,%d3
+    asrl    #2,%d3
+    lea.l   SFX_QBUF,%a2          | left
+    movel   %d4,%d1
+    lea.l   sfx_qlp,%a3
+    bsr     srq_one
+    lea.l   SFX_QBUF+8192,%a2     | right
+    movel   sfx_qpr,%d1
+    lea.l   sfx_qlp+4,%a3
+    bsr     srq_one
     addql   #1,%d6
-    andil   #SFX_CMASK,%d6
-    movel   %sp@(4),%d0           | out: left, right
-    bsr     sr_put
-    movel   %sp@+,%d0
-    bsr     sr_put
-    addql   #4,%sp
+    andil   #4095,%d6
     subql   #1,%d7
-    bnew    src_l
-    movel   %d6,sfx_cw
+    bnes    srq_l
+    movel   %d6,sfx_qw
     braw    sr_out
 
-| src_g(a2 = a grain; a4 = the line, d6 = its write point) -> d0 = its
-| sample, a2 to the next grain. A grain that has ended starts again: a new
-| length, and a place 0 .. 0.7 s before its own length back. Clobbers d1/d2.
-src_g:
-    tstl    %a2@(4)
-    bnes    srg_go
-    movel   sfx_cseed,%d0         | a new grain
-    movel   #1103515245,%d1
-    mulsl   %d1,%d0
-    addil   #12345,%d0
-    movel   %d0,sfx_cseed
-    swap    %d0
-    andil   #0xffff,%d0           | r: 0 .. 65535
-    movel   sfx_clen,%d1          | its length: up to half as long again
-    movel   %d1,%d2
-    mulul   %d0,%d2
-    swap    %d2
-    andil   #0xffff,%d2
-    lsrl    #1,%d2
-    addl    %d2,%d1
-    movel   %d1,%a2@(4)
-    movel   %d1,%a2@(8)
-    movel   #0x20000,%d2          | its envelope's step, Q16: the peak 1 at half
-    divul   %d1,%d2
-    movel   %d2,%a2@(12)
-    lsrl    #1,%d0                | where: its length and 0 .. 32767 back
-    addl    %d1,%d0
-    movel   %d6,%d2
-    subl    %d0,%d2
-    andil   #SFX_CMASK,%d2
-    movel   %d2,%a2@
-srg_go:
-    movel   %a2@(4),%d1           | samples left
-    subql   #1,%d1
-    movel   %d1,%a2@(4)
-    movel   %a2@(8),%d2           | the triangle: the nearer end
-    subl    %d1,%d2
-    cmpl    %d1,%d2
-    blss    srg_e
-    movel   %d1,%d2
-srg_e:
-    mulul   %a2@(12),%d2          | 0 .. 65536
-    lsrl    #1,%d2
-    movel   %a2@,%d1
-    movew   %a4@(0,%d1:l:2),%d0
-    extl    %d0
-    mulsl   %d2,%d0
+| srq_one(a2 = a comb's line, d1 = its period Q8, a3 = its lowpass (its DC
+| 8 bytes on), d3 = the input, d6 = the write point): its line written, its
+| output - less its DC, which a comb with positive feedback holds - out to
+| a1. Clobbers d0-d2/a6.
+srq_one:
+    movel   %d6,%d0
+    lsll    #8,%d0
+    subl    %d1,%d0               | the read point, Q8
+    movel   %d0,%d1
+    andil   #255,%d1              | its fraction
     asrl    #8,%d0
-    asrl    #7,%d0
-    addql   #1,%d1
-    andil   #SFX_CMASK,%d1
-    movel   %d1,%a2@
-    lea.l   %a2@(16),%a2
-    rts
+    andil   #4095,%d0
+    movea.l %d0,%a6
+    addql   #1,%d0
+    andil   #4095,%d0
+    movew   %a2@(0,%d0:l:2),%d0
+    extl    %d0                   | the newer sample
+    movea.w %a2@(0,%a6:l:2),%a6   | the older
+    subl    %a6,%d0
+    mulsl   %d1,%d0
+    asrl    #8,%d0
+    addl    %a6,%d0               | y
+    movel   %d0,%d1               | the lowpass: lp += (y - lp) x a
+    subl    %a3@,%d1
+    movel   sfx_qa,%d2
+    mulsl   %d2,%d1
+    asrl    #7,%d1
+    asrl    #7,%d1
+    addl    %a3@,%d1
+    movel   %d1,%a3@
+    movel   sfx_qfb,%d2           | back in: x + lp x feedback, clipped
+    mulsl   %d2,%d1
+    asrl    #7,%d1
+    asrl    #7,%d1
+    addl    %d3,%d1
+    cmpil   #32767,%d1
+    bles    srq_c1
+    movel   #32767,%d1
+srq_c1:
+    cmpil   #-32767,%d1
+    bges    srq_c2
+    movel   #-32767,%d1
+srq_c2:
+    movew   %d1,%a2@(0,%d6:l:2)
+    movel   %d0,%d1               | out: y less its DC (dc += (y - dc) / 256)
+    subl    %a3@(8),%d1
+    asrl    #8,%d1
+    addl    %d1,%a3@(8)
+    subl    %a3@(8),%d0
+    braw    sr_put
 
 
 | sfx_apk(d0 = the LFO's phase) -> d0 = the allpass coefficient there (Q14,
@@ -1148,8 +1124,9 @@ sfx_items:    .long sfx_lab_d, sfx_val_e, sfx_rot_d, new_slot2_invoker
               .long sfx_lab_r, sfx_val_e, sfx_rot_r, new_slot2_invoker
               .long sfx_lab_e, sfx_val_r, sfx_rot_r, new_slot2_invoker
 sfx_n_e:      .long sfx_s_e
-sfx_clen:     .long 4096       | CLOUD: the grains' length this block
-sfx_cseed:    .long 0x13579bdf | ... and their generator
+sfx_qpr:      .long 0          | RESO: the right comb's period this block
+sfx_qa:       .long 0          | ... the loop's lowpass
+sfx_qfb:      .long 0          | ... and its feedback
 sfx_n_d:      .long sfx_s_d0, sfx_s_d1, sfx_s_d2, sfx_s_d3
 sfx_n_r:      .long sfx_s_r0, sfx_s_r1, sfx_s_r2, sfx_s_r3, sfx_s_r4, sfx_s_r5
 | the spring's lines: {offset in SFX_RBUF, delay}, four allpasses, then two
@@ -1183,6 +1160,6 @@ sfx_s_r1:     .asciz "PHASER"
 sfx_s_r2:     .asciz "SPRING"
 sfx_s_r3:     .asciz "RING"
 sfx_s_r4:     .asciz "DIST"
-sfx_s_r5:     .asciz "CLOUD"
+sfx_s_r5:     .asciz "RESO"
     .align 2
     .include "sfx_tables.inc"

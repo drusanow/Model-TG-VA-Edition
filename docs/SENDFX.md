@@ -27,9 +27,8 @@ effect, and press **SETTINGS** or Return to close the menu.
     reflections.
   - **RING**: a ring modulator.
   - **DIST**: a distortion.
-  - **CLOUD**: a light granular cloud, after Mutable Instruments Clouds. Four
-    grains replay snatches of the last 0.7 s, two leaning left and two
-    right, each starting again elsewhere as it ends.
+  - **RESO**: a tuned resonator. Whatever is sent rings at a pitch you
+    set, like a struck string or tube, left and right a few cents apart.
 
 The sends, the FX page's knobs and the delay's feed into the reverb all
 still work. Only the effect on each send changes, and the FX page's four
@@ -44,7 +43,7 @@ knobs now drive it:
 | SPRING | Reverb Size: decay | Reverb Tone: dark to bright |
 | RING | Reverb Size: carrier frequency, 20 Hz to 4 kHz | Reverb Tone: smooth (triangle) to hard (square) |
 | DIST | Reverb Size: drive | Reverb Tone: dark to open |
-| CLOUD | Reverb Size: grain length, 21 to 360 ms | Reverb Tone: feedback, from a dry scatter to a long, dense tail |
+| RESO | Reverb Size: pitch, from C1 (33 Hz) to about 6.5 kHz | Reverb Tone: from dark and short to bright and long-ringing |
 
 Each pattern keeps its own two choices, saved with the pattern, as the
 delay and reverb settings are. A new pattern, or a new project, starts with
@@ -62,11 +61,10 @@ the stock delay and reverb.
 - The stock delay and reverb keep running on silence while another effect
   is chosen, so that switching back is clean. The new effect's cost comes
   on top of theirs (see below).
-- Sample memory is 768 KB smaller: the delay's lines (512 KB), and the
-  spring's and CLOUD's (256 KB), sit at the top of the sample region.
-- CLOUD needs its line to fill: for the first moments after you pick it,
-  some grains still read silence. LFO 3/4's
-  per-pattern blocks take another 12 KB there.
+- Sample memory is 640 KB smaller: the delay's lines (512 KB), and the
+  spring's and RESO's (128 KB), sit at the top of the sample region. LFO
+  3/4's per-pattern blocks take another 12 KB there.
+- RESO's pitch is set by Size only. It doesn't follow the trigs' notes.
 
 ## How it works
 
@@ -99,7 +97,7 @@ The code is in `src/sendfx.inc`.
     load).
 - **Starting clean.** On a change of type, the effect's lines are cleared
   16 KiB a block, and silence is output meanwhile: 32 blocks for the
-  delay's 512 KB, 12 for the spring's and CLOUD's 192 KB. The first change also clears
+  delay's 512 KB, 5 for the spring's and RESO's 80 KB. The first change also clears
   the state kept past the spring's lines (`sfx_init`).
 - **Samples.** The bus samples are 32-bit (16-bit << 16). The effects work
   on the top 16 bits, with Q14 coefficients. Lines are 16-bit.
@@ -125,12 +123,17 @@ The code is in `src/sendfx.inc`.
     1867 left, 1617 and 1777 right), with feedback 0.5 to 0.97.
   - **RING:** the input times a triangle carrier, pushed towards a square
     by Tone. The right side's carrier is a quarter turn ahead.
-  - **CLOUD:** the input, in mono, goes into a 65536-sample line (1.37 s),
-    with the cloud fed back into it (Tone, 0 to 0.9). Four grains read it
-    back, each under a triangle window. A grain's length is 1024 + Size / 2
-    samples, up to half as long again at random. It starts its length plus
-    0 to 32767 samples behind the write point. Grains 0 and 2 go left
-    (right at half), 1 and 3 the other way.
+  - **RESO:** two comb filters, Karplus-Strong style, one per side, over
+    4096-sample lines, fed a quarter of the input in mono.
+    - The period comes from `sfx_per`: 48000 / (32.70 x 200^(Size/127))
+      samples, Q8, read with linear interpolation. The right comb's period
+      is 1/128 longer, a few cents apart.
+    - In each loop there is a one-pole lowpass (0.3 to 1) and the feedback
+      (0.8 to 0.995), both from Tone.
+    - Each output loses its DC through a one-pole tracker (/256), because a
+      comb with positive feedback also rings at 0 Hz.
+    - It replaced CLOUD, a 4-grain cloud over a 1.37 s line that was too
+      heavy on hardware.
   - **DIST:** the input times the drive, then a cubic soft clip, -6 dB,
     and a one-pole lowpass.
   - The curves are in `src/sfx_tables.inc`, written by
@@ -182,13 +185,13 @@ Host verified (`tests/test_sendfx.py`):
   - Silence stays silence.
   - A steady input follows the carrier, at the right frequency.
   - Tone squares it.
-- **CLOUD:**
+- **RESO:**
   - Silence stays silence.
-  - Once its line has filled, it sounds, spread left and right.
-  - With Tone 0 it is gone 1 s after the input stops; with Tone up it
-    still sounds 1.5 s on.
-  - Size sets the grains' length: 1024 to 1536 samples at 0, ~17,000 to
-    26,000 at full.
+  - An impulse rings at Size's pitch: the autocorrelation peak is within 2%
+    of the period at three settings.
+  - The sides differ, and no DC is left.
+  - Tone up rings over 100 times longer than Tone 0.
+  - A full-scale square in stays bounded.
 - **DIST:**
   - Gentle settings are x1.06 at -6 dB.
   - Driven hard, it clips at -6 dB.
@@ -217,7 +220,7 @@ CPU, instructions a block (the Plaits engines run 880 to 6,830 a track):
 | SPRING | ~8,700 |
 | RING | ~2,500 |
 | DIST | ~3,350 |
-| CLOUD | ~5,370 |
+| RESO | ~4,190 |
 
 These are on top of the stock delay and reverb, which keep running.
 
@@ -233,7 +236,7 @@ Needs hardware:
    do not blow up.
 4. **CHORUS:** Feedback low gives a chorus. Above half it flanges. Delay
    Time sets the speed.
-5. **Reverb = PHASER, SPRING, RING, DIST, CLOUD:** each sounds as described, and
+5. **Reverb = PHASER, SPRING, RING, DIST, RESO:** each sounds as described, and
    the knobs act as in the table.
 6. **Save the project**, then load another and come back: each pattern has
    its own choices. A new project starts with DELAY and REVERB.

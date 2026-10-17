@@ -8,6 +8,8 @@ check that the file is up to date.
             phase per 32-sample block at 48 kHz. sendfx.inc also reads it
             x 12.5 as the ring modulator's carrier step a sample (20 Hz ..
             4 kHz), and >> 13 as the distortion's drive (Q4, x1.06 .. x218)
+  sfx_per   by a dial's value 0..127: RESO's pitch, C1 (32.70 Hz) x 200^(k/127)
+            (to ~6.5 kHz), as its comb's period in samples, Q8
   sfx_apc   by the phaser's sweep position 0..64: a first-order allpass
             coefficient, Q14, for a break frequency of
             100 Hz .. 4 kHz (exponential): a = (t - 1) / (t + 1),
@@ -29,6 +31,8 @@ def apc(j):
 
 
 ap = [apc(j) for j in range(65)]
+per = [round(FS / (32.70 * 200 ** (k / 127)) * 256) for k in range(128)]
+assert per[0] >> 8 < 4095 and per[-1] >> 8 >= 2
 assert all(a < b for a, b in zip(rate, rate[1:])), "the curve must rise"
 assert rate[-1] * 25 < 2 ** 31 and rate[0] >> 13 >= 16
 assert all(-16384 < a < 0 for a in ap)
@@ -46,6 +50,7 @@ L = ["",
      "| The alternative send effects' curves (src/sendfx.inc).",
      "    .align 4"]
 L += rows("sfx_rate", rate, "long")
+L += rows("sfx_per", per, "long")
 L += rows("sfx_apc", ap, "word")
 L += ["    .align 2"]
 open(out, 'w').write("\n".join(L) + "\n")

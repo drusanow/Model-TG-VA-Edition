@@ -66,7 +66,7 @@ keeps working.
   [docs/MUTESOLO.md](docs/MUTESOLO.md).
 - **Alternative send effects** (this fork): **SETTINGS** + **PAGE** opens
   Send FX, which puts a ping-pong, tape or chorus/flanger in the delay's
-  place, and a phaser, spring, ring modulator, distortion or granular cloud
+  place, and a phaser, spring, ring modulator, distortion or tuned resonator
   in the reverb's.
   The FX page's knobs drive them, and each pattern keeps its own. See
   [docs/SENDFX.md](docs/SENDFX.md).
