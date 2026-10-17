@@ -66,12 +66,14 @@ keeps working.
   [docs/MUTESOLO.md](docs/MUTESOLO.md).
 - **Alternative send effects** (this fork): **SETTINGS** + **PAGE** opens
   Send FX, which puts a ping-pong, tape or chorus/flanger in the delay's
-  place, and a phaser, spring, ring modulator or distortion in the reverb's.
+  place, and a phaser, spring, ring modulator, distortion or granular cloud
+  in the reverb's.
   The FX page's knobs drive them, and each pattern keeps its own. See
   [docs/SENDFX.md](docs/SENDFX.md).
 - **LFOs to MIDI CC** (this fork): a **MIDI CC** row in the LFO menu sends
-  any of the four LFOs of a track to a CC on that track's MIDI channel, as
-  well as (or instead of) its Destination. See
+  any of the four LFOs of a track to a CC on that track's MIDI channel,
+  sweeping from a Base value you set, as well as (or instead of) its
+  Destination. See
   [docs/LFOCC.md](docs/LFOCC.md).
 - **A Sampler machine**, the seventh machine on any track. It plays samples
   from the Cycles' internal storage, a different sample per pattern, with

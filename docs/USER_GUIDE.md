@@ -314,19 +314,33 @@ Details and limits: [LFO2.md](LFO2.md).
 
 ### LFOs to MIDI CC
 
-*Plaits Edition.* The LFO menu has a fifth row, **MIDI CC**. Scroll down to
-it and turn **DATA** to pick a CC number (0 to 127), or **OFF**. That LFO of
-that track then sends its movement as that CC, on the track's MIDI channel,
-to whatever is plugged into MIDI OUT or USB. Each of the four LFOs of each
-track has its own CC.
+*Plaits Edition.* The LFO menu has two more rows at the bottom:
 
+- **MIDI CC**: press **DATA** to edit it, turn to the CC number you want (0
+  to 127, or **OFF**), and press **DATA** again to switch it on. Nothing is
+  sent while you scroll through the numbers. Leaving the menu without that
+  second press keeps the old setting.
+- **CC Base**: the value the LFO sweeps from (0 to 127, 64 to start). Set it
+  to where you want the external parameter to sit.
+
+That LFO of that track then sends its movement as that CC, on the track's
+MIDI channel, to whatever is plugged into MIDI OUT or USB. Each of the four
+LFOs of each track has its own CC and Base.
+
+- **Depth** sweeps one way from the Base, in the menu's own steps: Base 50
+  with Depth -15 moves between 50 and 35; Depth +15 between 50 and 65. Depth
+  0 holds the Base. The value stops at 0 and 127.
+- Speed, Multiplier, Waveform, Fade, Start Phase and Trig Mode work as for
+  the internal destination. Each waveform runs from 0 to the full Depth:
+  TRI and SIN rise and fall, SQR jumps, SAW and EXP fall, RMP rises, RND
+  holds a new value each cycle.
 - It goes out as well as to the LFO's **Destination**. For an LFO that only
   moves the external gear, set Destination to **None**.
-- **Depth** sets how far it sweeps: 0 sends a steady 64, full Depth the whole
-  0 to 127, centred on 64. A negative Depth turns it upside down.
-- The CC numbers are a setting of the machine, like the tracks' MIDI
-  channels. They are not saved with the pattern, but they are kept when you
-  power off.
+- The CC numbers and Bases are a setting of the machine, like the tracks'
+  MIDI channels. They are not saved with the pattern, but they are kept when
+  you power off.
+- Very fast LFOs come out stepped: each LFO sends at most about 120 values a
+  second.
 - A track whose MIDI channel is OFF sends nothing.
 
 Details: [LFOCC.md](LFOCC.md).
@@ -438,13 +452,15 @@ happens at once. Details: [MUTESOLO.md](MUTESOLO.md).
 
 ## Alternative send effects
 
-*Plaits Edition.* **SETTINGS** + **PAGE** opens **Send FX**. Turn **DATA** on
-its rows:
+*Plaits Edition.* **SETTINGS** + **PAGE** opens **Send FX**: **DELAY FX**
+with the delay's effect on the line under it, then **REVERB FX** with the
+reverb's. Turn **DATA** to change them:
 
 - **Delay**: **DELAY** (stock), **PING** (ping-pong), **TAPE** (tape echo) or
   **CHORUS** (chorus, flanger past half Feedback).
 - **Reverb**: **REVERB** (stock), **PHASER**, **SPRING**, **RING** (ring
-  modulator) or **DIST** (distortion).
+  modulator), **DIST** (distortion) or **CLOUD** (a light granular cloud:
+  Size sets the grain length, Tone the feedback).
 
 The sends work as before. The FX page's Delay Time / Feedback and Reverb
 Size / Tone drive the chosen effect: echo time and repeats, LFO speed and
@@ -492,7 +508,8 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
 | LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
-| LFO menu | **MIDI CC** row, turn **DATA** | the CC the LFO showing sends (OFF, 0-127) |
+| LFO menu | **MIDI CC** row: press **DATA**, turn, press again | the CC the LFO showing sends (OFF, 0-127), switched on at the second press |
+| LFO menu | **CC Base** row, turn **DATA** | the value that CC sweeps from |
 | grid | **SETTINGS** + trig key | slide trig on / off |
 | main page | **SETTINGS** + pad | solo that track (again: back), on the next bar |
 | mute mode | pads | mute / unmute on the next bar (Device Config > Mute Q) |

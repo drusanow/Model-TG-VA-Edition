@@ -248,6 +248,7 @@ lfo_menu_new:
     rts
 lfo_menu_dtor:
     jsr     lcc_save              | a MIDI CC changed: the file (lfocc.inc)
+    clrl    lcc_ed                | ...and an edit left unpressed takes nothing
     clrl    lfo2_on
     clrl    lfo_pend
     clrl    lfo_live
@@ -300,6 +301,7 @@ lk_lfo:
     movel   lfo_page,%d0          | a tap: the next LFO
     addql   #1,%d0
     movel   %d0,lfo_page
+    clrl    lcc_ed                | (an unpressed MIDI CC edit: dropped)
     clrl    lfo2_on
     moveq   #1,%d1
     cmpl    %d0,%d1

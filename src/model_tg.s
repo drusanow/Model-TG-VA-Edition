@@ -9890,7 +9890,7 @@ dbh_pass:
                                   | changed}
     SLD_BASE    = MK_BASE - 0x800 | slide trigs: armed and running glides
     SFX_DBUF    = SLD_BASE - 0x80000 | the send effects' delay lines (sendfx.inc)
-    SFX_RBUF    = SFX_DBUF - 0x20000 | ... and the spring's
+    SFX_RBUF    = SFX_DBUF - 0x40000 | ... the spring's and CLOUD's
     L34_KITS    = SFX_RBUF - 0x3000 | LFO 3/4 and the send FX of each kit
                                   | (lfo2.inc: lfo34_kits, cleared at boot)
     PCM_TOP     = L34_KITS        | samples and takes stay below this

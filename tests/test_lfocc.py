@@ -8,7 +8,7 @@ file calls, the menu item constructor), as tests/test_mutesolo.py does.
 
     python3 -m unittest tests.test_lfocc -v
 """
-import os, sys, struct, unittest
+import os, sys, struct, unittest, math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from va_emu import *  # noqa
@@ -97,17 +97,29 @@ class Base(unittest.TestCase):
         self.e.w8(self.s['lcc_num'] + 6 * lfo + t, 0 if cc is None else cc + 1)
         self.e.run('lcc_remask')
 
-    def wave(self, lfo, t, v):
-        base = [LFO_STATE, self.s['lfo2_state'], self.s['lfo34_state'], self.s['lfo34_state'] + 192][lfo]
-        self.e.w32(base + 32 * t + 4, v)
+    def state(self, lfo, t):
+        return [LFO_STATE, self.s['lfo2_state'], self.s['lfo34_state'],
+                self.s['lfo34_state'] + 192][lfo] + 32 * t
 
-    def depth(self, lfo, t, v):
+    def phase(self, lfo, t, p, fade=1 << 30):
+        """The engine's phase (0..1 of a cycle) and fade gain."""
+        self.e.w32(self.state(lfo, t), int(p * 1382400000) % 1382400000)
+        self.e.w32(self.state(lfo, t) + 8, fade)
+
+    def words(self, lfo, t):
+        """-> (the Waveform word, the Depth word) addresses"""
         if lfo == 0:
-            self.e.w16(PAR + 14 + 66 * t + 16, v)
-        elif lfo == 1:
-            self.e.w16(PAR + 14 + 66 * t + 64, v)
-        else:
-            self.e.w16(self.blk() + 60 * (lfo - 2) + 10 * t + 8, v)
+            return PAR + 14 + 66 * t + 10, PAR + 14 + 66 * t + 16
+        if lfo == 1:
+            return PAR + 14 + 66 * t + 60, PAR + 14 + 66 * t + 64
+        b = self.blk() + 60 * (lfo - 2) + 10 * t
+        return b + 4, b + 8
+
+    def setup(self, lfo, t, wave, depth_steps, base):
+        w, d = self.words(lfo, t)
+        self.e.w16(w, wave << 8)
+        self.e.w16(d, 16384 + depth_steps * 256)
+        self.e.w8(self.s['lcc_base'] + 6 * lfo + t, base)
 
     def val(self, lfo, t):
         return self.e.r8(self.s['lcc_val'] + 6 * lfo + t)
@@ -116,26 +128,79 @@ class Base(unittest.TestCase):
         self.e.run('lcc_calc', regs={A[5]: PAR})
 
 
+def model(wave, p, depth_steps, base, fade=1 << 30):
+    """lcc_calc in Python: Base + Depth x the wave (0..1)."""
+    q = min(int(p * 1382400000) % 1382400000 // 21094, 65535)
+    if wave == 0:
+        u = 2 * q if 2 * q <= 65535 else 131071 - 2 * q
+    elif wave == 1:
+        sv = round(32767 * math.sin(2 * math.pi * (q >> 9) / 256))
+        u = sv * sv >> 14
+    elif wave == 2:
+        u = 65535 if q < 32768 else 0
+    elif wave == 3:
+        u = 65535 - q
+    elif wave == 4:
+        a = 65535 - q
+        a = a * a >> 16
+        u = a * a >> 16
+    elif wave == 5:
+        u = q
+    u = u * (fade >> 14) >> 16
+    v = (depth_steps * 256 * u + (1 << 23)) >> 24
+    return min(max(base + v, 0), 127)
+
+
 class TCalc(Base):
-    def test_values(self):
-        e = self.e
+    def test_from_the_base(self):
+        """Base 50, Depth -15: 50 down to 35, whatever the LFO and the wave."""
         for lfo in range(4):
             self.num(lfo, 3, 74)
-            for w, d, want in ((0x7fffffff, 32767, 127), (-0x80000000, 32767, 0),
-                               (0x40000000, 32767, 95), (0, 32767, 64),
-                               (-0x20000000, 24576, 56),             # -1/4 x +1/4 of the way
-                               (0x7fffffff, 16384, 64),             # Depth 0
-                               (0x7fffffff, 0, 0),                  # Depth -64: inverted
-                               (-0x80000000, 0, 127)):
-                self.wave(lfo, 3, w)
-                self.depth(lfo, 3, d)
-                self.calc()
-                self.assertEqual(self.val(lfo, 3), want, (lfo, hex(w), d))
+            for wave in range(6):
+                self.setup(lfo, 3, wave, -15, 50)
+                seen = set()
+                for i in range(64):
+                    self.phase(lfo, 3, i / 64)
+                    self.calc()
+                    v = self.val(lfo, 3)
+                    self.assertEqual(v, model(wave, i / 64, -15, 50), (lfo, wave, i))
+                    seen.add(v)
+                self.assertEqual((min(seen), max(seen)), (35, 50), (lfo, wave))
             self.assertEqual(self.val(lfo, 2), 0xff)            # OFF: left alone
 
+    def test_waves_depth_fade_and_clip(self):
+        e = self.e
+        self.num(0, 0, 1)
+        for wave, p, d, b, fade in ((0, 0.25, 20, 100, 1 << 30), (0, 0.5, 63, 0, 1 << 30),
+                                    (1, 0.5, 40, 10, 1 << 30), (2, 0.1, -64, 64, 1 << 30),
+                                    (3, 0.75, 30, 0, 1 << 29), (4, 0.2, 63, 64, 1 << 30),
+                                    (5, 0.9, 63, 100, 1 << 30), (0, 0.5, 30, 50, 0)):
+            self.setup(0, 0, wave, d, b)
+            self.phase(0, 0, p, fade)
+            self.calc()
+            self.assertEqual(self.val(0, 0), model(wave, p, d, b, fade), (wave, p, d, b))
+        self.setup(0, 0, 0, 63, 100)                            # clipped at 127
+        self.phase(0, 0, 0.5)
+        self.calc()
+        self.assertEqual(self.val(0, 0), 127)
+
+    def test_rnd_holds_a_cycle(self):
+        self.num(1, 2, 5)
+        self.setup(1, 2, 6, 63, 0)
+        vals = []
+        for cyc in range(6):
+            got = set()
+            for i in range(8):
+                self.phase(1, 2, i / 8)
+                self.calc()
+                got.add(self.val(1, 2))
+            self.assertEqual(len(got), 1)                       # held through the cycle
+            vals.append(got.pop())
+        self.assertGreater(len(set(vals)), 3)                   # and new each one
+
     def test_nothing_on_does_nothing(self):
-        self.wave(0, 0, 0x7fffffff)
-        self.depth(0, 0, 32767)
+        self.setup(0, 0, 0, 63, 64)
+        self.phase(0, 0, 0.5)
         self.calc()
         self.assertEqual(self.val(0, 0), 0xff)
 
@@ -221,26 +286,94 @@ class TSend(Base):
 
 
 class TMenu(Base):
-    def test_turns(self):
+    CLO, DATA, ITEM = SCRATCH + 0x9200, SCRATCH + 0x9210, SCRATCH + 0x9300
+
+    def setUp(self):
+        super().setUp()
         e = self.e
-        clo, data = SCRATCH + 0x9200, SCRATCH + 0x9210
-        e.w32(clo, data)
-        e.w32(data, 0)
+        e.w32(self.CLO, self.DATA)
+        e.w32(self.DATA, 0)
+        self.editing = 0
+        self.toggles = []
+        self.st.set(0x400732f8, lambda a: self.editing)         # the item: being edited?
+        self.st.set(0x400732ec, self._toggle)                    # ...set it
+
+    def _toggle(self, a):
+        self.toggles.append(a[1] & 0xff)
+        self.editing = a[1] & 0xff
+
+    def press(self):
+        self.e.run('lcc_press', stack=[self.CLO, self.ITEM])
+
+    def turn(self, fn, delta):
+        self.e.run(fn, stack=[self.CLO, 0, delta & M32])
+
+    def shows(self, fn):
+        e = self.e
+        e.run_to_any(fn, (self.s['gm_val'],), stack=[0, 0, 0, 0, 0])
+        b = bytes(e.uc.mem_read(e.r32(e.a(1)), 8))
+        return b[:b.index(0)].decode()
+
+    def test_cc_taken_on_the_press(self):
+        e = self.e
         e.w32(self.s['lfo_page'], 2)                            # LFO 3
         i = self.s['lcc_num'] + 12 + self.TRACK
-        seen, v = [], 0
-        for delta in (1, 1, -1, -1, -1, 5, 0):
-            e.run('lcc_rot', stack=[clo, 0, delta & M32])
-            v = min(max(v + (delta > 0) - (delta < 0), 0), 128)
-            seen.append((e.r8(i), v))
-        self.assertEqual([a for a, b in seen], [b for a, b in seen])
-        e.w8(i, 127)
-        e.run('lcc_rot', stack=[clo, 0, 1])
-        e.run('lcc_rot', stack=[clo, 0, 1])
-        self.assertEqual(e.r8(i), 128)                          # CC 127 the last
-        self.assertEqual(e.r32(self.s['lcc_mask']), 0b100)
+        self.turn('lcc_rot', 1)                                  # not editing: nothing
+        self.assertEqual(e.r8(i), 0)
+        self.press()                                             # into the edit
+        self.assertEqual(self.toggles, [1])
+        for _ in range(75):
+            self.turn('lcc_rot', 1)
+        self.assertEqual(self.shows('lcc_value'), '74')         # shown, pending...
+        self.assertEqual((e.r8(i), e.r32(self.s['lcc_mask'])), (0, 0))   # ...not in force
+        self.press()                                             # the press: taken
+        self.assertEqual(self.toggles, [1, 0])
+        self.assertEqual((e.r8(i), e.r32(self.s['lcc_mask'])), (75, 0b100))
         self.assertEqual(e.r32(self.s['lcc_dirty']), 1)
-        self.assertEqual(e.r8(self.s['lcc_sent'] + 12 + self.TRACK), 0xff)
+        self.assertEqual(self.shows('lcc_value'), '74')
+        self.press()                                             # again, turned to OFF
+        for _ in range(80):
+            self.turn('lcc_rot', -1)
+        self.assertEqual(self.shows('lcc_value'), 'OFF')
+        self.assertEqual(e.r8(i), 75)
+        self.press()
+        self.assertEqual((e.r8(i), e.r32(self.s['lcc_mask'])), (0, 0))
+
+    def test_unpressed_edit_takes_nothing(self):
+        e = self.e
+        e.uc.mem_write(0x400d97a2, bytes.fromhex('588f4e75'))
+        i = self.s['lcc_num'] + self.TRACK
+        self.press()
+        self.turn('lcc_rot', 1)
+        self.turn('lcc_rot', 1)
+        e.run('lfo_menu_dtor')                                   # closed mid-edit
+        self.assertEqual((e.r8(i), e.r32(self.s['lcc_ed'])), (0, 0))
+        self.assertEqual(self.shows('lcc_value'), 'OFF')
+
+    def test_clamps(self):
+        e = self.e
+        i = self.s['lcc_num'] + self.TRACK
+        self.press()
+        for _ in range(200):
+            self.turn('lcc_rot', 1)
+        self.press()
+        self.assertEqual((e.r8(i), self.shows('lcc_value')), (128, '127'))
+
+    def test_base(self):
+        e = self.e
+        e.w32(self.s['lfo_page'], 1)
+        i = self.s['lcc_base'] + 6 + self.TRACK
+        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (64, '64'))
+        for _ in range(14):
+            self.turn('lcc_rotb', -1)
+        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (50, '50'))
+        for _ in range(100):
+            self.turn('lcc_rotb', 1)
+        self.assertEqual(e.r8(i), 127)
+        for _ in range(200):
+            self.turn('lcc_rotb', -1)
+        self.assertEqual((e.r8(i), self.shows('lcc_valueb')), (0, '0'))
+        self.assertEqual(e.r32(self.s['lcc_dirty']), 1)
 
     def test_shows(self):
         e = self.e
@@ -249,12 +382,7 @@ class TMenu(Base):
         for n, want in ((0, 'OFF'), (1, '0'), (8, '7'), (11, '10'), (75, '74'),
                         (100, '99'), (101, '100'), (128, '127')):
             e.w8(i, n)
-            st = e.run_to_any('lcc_value', (self.s['gm_val'],), stack=[0, 0, 0, 0, 0])
-            self.assertEqual(st, self.s['gm_val'])
-            self.assertEqual(e.r32(e.a(0)), 0)
-            name = e.r32(e.a(1))
-            b = bytes(e.uc.mem_read(name, 8))
-            self.assertEqual(b[:b.index(0)].decode(), want)
+            self.assertEqual(self.shows('lcc_value'), want)
 
     def test_row_added_to_the_lfo_menu(self):
         e = self.e
@@ -266,20 +394,23 @@ class TMenu(Base):
             return heap[0]
         made = []
         self.st.set(0x40080064, alloc)
-        self.st.set(0x400734b0, lambda a: made.append(a))
+        # the closures live in the caller's frame, reused row after row: read
+        # them as the constructor gets them
+        self.st.set(0x400734b0, lambda a: made.append(
+            a[:7] + tuple(e.r32(c + 12) for c in a[1:5]) + (e.r32(e.r32(a[4])),)))
         added = []
         self.st.set(0x40072ce6, lambda a: added.append(a[:2]))
         self.st.set(0x40025798, lambda a: a[0])                # the stock constructor
         e.run('lfo_menu_new', stack=[MENU, 0x77, 0x88])
         self.assertEqual(e.d(0), MENU)
-        self.assertEqual(len(made), 1)
-        item, lab, press, value, turn = made[0][:5]
-        self.assertEqual(added, [(MENU, item)])
-        fns = [e.r32(c + 12) for c in (lab, press, value, turn)]
-        self.assertEqual(fns, [self.s['lcc_lab'], self.s['new_slot2_invoker'],
-                               self.s['lcc_value'], self.s['lcc_rot']])
-        self.assertEqual(e.r32(e.r32(turn)), MENU)              # the turn's data: the menu
-        self.assertEqual(made[0][5:7], (M32, 8))
+        self.assertEqual(len(made), 2)
+        self.assertEqual(added, [(MENU, m[0]) for m in made])
+        want = [('lcc_lab', 'lcc_press', 'lcc_value', 'lcc_rot'),
+                ('lcc_labb', 'new_slot2_invoker', 'lcc_valueb', 'lcc_rotb')]
+        for m, names in zip(made, want):
+            self.assertEqual(list(m[7:11]), [self.s[n] for n in names])
+            self.assertEqual(m[11], MENU)                       # the turn's data: the menu
+            self.assertEqual(m[5:7], (M32, 8))
 
 
 class TFile(Base):
@@ -287,6 +418,7 @@ class TFile(Base):
         e = self.e
         self.num(0, 0, 74)
         self.num(3, 5, 0)
+        e.w8(self.s['lcc_base'] + 7, 33)
         e.w32(self.s['lcc_dirty'], 1)
         e.uc.mem_write(0x400d97a2, bytes.fromhex('588f4e75'))  # the stock rest: pop a2
         e.run('lfo_menu_dtor')                                 # the menu closes: posted
@@ -294,16 +426,24 @@ class TFile(Base):
         self.assertEqual(e.r32(self.s['lcc_dirty']), 0)
         e.run('lcc_write', stack=[0, 0])
         f = self.files['/lfo_cc.bin']
-        self.assertEqual(len(f), 32)
-        self.assertEqual(f[:4], b'LCC1')
-        self.assertEqual((f[4], f[4 + 23]), (75, 1))
+        self.assertEqual(len(f), 56)
+        self.assertEqual(f[:4], b'LCC2')
+        self.assertEqual((f[4], f[4 + 23], f[28 + 7], f[28]), (75, 1, 33, 64))
         for i in range(24):                                     # forgotten, then read
             e.w8(self.s['lcc_num'] + i, 0)
+            e.w8(self.s['lcc_base'] + i, 64)
         e.run('lcc_remask')
         e.run('lcc_poll')
         self.assertEqual(e.r32(self.s['lcc_ld']), 1)
         self.assertEqual((e.r8(self.s['lcc_num']), e.r8(self.s['lcc_num'] + 23)), (75, 1))
+        self.assertEqual(e.r8(self.s['lcc_base'] + 7), 33)
         self.assertEqual(e.r32(self.s['lcc_mask']), 0b1001)
+
+    def test_older_file(self):
+        e = self.e
+        self.files['/lfo_cc.bin'] = b'LCC1' + bytes([11] + [0] * 23) + bytes(4)
+        e.run('lcc_poll')
+        self.assertEqual((e.r8(self.s['lcc_num']), e.r8(self.s['lcc_base'])), (11, 64))
 
     def test_no_file_or_a_bad_one(self):
         e = self.e

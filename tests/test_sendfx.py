@@ -112,17 +112,17 @@ class TSlots(Base):
         self.types(1, 2)
         # garbage where the lines and the silence go
         e.uc.mem_write(self.dbuf(), b'\x5a' * 0x80000)
-        e.uc.mem_write(self.rbuf(), b'\x5a' * 0x20000)
+        e.uc.mem_write(self.rbuf(), b'\x5a' * 0x3f000)
         self.params(1792, 16384)
-        for fn, n in (('sfx_dly', 32), ('sfx_rev', 4)):
+        for fn, n in (('sfx_dly', 32), ('sfx_rev', 12)):
             self.fed = []
             for _ in range(n):                       # clearing: silence, whatever comes in
                 a, b = self.block(fn, [9000] * 32)
                 self.assertEqual(a + b, [0] * 64)
-            zero = self.rbuf() + 0x1f000
+            zero = self.rbuf() + 0x3f000
             self.assertEqual(set(f[1:] for f in self.fed), {(OUT, zero, PAR, True)})
         self.assertEqual(bytes(e.uc.mem_read(self.dbuf(), 0x80000)), b'\0' * 0x80000)
-        self.assertEqual(bytes(e.uc.mem_read(self.rbuf(), 0x10000)), b'\0' * 0x10000)
+        self.assertEqual(bytes(e.uc.mem_read(self.rbuf(), 0x30000)), b'\0' * 0x30000)
         a, b = self.block('sfx_dly', [0] * 32)       # then the effect: nothing in, nothing out
         self.assertEqual(a + b, [0] * 64)
 
@@ -228,7 +228,7 @@ class TReverbs(Base):
     def test_phaser(self):
         self.params(64 << 8, 0)
         self.types(r=1)
-        self.settle('sfx_rev', 4)
+        self.settle('sfx_rev', 12)
         ol, orr = self.run_for('sfx_rev', [0] * 640)
         self.assertEqual(max(map(abs, ol + orr)), 0)            # silence stays silence
         ol, _ = self.run_for('sfx_rev', impulse(640))
@@ -245,7 +245,7 @@ class TReverbs(Base):
             self.setUp()
             self.params(size, 16384)
             self.types(r=2)
-            self.settle('sfx_rev', 4)
+            self.settle('sfx_rev', 12)
             ol, orr = self.run_for('sfx_rev', impulse(32 * 600))
             e1 = sum(x * x for x in ol[2000:6000])
             e2 = sum(x * x for x in ol[12000:16000])
@@ -258,7 +258,7 @@ class TReverbs(Base):
     def test_ring(self):
         self.params(64 << 8, 0)                                 # ~290 Hz triangle
         self.types(r=3)
-        self.settle('sfx_rev', 4)
+        self.settle('sfx_rev', 12)
         ol, orr = self.run_for('sfx_rev', [0] * 640)
         self.assertEqual(max(map(abs, ol + orr)), 0)
         ol, orr = self.run_for('sfx_rev', [8192] * 4800)
@@ -275,7 +275,7 @@ class TReverbs(Base):
     def test_dist(self):
         self.params(0, 32767)                                   # gentle, open
         self.types(r=4)
-        self.settle('sfx_rev', 4)
+        self.settle('sfx_rev', 12)
         sine = [round(200 * __import__('math').sin(i / 10)) for i in range(32 * 40)]
         ol, _ = self.run_for('sfx_rev', sine)
         for x, y in zip(sine[200:], ol[200:]):
@@ -287,6 +287,49 @@ class TReverbs(Base):
         self.params(127 << 8, 0)                                # dark
         ol2, _ = self.run_for('sfx_rev', sine)
         self.assertLess(max(map(abs, ol2[200:])), max(map(abs, ol[200:])))
+
+
+class TCloud(Base):
+    def run_cloud(self, size, tone, x):
+        self.params(size, tone)
+        self.types(r=5)
+        self.settle('sfx_rev', 12)
+        return self.run_for('sfx_rev', x)
+
+    def test_silence_stays_silent(self):
+        ol, orr = self.run_cloud(64 << 8, 64 << 8, [0] * 3200)
+        self.assertEqual(max(map(abs, ol + orr)), 0)
+
+    def test_a_cloud_of_grains(self):
+        tone = [round(8000 * __import__('math').sin(i / 7)) for i in range(32 * 1500)]
+        ol, orr = self.run_cloud(32 << 8, 0, tone + [0] * 32 * 2000)
+        lit = sum(1 for x in ol[36000:48000] if abs(x) > 100)
+        self.assertGreater(lit, 9000)                           # it sounds once filled
+        self.assertNotEqual(ol[36000:40000], orr[36000:40000])  # spread left and right
+        self.assertLessEqual(max(map(abs, ol + orr)), 32767)
+        tail = ol[48000 + 48000:]                               # 1 s after: no feedback, gone
+        self.assertEqual(max(map(abs, tail)), 0)
+
+    def test_tone_feeds_it_back(self):
+        burst = [8000 if (i // 20) % 2 else -8000 for i in range(32 * 100)]
+        tails = []
+        for tone in (0, 127 << 8):
+            self.setUp()
+            ol, _ = self.run_cloud(32 << 8, tone, burst + [0] * 32 * 3000)
+            tails.append(sum(x * x for x in ol[3200 + 70000:3200 + 90000]))
+        self.assertEqual(tails[0], 0)
+        self.assertGreater(tails[1], 0)                         # still there 1.5 s on
+
+    def test_size_sets_the_grains(self):
+        e = self.e
+        lens = []
+        for size in (0, 127 << 8):
+            self.setUp()
+            self.run_cloud(size, 0, [1000] * 32 * 40)
+            g = self.s['sfx_cg']
+            lens.append(max(e.r32(g + 16 * i + 8) for i in range(4)))
+        self.assertTrue(1024 <= lens[0] <= 1536 + 1, lens)
+        self.assertTrue(17000 <= lens[1] <= 26200, lens)
 
 
 class TCpu(Base):
@@ -301,9 +344,9 @@ class TCpu(Base):
             for _ in range(33):
                 e.run('sfx_dly', stack=[OUT, IN, PAR])
             got['dly%d' % d] = e.count_instructions('sfx_dly', RET, stack=[OUT, IN, PAR])
-        for r in (1, 2, 3, 4):
+        for r in (1, 2, 3, 4, 5):
             self.types(0, r)
-            for _ in range(5):
+            for _ in range(13):
                 e.run('sfx_rev', stack=[OUT, IN, PAR])
             got['rev%d' % r] = e.count_instructions('sfx_rev', RET, stack=[OUT, IN, PAR])
         print('\n  send FX, instructions a block:', got)
@@ -313,7 +356,7 @@ class TCpu(Base):
 class TMenu(Base):
     def test_rows_turn_the_playing_kit(self):
         e = self.e
-        for fn, off, n in (('sfx_rot_d', 120, 4), ('sfx_rot_r', 121, 5)):
+        for fn, off, n in (('sfx_rot_d', 120, 4), ('sfx_rot_r', 121, 6)):
             seen, want, v = [], [], 0
             for delta in (1, 1, 1, 1, 1, 1, -1, 0, -1, -1, -1, -1, -1, -3, 5):
                 e.run(fn, stack=[0, 0, delta & M32])
@@ -331,13 +374,33 @@ class TMenu(Base):
             self.assertEqual(st, self.s['gm_val'])
             self.assertEqual((e.a(0), e.a(1), e.r32(self.s['sfx_v'])), (self.s['sfx_v'], self.s[names], want))
         strings = []
-        for names, n in (('sfx_n_d', 4), ('sfx_n_r', 5)):
+        for names, n in (('sfx_n_d', 4), ('sfx_n_r', 6)):
             for i in range(n):
                 a = e.r32(self.s[names] + 4 * i)
                 b = bytes(e.uc.mem_read(a, 8))
                 strings.append(b[:b.index(0)].decode())
         self.assertEqual(strings, ['DELAY', 'PING', 'TAPE', 'CHORUS',
-                                   'REVERB', 'PHASER', 'SPRING', 'RING', 'DIST'])
+                                   'REVERB', 'PHASER', 'SPRING', 'RING', 'DIST', 'CLOUD'])
+
+    def test_four_lines(self):
+        """A heading, then its effect on the line under it: no line carries
+        both a label and a value. Both lines of a pair turn the same type."""
+        e = self.e
+        d = self.s['sfx_desc']
+        self.assertEqual(e.r32(d + 8), 4)
+        items = e.r32(d + 12)
+        rows = [[e.r32(items + 16 * r + 4 * c) for c in range(4)] for r in range(4)]
+        S = self.s
+        self.assertEqual(rows, [[S['sfx_lab_d'], S['sfx_val_e'], S['sfx_rot_d'], S['new_slot2_invoker']],
+                                [S['sfx_lab_e'], S['sfx_val_d'], S['sfx_rot_d'], S['new_slot2_invoker']],
+                                [S['sfx_lab_r'], S['sfx_val_e'], S['sfx_rot_r'], S['new_slot2_invoker']],
+                                [S['sfx_lab_e'], S['sfx_val_r'], S['sfx_rot_r'], S['new_slot2_invoker']]])
+        e.run_to_any('sfx_val_e', (S['gm_val'],), stack=[0, 0, 0, 0, 0])
+        self.assertEqual(e.r8(e.r32(e.a(1) + 4 * e.r32(e.a(0)))), 0)     # the heading's value: ""
+        for lab, want in (('sfx_lab_d', 'DELAY FX'), ('sfx_lab_r', 'REVERB FX'), ('sfx_lab_e', '')):
+            e.run_to_any(lab, (S['gm_lab'],), stack=[0])
+            b = bytes(e.uc.mem_read(e.a(1), 12))
+            self.assertEqual(b[:b.index(0)].decode(), want)
 
     def test_settings_page_reaches_the_menu(self):
         e = self.e
@@ -405,7 +468,7 @@ class TKits(Base):
             e.w8(STO + 647, b)
             self.load(self.kit(41))
             got = (e.r8(self.blk(41) + 120), e.r8(self.blk(41) + 121))
-            want = {(0x97, 0x68): (0, 0), (0x5f, 0xa0): (0, 0)}.get((a, b), (0, 0))
+            want = {(0x5f, 0xa0): (0, 5)}.get((a, b), (0, 0))   # CLOUD's 5: in range
             self.assertEqual(got, want, (a, b))
         e.w8(STO + 646, 0x31)                                   # one in range, one not
         e.w8(STO + 647, 0xce)
