@@ -175,13 +175,13 @@ print("  Start/End published before the slice-mode skip")
 _pl=open(f"{proto}/plaits.inc").read()
 _str=dict(_re.findall(r'^(\w+):\s+\.asciz\s+"([^"]*)"', _pl, _re.M))
 _rows=_re.findall(r'^\s+\.long\s+(s_\w+(?:,\s*s_\w+){7})\s*$', _pl[_pl.index('mi_labs:'):_pl.index('mi_engn:')], _re.M)
-assert len(_rows)==8, f"mi_labs: {len(_rows)} rows"
+assert len(_rows)==10, f"mi_labs: {len(_rows)} rows"
 for _r in _rows:
     for _i,_n in enumerate(_r.replace(' ','').split(',')):
         _lim=4 if _i%2 else 9
         if len(_str[_n])>_lim:
             raise SystemExit(f"PLAITS label {_n} = {_str[_n]!r} is longer than {_lim}")
-for _n in ('s_e0','s_e1','s_e2','s_e3','s_e4','s_e5','s_e6','s_e7','str_mih','str_mit','str_mim','str_mie'):
+for _n in ('s_e0','s_e1','s_e2','s_e3','s_e4','s_e5','s_e6','s_e7','s_e8','s_e9','str_mih','str_mit','str_mim','str_mie'):
     if len(_str[_n])>(4 if _n.startswith('s_e') else 9):
         raise SystemExit(f"PLAITS label {_n} = {_str[_n]!r} is too long")
 print("  PLAITS labels: names <= 9 characters, short labels and engine names <= 4")
@@ -209,7 +209,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
               'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',

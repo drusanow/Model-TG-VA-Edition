@@ -1,5 +1,5 @@
 | ============================================================================
-| =================  PLAITS: machine 11, eight macro engines  =================
+| ==================  PLAITS: machine 11, ten macro engines  ==================
 |
 | See docs/PLAITS.md. A machine after Mutable Instruments Plaits (Emilie
 | Gillet, MIT licence): one voice, four knobs and an engine select. Built
@@ -10,21 +10,25 @@
 | followed by the same tail (decimator, Amp Decay, Attack, Filter, Res).
 |
 |   Color   HARM  Plaits' HARMONICS     Shape  TIMB  TIMBRE
-|   Sweep   MORP  MORPH                 Contour ENG  the engine, eight
-|                                              steps of 16 on the dial
+|   Sweep   MORP  MORPH                 Contour ENG  the engine, ten
+|                                              steps of 12.8 on the dial
 | Engines (each a fixed-point remake of Plaits' algorithm, not its code):
 |   0 WSHP  waveshaping: a slope oscillator through Plaits' five shapers and
 |           its wavefolder               HARM shaper  TIMB fold  MORP slope
 |   1 FM    2-op phase modulation        HARM ratio   TIMB index MORP fdbk
-|   2 GRAN  two grainlets (formants)     HARM ratio   TIMB form. MORP shape
-|   3 PD    phase distortion (Plaits 1.2) HARM ratio  TIMB amount MORP asym
-|   4 CHIP  hard-synced square, one arpeggio step per trig (Plaits 1.2)
+|   2 SWRM  a granular cloud of sawtooth grains
+|                                        HARM spread  TIMB dens. MORP length
+|   3 GRAN  two grainlets (formants)     HARM ratio   TIMB form. MORP shape
+|   4 PD    phase distortion (Plaits 1.2) HARM ratio  TIMB amount MORP asym
+|   5 CHIP  hard-synced square, one arpeggio step per trig (Plaits 1.2)
 |                                        HARM chord   TIMB arp   MORP sync
-|   5 NOIS  clocked noise through a resonant LP-BP-HP filter
+|   6 NOIS  clocked noise through a resonant LP-BP-HP filter
 |                                        HARM type    TIMB clock MORP reso
-|   6 PART  random impulses through three band-passes (dust)
+|   7 MODL  a modal resonator, eight modes struck by each trig
+|                                        HARM material TIMB bright MORP decay
+|   8 PART  random impulses through three band-passes (dust)
 |                                        HARM spread  TIMB dens. MORP reso
-|   7 STRG  a Karplus-Strong string      HARM bridge/dispersion
+|   9 STRG  a Karplus-Strong string      HARM bridge/dispersion
 |                                        TIMB brightness  MORP damping
 | The pitch (Pitch knob and the trig's note) is Plaits' FREQUENCY; the stock
 | amp envelope and Filter play its low-pass gate.
@@ -315,9 +319,8 @@ mf_st:
     lsll    #7,%d0
     lea.l   mi_st,%a5
     adda.l  %d0,%a5
-    movel   %a4@(12),%d0          | the engine: ENG / 4096
-    moveq   #12,%d1
-    lsrl    %d1,%d0
+    movel   %a4@(12),%d0          | the engine: ENG x 10 / 32768
+    bsr     mi_eidx
     lea.l   mi_eng,%a0
     cmpl    %a0@(0,%d6:l:4),%d0
     beqs    mf_same
@@ -347,7 +350,27 @@ mi_out:
 
     .align 2
 mi_etab:
-    .long   mi_ws_e, mi_fm_e, mi_gr_e, mi_pd_e, mi_ch_e, mi_ns_e, mi_pt_e, mi_sg_e
+    .long   mi_ws_e, mi_fm_e, mi_sw_e, mi_gr_e, mi_pd_e
+    .long   mi_ch_e, mi_ns_e, mi_md_e, mi_pt_e, mi_sg_e
+
+| d0 = Contour's value -> d0 = the engine, value x 10 / 32768, held to 0..9:
+| ten equal steps. The middles of the eight engines before SWRM and MODL
+| came (4096 e + 2048) still land on the same engines. Clobbers d1.
+mi_eidx:
+    tstl    %d0
+    bpls    1f
+    moveq   #0,%d0
+1:  movel   %d0,%d1
+    lsll    #2,%d0
+    addl    %d1,%d0
+    addl    %d0,%d0
+    moveq   #15,%d1
+    lsrl    %d1,%d0
+    moveq   #9,%d1
+    cmpl    %d0,%d1
+    bges    2f
+    movel   %d1,%d0
+2:  rts
 
 | ============================================================================
 | 0 WSHP - Plaits' waveshaping engine: a slope oscillator (a triangle at
@@ -527,7 +550,7 @@ mfm_l:
     braw    mi_out
 
 | ============================================================================
-| 2 GRAN - Plaits' grain engine (its main output): two grainlets - a window
+| 3 GRAN - Plaits' grain engine (its main output): two grainlets - a window
 | at the note's pitch (shaped by MORP) filled with a sine at a formant -
 | the first formant set by TIMB (note 24 .. 108, whatever the pitch), the
 | second at HARM's ratio to it (-24 .. +24 semitones), HARM below the
@@ -735,7 +758,7 @@ mgr_ws:
     braw    mi_out
 
 | ============================================================================
-| 3 PD - Plaits 1.2's phase distortion engine: a cosine whose phase is bent
+| 4 PD - Plaits 1.2's phase distortion engine: a cosine whose phase is bent
 | by a triangle at HARM's quantized ratio, hard-synced to the note and
 | windowed so the reset is smooth; TIMB the amount (to 8 cycles), MORP the
 | triangle's and the phasor's asymmetry.
@@ -876,7 +899,7 @@ mpd_l:
     braw    mi_out
 
 | ============================================================================
-| 4 CHIP - Plaits 1.2's chiptune engine, as Plaits plays it when triggered:
+| 5 CHIP - Plaits 1.2's chiptune engine, as Plaits plays it when triggered:
 | each trig takes the next note of an arpeggio over Plaits' eleven chords
 | (HARM), in one of its twelve patterns (TIMB: up, down, up-down, random
 | over 1, 2 or 4 octaves), on a square hard-synced to the note - MORP the
@@ -1058,7 +1081,7 @@ mch_l:
     braw    mi_out
 
 | ============================================================================
-| The three engines below run at 48 kHz - the rate the stock decimator brings
+| The engines below run at 48 kHz - the rate the stock decimator brings
 | every render down to - and write each sample twice: half the work, and
 | their filters' coefficients twice as large, so the integer states keep
 | their precision at low cutoffs.
@@ -1205,7 +1228,7 @@ mi_svfset:
     rts
 
 | ============================================================================
-| 5 NOIS - Plaits' noise engine (its main output): white noise sampled and
+| 6 NOIS - Plaits' noise engine (its main output): white noise sampled and
 | held at a clock (TIMB, note 0 .. 128; raw noise blends in at the top),
 | through a state-variable filter at the note's pitch whose type HARM
 | sweeps low-pass - band-pass - high-pass, resonance MORP (Q 0.5 .. 512),
@@ -1338,7 +1361,380 @@ mns_l:
     braw    mi_out
 
 | ============================================================================
-| 6 PART - Plaits' particle engine: random impulses (their density TIMB:
+| 2 SWRM - Plaits' granular cloud (its swarm engine, remade): up to six
+| grains, each a sawtooth under a bell (a triangle, squared) with a pitch of
+| its own. HARM spreads their pitches at random (up to +-24 semitones), TIMB
+| sets how often one starts (about 1 to 950 a second), MORP how long each
+| lasts (10 ms to 1 s): long grains at a high density overlap into a steady
+| cloud. Each trig starts one at once. 48 kHz.
+| locals: 0 the chance of a grain a sample (Q32), 4 the spread (Q8),
+| 8 the envelope's step (Q32), 12 the trig
+| state: six grains of 20 bytes: 0 phase, 4 increment (48 kHz),
+| 8 envelope position (Q32), 12 its step (0 = free), 16 pitch ratio (Q12)
+SW_N = 6
+mi_sw_e:
+    moveq   #31,%d0
+    movel   %d0,%sp@(MI_CNT)
+    movel   %d7,%sp@(12)
+    movel   %a4@(4),%d0           | the chance: 1000 Hz x 2^(10 (TIMB - 1)) / 48 kHz
+    mulu.w  #30720,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    subil   #30720,%d0
+    bsr     mi_exp2
+    movel   #5461,%d1
+    mulul   %d1,%d0
+    movel   %d0,%sp@(0)
+    movel   %a4@,%d0              | the spread: 24 HARM^2 semitones, Q8
+    mulu.w  %d0,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    mulu.w  #6144,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    movel   %d0,%sp@(4)
+    movel   %a4@(8),%d0           | the bell's step: 2^32 / 480 x 2^(-80 MORP / 12)
+    mulu.w  #20480,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    negl    %d0
+    bsr     mi_exp2
+    mulu.w  #546,%d0
+    movel   %d0,%sp@(8)
+    movea.l %a5,%a2               | the grains that play: this block's note
+    moveq   #SW_N-1,%d4
+1:  tstl    %a2@(12)
+    beqs    2f
+    movel   %a2@(16),%d1
+    bsr     msw_inc
+    movel   %d0,%a2@(4)
+2:  lea.l   %a2@(20),%a2
+    subql   #1,%d4
+    bpls    1b
+    movel   mi_seed,%d7
+msw_l:
+    MI_RND  %d7,%d1
+    tstl    %sp@(12)
+    bnes    msw_new
+    cmpl    %sp@(0),%d7
+    bccw    msw_g
+msw_new:
+    clrl    %sp@(12)              | a new grain, in the first free slot
+    movea.l %a5,%a2
+    moveq   #SW_N-1,%d4
+1:  tstl    %a2@(12)
+    beqs    2f
+    lea.l   %a2@(20),%a2
+    subql   #1,%d4
+    bpls    1b
+    bras    msw_g                 | none free: not this one
+2:  MI_RND  %d7,%d1
+    movel   %d7,%a2@              | a random phase
+    clrl    %a2@(8)
+    movel   %sp@(8),%a2@(12)
+    MI_RND  %d7,%d1
+    movel   %d7,%d0
+    swap    %d0
+    extl    %d0                   | u, -1..1
+    mulsl   %sp@(4),%d0
+    asrl    #8,%d0
+    asrl    #7,%d0
+    bsr     mi_exp2
+    lsrl    #2,%d0                | its ratio, Q12
+    movel   %d0,%a2@(16)
+    movel   %d0,%d1
+    bsr     msw_inc
+    movel   %d0,%a2@(4)
+msw_g:
+    moveq   #0,%d5                | the grains, summed
+    movea.l %a5,%a2
+    moveq   #SW_N-1,%d4
+msw_v:
+    movel   %a2@(12),%d2
+    beqs    msw_n
+    movel   %a2@(8),%d0
+    addl    %d2,%d0
+    bcss    msw_end
+    movel   %d0,%a2@(8)
+    bpls    1f
+    notl    %d0
+1:  swap    %d0
+    mvzw    %d0,%d0               | the triangle, 0..32767
+    mulu.w  %d0,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0                | ...squared: the bell, Q15
+    movel   %a2@,%d1
+    addl    %a2@(4),%d1
+    movel   %d1,%a2@
+    swap    %d1
+    extl    %d1                   | the sawtooth
+    mulsl   %d0,%d1
+    asrl    #8,%d1
+    asrl    #7,%d1
+    addl    %d1,%d5
+    bras    msw_n
+msw_end:
+    clrl    %a2@(12)              | over: free
+msw_n:
+    lea.l   %a2@(20),%a2
+    subql   #1,%d4
+    bpls    msw_v
+    movel   %d5,%d0               | x 5/8
+    asrl    #1,%d0
+    asrl    #3,%d5
+    addl    %d5,%d0
+    MI_OUT2
+    subql   #1,%sp@(MI_CNT)
+    bplw    msw_l
+    movel   %d7,mi_seed
+    braw    mi_out
+
+| d1 = a grain's ratio (Q12) -> d0 = its increment at 48 kHz, held below a
+| quarter of the rate. Uses d3. Clobbers d1, a0.
+msw_inc:
+    movel   %d3,%d0
+    bsr     mi_mulr
+    cmpil   #0x3fffffff,%d0
+    blss    1f
+    movel   #0x3fffffff,%d0
+1:  addl    %d0,%d0
+    rts
+
+| ============================================================================
+| 7 MODL - Plaits' modal resonator, struck: eight modes, each a decaying
+| sine (a coupled-form oscillator: x += e y, y -= e x, e = 2 sin(pi f / fs)),
+| struck by each trig. HARM picks the material, from the modes of a string
+| (1, 2, 3 ..) through a bell's and a drum's to a free bar's (1, 2.76,
+| 5.40 ..), in between blended. TIMB is the brightness: how hard the higher
+| modes are struck (each 0.4 .. 1 of the one below), and how much faster
+| they die (up to x (1 + 1.5 m) at TIMB 0). MORP is the decay, from 50 ms to
+| 8 s. Modes above 12 kHz are silent. 48 kHz; each mode runs the block in
+| registers into the window, then the window is spread to 96 kHz.
+| locals: 0 the blend (Q15), 4 its row of md_rat, 8 the damping k0 (Q16 a
+| block), 12 its slope (Q8), 16 the next mode's strike, 20 the brightness
+| (Q15), 24 the mode, 28 the trig
+| state: eight modes of 8 bytes: 0 x, 4 y (+-2^21 at a strike)
+MD_A   = 2097152                  | a strike's amplitude, all modes together
+mi_md_e:
+    movel   %d7,%sp@(28)
+    movel   %a4@,%d0              | the blend: HARM x 3 (x 129/128), three spans
+    cmpil   #32512,%d0
+    blss    1f
+    movel   #32512,%d0
+1:  movel   %d0,%d1
+    addl    %d0,%d0
+    addl    %d1,%d0
+    movel   %d0,%d1
+    asrl    #7,%d1
+    addl    %d1,%d0
+    movel   %d0,%d1
+    moveq   #15,%d2
+    lsrl    %d2,%d1
+    andil   #0x7fff,%d0
+    movel   %d0,%sp@(0)
+    lsll    #4,%d1
+    lea.l   md_rat,%a0
+    adda.l  %d1,%a0
+    movel   %a0,%sp@(4)
+    movel   %a4@(8),%d0           | k0 = 6036 x 2^(-88 MORP / 12) / 16384: a
+    mulu.w  #22528,%d0            | decay (to -60 dB) of 75 .. 12000 blocks
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    negl    %d0
+    bsr     mi_exp2
+    mulu.w  #6036,%d0
+    lsrl    #8,%d0
+    lsrl    #6,%d0
+    movel   %d0,%sp@(8)
+    movel   %a4@(4),%d0           | the slope: 1.5 - 1.375 TIMB, Q8
+    mulu.w  #352,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    negl    %d0
+    addil   #384,%d0
+    movel   %d0,%sp@(12)
+    movel   %a4@(4),%d0           | the brightness: 0.4 + 0.6 TIMB, Q15
+    mulu.w  #19600,%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    addil   #13107,%d0
+    movel   %d0,%sp@(20)
+    tstl    %d7
+    beqs    md_a
+    moveq   #0,%d1                | a strike: MD_A shared as 1, b, b^2 ..
+    movel   #32768,%d0
+    moveq   #7,%d2
+1:  addl    %d0,%d1
+    mulul   %sp@(20),%d0
+    lsrl    #8,%d0
+    lsrl    #7,%d0
+    subql   #1,%d2
+    bpls    1b
+    lsrl    #5,%d1
+    movel   #MD_A<<15>>5,%d0
+    divul   %d1,%d0
+    movel   %d0,%sp@(16)          | the first mode's
+md_a:
+    movea.l %a3,%a1               | the sum, in the window's first half
+    moveq   #31,%d0
+1:  clrl    %a1@+
+    subql   #1,%d0
+    bpls    1b
+    movea.l %a5,%a2
+    clrl    %sp@(24)
+md_m:
+    movea.l %sp@(4),%a0           | this mode's ratio, Q11, blended
+    movel   %sp@(24),%d0
+    lea.l   %a0@(0,%d0:l:2),%a0
+    mvzw    %a0@,%d1
+    mvzw    %a0@(16),%d0
+    subl    %d1,%d0
+    mulsl   %sp@(0),%d0
+    asrl    #8,%d0
+    asrl    #7,%d0
+    addl    %d0,%d1
+    movel   %d3,%d0
+    bsr     mi_mulr               | the note x ratio / 2
+    cmpil   #0x10000000,%d0
+    bccw    md_mute               | 12 kHz and up: silent
+    addl    %d0,%d0
+    bsr     md_e
+    movel   %d0,%d6               | e, Q18
+    movel   %sp@(12),%d0          | the damping: k0 (1 + slope x m), <= 0.5
+    mulsl   %sp@(24),%d0
+    addil   #256,%d0
+    mulul   %sp@(8),%d0
+    lsrl    #8,%d0
+    cmpil   #32768,%d0
+    blss    1f
+    movel   #32768,%d0
+1:  negl    %d0
+    addil   #65536,%d0
+    movel   %d0,%d7               | r = 1 - k, Q16, this block
+    movel   %a2@,%d4
+    movel   %d4,%d0               | x r: (x >> 16) r + ((x & 0xffff) r >> 16)
+    swap    %d0
+    extl    %d0
+    mulsl   %d7,%d0
+    andil   #0xffff,%d4
+    mulul   %d7,%d4
+    clrw    %d4
+    swap    %d4
+    addl    %d0,%d4
+    movel   %a2@(4),%d5
+    movel   %d5,%d0               | y r
+    swap    %d0
+    extl    %d0
+    mulsl   %d7,%d0
+    andil   #0xffff,%d5
+    mulul   %d7,%d5
+    clrw    %d5
+    swap    %d5
+    addl    %d0,%d5
+    tstl    %sp@(28)
+    beqs    md_r
+    addl    %sp@(16),%d5          | struck: y += its share, x and y held
+    MI_CLAMP %d5, MD_A
+    MI_CLAMP %d4, MD_A
+md_r:
+    movea.l %a3,%a1
+    moveq   #31,%d2
+    moveq   #10,%d1
+md_s:
+    movel   %d5,%d0               | x += e y
+    asrl    %d1,%d0
+    mulsl   %d6,%d0
+    asrl    #8,%d0
+    addl    %d0,%d4
+    movel   %d4,%d0               | y -= e x
+    asrl    %d1,%d0
+    mulsl   %d6,%d0
+    asrl    #8,%d0
+    subl    %d0,%d5
+    addl    %d4,%a1@+
+    subql   #1,%d2
+    bpls    md_s
+    movel   %d4,%a2@
+    movel   %d5,%a2@(4)
+md_n:
+    movel   %sp@(16),%d0          | the next mode's strike: x b
+    lsrl    #7,%d0
+    mulul   %sp@(20),%d0
+    lsrl    #8,%d0
+    movel   %d0,%sp@(16)
+    lea.l   %a2@(8),%a2
+    addql   #1,%sp@(24)
+    moveq   #8,%d0
+    cmpl    %sp@(24),%d0
+    bnew    md_m
+    lea.l   %a3@(128),%a1         | the sum (x 2^-6, Q15) to 96 kHz, from the end
+    lea.l   %a3@(256),%a0
+    moveq   #31,%d2
+1:  movel   %a1@-,%d0
+    asrl    #6,%d0
+    MI_CLAMP %d0, 32767
+    lsll    #8,%d0
+    lsll    #7,%d0
+    movel   %d0,%a0@-
+    movel   %d0,%a0@-
+    subql   #1,%d2
+    bpls    1b
+    braw    mi_out
+md_mute:
+    clrl    %a2@
+    clrl    %a2@(4)
+    braw    md_n
+
+| d0 = a mode's increment at 96 kHz (< 2^29) -> d0 = e = 2 sin(pi f / 48k),
+| Q18: E = 2 pi f / 48k (inc x pi/4 / 1024, full precision), then
+| E - E^3/24 + E^5/1920. Clobbers d1, a0.
+md_e:
+    movel   %d2,%sp@-
+    movel   #3217,%d1
+    bsr     mi_mulr
+    addil   #512,%d0
+    moveq   #10,%d1
+    lsrl    %d1,%d0
+    movel   %d0,%d2               | E, Q18, rounded
+    lsrl    #4,%d0                | E, Q14
+    movel   %d0,%d1
+    mulu.w  %d0,%d1
+    moveq   #14,%d0
+    lsrl    %d0,%d1               | E^2, Q14
+    movea.l %d1,%a0
+    movel   %d2,%d0
+    lsrl    #4,%d0
+    mulul   %d0,%d1
+    moveq   #14,%d0
+    lsrl    %d0,%d1               | E^3, Q14 (< 65536)
+    movel   %d1,%d0
+    mulu.w  #43691,%d0
+    clrw    %d0
+    swap    %d0                   | E^3 / 24, Q18
+    subl    %d0,%d2
+    movel   %a0,%d0
+    mulul   %d0,%d1
+    moveq   #14,%d0
+    lsrl    %d0,%d1               | E^5, Q14
+    movel   #546,%d0
+    mulul   %d0,%d1
+    clrw    %d1
+    swap    %d1                   | E^5 / 1920, Q18
+    addl    %d1,%d2
+    movel   %d2,%d0
+    movel   %sp@+,%d2
+    rts
+
+| the modes' ratios, Q11, per material (HARM blends the rows in turn)
+    .align 2
+md_rat:
+    .word 2048, 4096, 6144, 8192, 10240, 12288, 14336, 16384  | string
+    .word 2048, 4096, 4915, 6144, 8192, 10322, 12349, 16507   | bell
+    .word 2048, 3265, 4375, 4702, 5433, 5976, 6463, 7170      | drum
+    .word 2048, 5644, 11067, 18295, 27329, 38175, 50811, 65270 | free bar
+
+| ============================================================================
+| 8 PART - Plaits' particle engine: random impulses (their density TIMB:
 | note 60 .. 132 squared) each ringing one of three band-pass filters, each
 | filter retuned at random about the note when it is struck (spread HARM,
 | up to +-48 semitones), resonance MORP above the middle (Q to ~1000; below
@@ -1520,7 +1916,7 @@ mpt_b:
     braw    mi_out
 
 | ============================================================================
-| 7 STRG - Plaits' string engine, one string: a Karplus-Strong delay line
+| 9 STRG - Plaits' string engine, one string: a Karplus-Strong delay line
 | one period long (from ~23 Hz), struck on each trig by a period of noise
 | low-passed by the brightness (TIMB^2), with a one-pole damping filter
 | whose cutoff rises with MORP and the brightness (MORP 0.95 .. 1: no
@@ -1899,8 +2295,7 @@ mi_watch:
     lea.l   mi_p,%a0
     lsll    #4,%d0
     movel   %a0@(12,%d0:l),%d0
-    moveq   #12,%d1
-    lsrl    %d1,%d0
+    bsr     mi_eidx
     movel   %d0,%sp@-
     bsr     mi_icon               | the machine page's picture: this engine's
     movel   %sp@+,%d0
@@ -1918,7 +2313,7 @@ mw_out:
     rts
 
 | ---- mi_icon: PLAITS' picture on the machine page --------------------------
-| d0 = an engine (0..7), or -1 for PLAITS' own picture. Table B's twelve
+| d0 = an engine (0..9), or -1 for PLAITS' own picture. Table B's twelve
 | entries (0x40fe384c, built by build_sampler_icons) hold PLAITS' at entry 11
 | (+308); its pixel pointer (+16) is set to the engine's. Nothing is written
 | until the table has been rebuilt to twelve entries. Clobbers d0/d1/a0/a1.
@@ -1990,25 +2385,19 @@ mi_fmtswap:
 | page has drawn the parameter's name on the left and its five stock pips.
 |  - the left: a black square at the picture slot (centre 32, 19) and the
 |    engine's picture on it, white (the machine page's blit, 0x40071da4)
-|  - the pips: the stock five cleared, eight drawn in their place, the
+|  - the pips: the stock five cleared, ten drawn in their place, the
 |    engine's filled (0x40070efc filled / 0x40070c4e outlined, as stock)
 |  - the engine's name in the big font, centred on the pips (x 96)
-MI_PIP0 = 73                      | the first pip's left edge; 6 apart
+MI_PIP0 = 72                      | the first pip's left edge; 5 apart
 mi_draw:
     linkw   %fp,#-60
     moveml  %d2-%d7/%a2-%a5,%sp@
     movel   %fp@(16),%d2          | ctx
     movel   %fp@(24),%d3          | y
-    movel   %fp@(12),%d7          | the engine
-    moveq   #12,%d0
-    asrl    %d0,%d7
-    bpls    1f
-    moveq   #0,%d7
-1:  moveq   #7,%d0
-    cmpl    %d7,%d0
-    bges    2f
+    movel   %fp@(12),%d0          | the engine
+    bsr     mi_eidx
     movel   %d0,%d7
-2:  lea.l   0x40070efc,%a2        | filled
+    lea.l   0x40070efc,%a2        | filled
     lea.l   0x40070c4e,%a3        | outlined
     clrl    %sp@-                 | the picture: black behind it
     pea     37
@@ -2037,12 +2426,12 @@ mi_draw:
     movel   %d2,%sp@-
     jsr     %a2@
     lea.l   %sp@(24),%sp
-    moveq   #0,%d4                | ...and eight drawn
+    moveq   #0,%d4                | ...and ten drawn, 4 wide
     moveq   #MI_PIP0,%d5
 3:  pea     1
     pea     0x1b
     movel   %d5,%d0
-    addql   #4,%d0
+    addql   #3,%d0
     movel   %d0,%sp@-
     pea     0x17
     movel   %d5,%sp@-
@@ -2053,9 +2442,9 @@ mi_draw:
     movea.l %a2,%a0
 4:  jsr     %a0@
     lea.l   %sp@(24),%sp
-    addql   #6,%d5
+    addql   #5,%d5
     addql   #1,%d4
-    moveq   #8,%d0
+    moveq   #10,%d0
     cmpl    %d4,%d0
     bnes    3b
     lea.l   mi_engn,%a0           | the name, centred on the pips
@@ -2108,15 +2497,8 @@ mi_draw:
 | (record + 0x14, value, buf) -> sprintf(buf, "%s", the engine's name)
 mi_eng_fmt:
     movel   %sp@(8),%d0
-    moveq   #12,%d1
-    asrl    %d1,%d0               | the engine: value / 4096, as mi_fill
-    bpls    1f
-    moveq   #0,%d0
-1:  moveq   #7,%d1
-    cmpl    %d0,%d1
-    bges    2f
-    movel   %d1,%d0
-2:  lea.l   mi_engn,%a0
+    bsr     mi_eidx               | the engine, as mi_fill
+    lea.l   mi_engn,%a0
     movel   %a0@(0,%d0:l:4),%d0
     movel   %sp@(12),%d1
     movel   %d1,%sp@(4)           | buf
@@ -2128,8 +2510,8 @@ mi_eng_fmt:
 | ---- Contour steps one engine per four clicks ------------------------------
 | From fine_hook (track-handle slot 0x14, "current + delta") for id 0x4a. On
 | a PLAITS track the turn is added up (mi_eacc; a click is 256) and every
-| MI_CLICKS of it moves to the middle of the next or previous engine's 16
-| values - four clicks an engine, whatever the speed; turning back starts
+| MI_CLICKS of it moves to the middle of the next or previous engine's
+| values ((2 e + 1) x 1638) - four clicks an engine, whatever the speed; turning back starts
 | the count again; on
 | every other machine (Chord's Contour, the Sampler's Resonance) the step
 | is the stock one.   args: sp@(4) this, sp@(8) id, sp@(12) current,
@@ -2171,13 +2553,14 @@ mi_eng_step:
     bras    8f
 7:  moveq   #-1,%d1
 8:  clrl    mi_eacc
-    movel   %sp@(12),%d0
-    asrl    #8,%d0
-    asrl    #4,%d0                | this engine
+    movel   %d1,%sp@-
+    movel   %sp@(16),%d0
+    bsr     mi_eidx               | this engine
+    movel   %sp@+,%d1
     tstl    %d1
     bmis    1f
     addql   #1,%d0
-    moveq   #7,%d1
+    moveq   #9,%d1
     cmpl    %d0,%d1
     bges    2f
     movel   %d1,%d0
@@ -2185,9 +2568,9 @@ mi_eng_step:
 1:  subql   #1,%d0
     bpls    2f
     moveq   #0,%d0
-2:  moveq   #12,%d1
-    lsll    %d1,%d0
-    addil   #2048,%d0             | its middle
+2:  addl    %d0,%d0
+    addql   #1,%d0
+    mulu.w  #1638,%d0             | its middle
     subl    %sp@(12),%d0
     movel   %d0,%sp@(16)          | the delta that lands there
 mes_out:
@@ -2206,27 +2589,31 @@ mi_swap:
 mi_labs:
     .long s_wsh, s_wshs, s_fld, s_flds, s_asy, s_asys, s_eng, s_engs
     .long s_rat, s_rats, s_idx, s_idxs, s_fdb, s_fdbs, s_eng, s_engs
+    .long s_spr, s_sprs, s_den, s_dens, s_dur, s_durs, s_eng, s_engs
     .long s_frt, s_frts, s_frm, s_frms, s_wdt, s_wdts, s_eng, s_engs
     .long s_rat, s_rats, s_dst, s_dsts, s_asy, s_asys, s_eng, s_engs
     .long s_chd, s_chds, s_arp, s_arps, s_syn, s_syns, s_eng, s_engs
     .long s_typ, s_typs, s_clk, s_clks, s_res, s_ress, s_eng, s_engs
+    .long s_mat, s_mats, s_brt, s_brts, s_dec, s_decs, s_eng, s_engs
     .long s_spr, s_sprs, s_den, s_dens, s_res, s_ress, s_eng, s_engs
     .long s_stf, s_stfs, s_brt, s_brts, s_dmp, s_dmps, s_eng, s_engs
 | the machine page's picture, per engine (mi_icon; tools/gen_mi_icons.py)
 mi_icons:
-    .long mi_ic_wshp, mi_ic_fm, mi_ic_gran, mi_ic_pd
-    .long mi_ic_chip, mi_ic_nois, mi_ic_part, mi_ic_strg
+    .long mi_ic_wshp, mi_ic_fm, mi_ic_swrm, mi_ic_gran, mi_ic_pd
+    .long mi_ic_chip, mi_ic_nois, mi_ic_modl, mi_ic_part, mi_ic_strg
 mi_ic_wshp: .incbin "va_icons/mi_wshp_B_34x34.bin"
 mi_ic_fm:   .incbin "va_icons/mi_fm_B_34x34.bin"
+mi_ic_swrm: .incbin "va_icons/mi_swrm_B_34x34.bin"
 mi_ic_gran: .incbin "va_icons/mi_gran_B_34x34.bin"
 mi_ic_pd:   .incbin "va_icons/mi_pd_B_34x34.bin"
 mi_ic_chip: .incbin "va_icons/mi_chip_B_34x34.bin"
 mi_ic_nois: .incbin "va_icons/mi_nois_B_34x34.bin"
+mi_ic_modl: .incbin "va_icons/mi_modl_B_34x34.bin"
 mi_ic_part: .incbin "va_icons/mi_part_B_34x34.bin"
 mi_ic_strg: .incbin "va_icons/mi_strg_B_34x34.bin"
 | Contour's value, per engine (mi_eng_fmt)
 mi_engn:
-    .long s_e0, s_e1, s_e2, s_e3, s_e4, s_e5, s_e6, s_e7
+    .long s_e0, s_e1, s_e2, s_e3, s_e4, s_e5, s_e6, s_e7, s_e8, s_e9
 str_mih:  .asciz "Harmonics"
 str_mit:  .asciz "Timbre"
 str_mim:  .asciz "Morph"
@@ -2240,12 +2627,14 @@ s_eng:    .asciz "Engine"
 s_engs:   .asciz "ENG"
 s_e0:     .asciz "WSHP"
 s_e1:     .asciz "FM"
-s_e2:     .asciz "GRAN"
-s_e3:     .asciz "PD"
-s_e4:     .asciz "CHIP"
-s_e5:     .asciz "NOIS"
-s_e6:     .asciz "PART"
-s_e7:     .asciz "STRG"
+s_e2:     .asciz "SWRM"
+s_e3:     .asciz "GRAN"
+s_e4:     .asciz "PD"
+s_e5:     .asciz "CHIP"
+s_e6:     .asciz "NOIS"
+s_e7:     .asciz "MODL"
+s_e8:     .asciz "PART"
+s_e9:     .asciz "STRG"
 s_wsh:    .asciz "Waveshape"
 s_wshs:   .asciz "SHPE"
 s_fld:    .asciz "Fold"
@@ -2288,6 +2677,12 @@ s_brt:    .asciz "Bright"
 s_brts:   .asciz "BRIG"
 s_dmp:    .asciz "Damping"
 s_dmps:   .asciz "DAMP"
+s_dur:    .asciz "Duration"
+s_durs:   .asciz "DUR"
+s_mat:    .asciz "Material"
+s_mats:   .asciz "MATR"
+s_dec:    .asciz "Decay"
+s_decs:   .asciz "DEC"
     .align 2
 
 | ---- state ------------------------------------------------------------------

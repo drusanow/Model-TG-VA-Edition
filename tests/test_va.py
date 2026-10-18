@@ -487,7 +487,7 @@ class T7Static(unittest.TestCase):
                            ('gen_mi_icons.py', ['src/va_icons/plaits_icon_A_48x33.bin',
                                                 'src/va_icons/plaits_icon_B_34x34.bin'] +
                             [f'src/va_icons/mi_{n}_B_34x34.bin' for n in
-                             ('wshp', 'fm', 'gran', 'pd', 'chip', 'nois', 'part', 'strg')])):
+                             ('wshp', 'fm', 'swrm', 'gran', 'pd', 'chip', 'nois', 'modl', 'part', 'strg')])):
             old = [open(os.path.join(REPO, o), 'rb').read() for o in outs]
             subprocess.run([sys.executable, os.path.join(REPO, 'tools', tool)],
                            check=True, capture_output=True)

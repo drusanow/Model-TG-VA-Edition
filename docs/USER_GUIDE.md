@@ -363,9 +363,9 @@ Every knob p-locks, slides, takes LFOs and is saved. Details:
 
 ## PLAITS
 
-*Plaits Edition only.* One machine, the twelfth, with eight sound engines
+*Plaits Edition only.* One machine, the twelfth, with ten sound engines
 after Mutable Instruments Plaits. **Contour** (ENG) picks the engine: turning
-it shows the engine's picture, eight pips and its name, and four clicks move
+it shows the engine's picture, ten pips and its name, and four clicks move
 one engine. **Color**,
 **Shape** and **Sweep** are Plaits' HARMONICS, TIMBRE and MORPH, labelled
 for the engine.
@@ -374,16 +374,20 @@ for the engine.
 |---|---|---|---|---|
 | WSHP | waveshaping | **SHPE** waveshaper | **FOLD** wavefolder | **ASYM** slope |
 | FM | 2-op FM | **RATI** ratio | **INDX** index | **FDBK** feedback |
+| SWRM | granular cloud (a grain per trig too) | **SPRD** pitch spread | **DENS** density | **DUR** grain length |
 | GRAN | formants | **FRM2** 2nd formant | **FRMT** formant | **WDTH** grain shape |
 | PD | phase distortion | **RATI** ratio | **DIST** amount | **ASYM** asymmetry |
 | CHIP | chiptune arpeggio (a step per trig) | **CHRD** chord | **ARP** pattern | **SYNC** synced ratio |
 | NOIS | filtered noise | **TYPE** LP-BP-HP | **CLK** clock | **RESO** resonance |
+| MODL | modal resonator (struck per trig) | **MATR** string - bell - drum - bar | **BRIG** brightness | **DEC** decay |
 | PART | particles | **SPRD** spread | **DENS** density | **RESO** resonance |
 | STRG | plucked string | **STIF** bridge / stiffness | **BRIG** brightness | **DAMP** damping |
 
 Pitch and the trig's note tune it; Decay, Attack, Filter and Resonance work
 as on the VA. Every knob - Contour too - p-locks, slides, takes LFOs and is
-saved. Details: [PLAITS.md](PLAITS.md).
+saved. Patterns from before SWRM and MODL keep their engines; a p-lock or
+LFO on Contour near an engine's edge may now reach its neighbour. Details:
+[PLAITS.md](PLAITS.md).
 
 ## Additions for every machine
 

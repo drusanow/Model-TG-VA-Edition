@@ -7,10 +7,12 @@ and style of gen_drum_icons.py:
       selected track's (mi_watch / mi_icon):
       WSHP  a triangle folding inside a frame
       FM    two operators: two rings joined by a diagonal line
+      SWRM  a swarm of short sawtooth teeth at different heights
       GRAN  a cloud of grain squares rising diagonally
       PD    a trapezoid wave: slanted edges, flat tops
       CHIP  a square wave
       NOIS  speckle thinning out to the right (filtered noise)
+      MODL  a mallet striking a bar on two supports, rings above it
       PART  scattered dust
       STRG  three strings from their pegs, the middle one plucked
 Rerun after changing them; CI checks that the files are up to date. --show
@@ -74,6 +76,14 @@ def fm():
     return px
 
 
+def swrm():
+    px = canvas(W, H)
+    for x, y, w, h in ((2, 9, 8, 6), (13, 3, 7, 5), (23, 7, 9, 7), (5, 21, 7, 5),
+                       (16, 15, 8, 7), (25, 24, 7, 5), (12, 28, 6, 4)):
+        stroke(px, [(x, y + h), (x + w, y), (x + w, y + h)], 0.9)
+    return px
+
+
 def gran():
     px = canvas(W, H)
     for x, y, s in ((2, 26, 5), (8, 21, 4), (13, 24, 3), (12, 14, 5), (19, 17, 4), (20, 8, 4),
@@ -107,6 +117,18 @@ def nois():
     return px
 
 
+def modl():
+    px = canvas(W, H)
+    fill(px, in_rect(2, 23, 32, 26))
+    for cx in (8, 26):
+        stroke(px, [(cx - 3, 32), (cx, 27), (cx + 3, 32)], 0.9)
+    fill(px, in_ellipse(7, 16, 3.5, 3.5))
+    stroke(px, [(5, 13), (2, 2)], 1.1)
+    for r in (4, 8):
+        stroke(px, curve(lambda t, r=r: 20 - r * math.sin(math.pi * t), 22 - r, 22 + r, 60), 0.7)
+    return px
+
+
 def part():
     px = canvas(W, H)
     for cx, cy, r in ((7, 8, 2.5), (20, 5, 1.5), (28, 12, 3), (12, 19, 3.5), (25, 25, 2),
@@ -127,8 +149,8 @@ def strg():
     return px
 
 
-ENGINES = (('wshp', wshp), ('fm', fm), ('gran', gran), ('pd', pd),
-           ('chip', chip), ('nois', nois), ('part', part), ('strg', strg))
+ENGINES = (('wshp', wshp), ('fm', fm), ('swrm', swrm), ('gran', gran), ('pd', pd),
+           ('chip', chip), ('nois', nois), ('modl', modl), ('part', part), ('strg', strg))
 
 
 def main():

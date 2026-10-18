@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host tests for PLAITS (machine 11, src/plaits.inc): its eight engines -
+"""Host tests for PLAITS (machine 11, src/plaits.inc): its ten engines -
 pitch, what each knob does, bounds, CPU - and the plumbing it shares with the
 drums: the routing through sampler_pre and the render, the labels (per
 engine), the defaults, the level stage. HOST verification only: how it sounds
@@ -16,7 +16,8 @@ from va_emu import *  # noqa
 import test_va as V
 
 MI = 11
-WSHP, FM, GRAN, PD, CHIP, NOIS, PART, STRG = range(8)
+WSHP, FM, SWRM, GRAN, PD, CHIP, NOIS, MODL, PART, STRG = range(10)
+NAMES = ('WSHP', 'FM', 'SWRM', 'GRAN', 'PD', 'CHIP', 'NOIS', 'MODL', 'PART', 'STRG')
 FS = 96000
 STEP1 = 0x10000                                   # note 60
 EMU = None
@@ -31,8 +32,13 @@ def emu():
     return EMU
 
 
+def mid(k):
+    """the middle of engine k's span of Contour"""
+    return (2 * k + 1) * 1638
+
+
 def dials(e, t, eng, h, tb, m):
-    for i, v in enumerate((h, tb, m, eng * 4096 + 2048)):
+    for i, v in enumerate((h, tb, m, mid(eng))):
         e.w32(e.sym['mi_p'] + 16 * t + 4 * i, v)
 
 
@@ -206,6 +212,77 @@ class TEngines(unittest.TestCase):
         x = render(e, PART, 0, 28000, 30000, 120)[1000:]
         self.assertLess(abs(cents(peak_hz(x, 100, 2000), 261.63)), 50)
 
+    def test_swarm(self):
+        e = emu()
+        st = e.sym['mi_st']
+        x = render(e, SWRM, 0, 30000, 20000, 120)[2000:]        # no spread: the note
+        self.assertLess(abs(cents(peak_hz(x, 150, 400), 261.63)), 5)
+        self.assertEqual({e.r32(st + 20 * i + 16) for i in range(6) if e.r32(st + 20 * i + 12)},
+                         {4096})
+        ratios = set()                                          # HARM spreads the pitches
+        e = emu()
+        dials(e, 0, SWRM, 32767, 30000, 6000)
+        for _ in range(60):
+            e.run('mi_fill', stack=[0, STEP1, MI])
+            ratios |= {e.r32(st + 20 * i + 16) for i in range(6) if e.r32(st + 20 * i + 12)}
+        self.assertGreater(len(ratios), 10)
+        self.assertTrue(all(1024 <= r <= 16384 for r in ratios), ratios)
+        sparse = render(emu(), SWRM, 8000, 2000, 8000, 120, trig=False)
+        dense = render(emu(), SWRM, 8000, 30000, 8000, 120, trig=False)
+        self.assertGreater((dense ** 2).sum(), 20 * (sparse ** 2).sum() + 1)   # TIMB: density
+        # a trig starts a grain at once; MORP sets how long it lasts
+        short = render(emu(), SWRM, 0, 0, 0, 60)
+        self.assertGreater(np.abs(short[:600]).max(), 5000)
+        self.assertEqual(np.abs(short[1200:]).max(), 0)         # 10 ms, then silence
+        long_ = render(emu(), SWRM, 0, 0, 32767, 600)
+        self.assertGreater(np.abs(long_[FS // 4:FS // 4 + 2000]).max(), 5000)   # still at 250 ms
+        self.assertLess(abs(dense.mean()), 300)
+
+    def test_modal_pitch_and_material(self):
+        x = render(emu(), MODL, 0, 16000, 24000, 120)[500:]     # a string's modes
+        self.assertLess(abs(cents(peak_hz(x, 150, 400), 261.63)), 3)
+        f, s = spectrum(x)
+        for n in (2, 3):
+            m = (f > 261.63 * (n - 0.3)) & (f < 261.63 * (n + 0.3))
+            self.assertLess(abs(cents(f[m][np.argmax(s[m])], 261.63 * n)), 5, n)
+        x = render(emu(), MODL, 32767, 30000, 24000, 120)[500:]  # a free bar's
+        f, s = spectrum(x)
+        for r in (1, 2.756, 5.404):
+            m = (f > 261.63 * r * 0.95) & (f < 261.63 * r * 1.05)
+            self.assertGreater(s[m].max(), s.max() * 0.02, r)
+            self.assertLess(abs(cents(f[m][np.argmax(s[m])], 261.63 * r)), 15, r)
+        self.assertLess(band(x, 261.63 * 1.9, 261.63 * 2.1), 0.01 * band(x, 700, 750))
+        for step in (STEP1 // 8, STEP1 // 2, STEP1 * 2, STEP1 * 8):   # in tune elsewhere
+            hz = 261.63 * step / STEP1
+            x = render(emu(), MODL, 0, 4000, 32767, 600, step=step)[500:]
+            f, s = spectrum(x)
+            m = (f > hz * 0.7) & (f < hz * 1.4)
+            k = np.flatnonzero(m)[np.argmax(s[m])]
+            a, b, c = np.log(s[k - 1:k + 2])                    # the peak, interpolated
+            pk = f[k] + (a - c) / (2 * (a - 2 * b + c)) * (f[1] - f[0])
+            self.assertLess(abs(cents(pk, hz)), 2, step)
+
+    def test_modal_decay_brightness_strike(self):
+        rms = lambda v: np.sqrt((v ** 2).mean())
+        quick = render(emu(), MODL, 8000, 16000, 0, 160)
+        self.assertGreater(np.abs(quick[:2000]).max(), 8000)    # struck at once
+        self.assertLess(rms(quick[FS // 10:FS // 10 + 2000]), 1e-3 * rms(quick[:2000]) + 1)
+        long_ = render(emu(), MODL, 8000, 16000, 32767, 1500)   # MORP at the top: 8 s
+        self.assertGreater(rms(long_[-4000:]), 0.3 * rms(long_[2000:6000]))   # -7.5 dB in 1 s
+        dull = centroid(render(emu(), MODL, 8000, 0, 20000, 60))
+        bright = centroid(render(emu(), MODL, 8000, 32767, 20000, 60))
+        self.assertLess(1.5 * dull, bright)
+        e = emu()                                               # no trig, no sound
+        self.assertEqual(np.abs(render(e, MODL, 8000, 16000, 20000, 20, trig=False)).max(), 0)
+        st = e.sym['mi_st']                                     # struck every block: held
+        for _ in range(60):
+            render(e, MODL, 32767, 32767, 32767, 1)
+            self.assertTrue(all(abs(e.rs32(st + 4 * i)) < 6_000_000 for i in range(16)))
+        e = emu()                                               # modes over 12 kHz: silent
+        render(e, MODL, 32767, 32767, 20000, 4, step=STEP1 * 8)
+        self.assertEqual([e.r32(st + 8 * i) for i in range(3, 8)], [0] * 5)   # 2093 Hz x 8.93 ..
+        self.assertNotEqual(e.r32(st + 16), 0)                  # x 5.40: 11.3 kHz, kept
+
     def test_string_in_tune(self):
         for h, tb, m in ((8200, 0, 0), (8200, 10000, 20000), (8200, 30000, 30000),
                          (30000, 16000, 25000), (0, 16000, 25000)):
@@ -254,7 +331,7 @@ class TEngines(unittest.TestCase):
     def test_bounds_everywhere(self):
         e = emu(); rnd = random.Random(7)
         for _ in range(48):
-            eng = rnd.randrange(8)
+            eng = rnd.randrange(10)
             p = [rnd.choice((0, 32767, rnd.randrange(32768))) for _ in range(3)]
             step = rnd.choice((STEP1 // 8, STEP1, 4 * STEP1, 12 * STEP1))
             x = render(e, eng, *p, 6, t=rnd.randrange(6), step=step, trig=rnd.random() < 0.5)
@@ -262,7 +339,7 @@ class TEngines(unittest.TestCase):
 
     def test_cpu(self):
         worst = {}
-        for eng in range(8):
+        for eng in range(10):
             for p in ((32767, 32767, 32767), (16384, 16384, 16384), (0, 0, 0), (9000, 32767, 20000)):
                 e = emu()
                 dials(e, 0, eng, *p)
@@ -309,7 +386,7 @@ class TPlumbing(unittest.TestCase):
         pt = 0x4010dce0
         rd = lambda a: bytes(e.uc.mem_read(a, 16)).split(b'\0')[0].decode()
         shorts = []
-        for eng in range(8):
+        for eng in range(10):
             e.w32(s['mi_lab'], eng)
             e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[MI])
             names = [rd(e.r32(pt + off + 44)) for off in (2576, 3472, 4088, 4144)]
@@ -320,7 +397,9 @@ class TPlumbing(unittest.TestCase):
             self.assertEqual(cats, {'Plaits'})
         self.assertEqual({x[3] for x in shorts}, {'ENG'})       # the value names it
         self.assertEqual(shorts[1][:3], ['RATI', 'INDX', 'FDBK'])
-        self.assertEqual(shorts[7][:3], ['STIF', 'BRIG', 'DAMP'])
+        self.assertEqual(shorts[2][:3], ['SPRD', 'DENS', 'DUR'])
+        self.assertEqual(shorts[7][:3], ['MATR', 'BRIG', 'DEC'])
+        self.assertEqual(shorts[9][:3], ['STIF', 'BRIG', 'DAMP'])
         for row in shorts:
             self.assertTrue(all(1 <= len(x) <= 4 for x in row), row)
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[2])
@@ -354,12 +433,17 @@ class TPlumbing(unittest.TestCase):
         self.assertEqual(e.r32(REC), s['mi_eng_fmt'])
         rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
         names = []
-        for v in (0, 2048, 4095, 4096, 12288, 20480, 30720, 32512, 32767):
+        for v in (0, 2048, 3276, 3277, 7000, 12288, 20480, 23000, 30720, 32512, 32767):
             e.run('mi_eng_fmt', 0x40000e6e, stack=[0x1000, v, 0x2000])
             sp = e.sp()
             self.assertEqual((e.r32(sp + 4), e.r32(sp + 8)), (0x2000, 0x40124b58), v)  # buf, "%s"
             names.append(rd(e.r32(sp + 12)))
-        self.assertEqual(names, ['WSHP', 'WSHP', 'WSHP', 'FM', 'PD', 'NOIS', 'STRG', 'STRG', 'STRG'])
+        self.assertEqual(names, ['WSHP', 'WSHP', 'WSHP', 'FM', 'SWRM', 'GRAN', 'NOIS', 'MODL',
+                                 'STRG', 'STRG', 'STRG'])
+        for k in range(8):                                      # the old middles: the same engines
+            e.run('mi_eng_fmt', 0x40000e6e, stack=[0x1000, 4096 * k + 2048, 0x2000])
+            self.assertEqual(rd(e.r32(e.sp() + 12)),
+                             ('WSHP', 'FM', 'GRAN', 'PD', 'CHIP', 'NOIS', 'PART', 'STRG')[k])
         for m in (2, 6, 7):                                     # any other machine: stock
             e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[m])
             self.assertEqual(e.r32(REC), 0x400456c8, m)
@@ -382,7 +466,6 @@ class TPlumbing(unittest.TestCase):
             e.w8(SNDO + 38, mach)
             e.run('fine_hook', stack=[HANDLE, 0x4a, cur, delta])
             return e.d(0)
-        mid = lambda k: 4096 * k + 2048
         def clicks(cur, n, d=256):                              # n clicks of d
             for _ in range(n):
                 cur = step(MI, cur, d)
@@ -397,7 +480,9 @@ class TPlumbing(unittest.TestCase):
         self.assertEqual(clicks(mid(1), 3, -256), mid(0))
         self.assertEqual(step(MI, mid(0), 4096), mid(1))        # a fast turn: one engine
         self.assertEqual(clicks(5000, 4, -256), mid(0))         # 5000 is FM: back to WSHP
-        self.assertEqual(clicks(mid(7), 8), mid(7))             # held at the ends
+        self.assertEqual(clicks(4096 * 5 + 2048, 4), mid(7))    # an old NOIS: on to MODL
+        self.assertEqual(clicks(mid(8), 8), mid(9))             # held at the ends
+        self.assertEqual(clicks(mid(9), 8), mid(9))
         self.assertEqual(clicks(mid(0), 8, -256), mid(0))
         self.assertEqual(step(4, 1000, 256), 1256)              # Chord: the stock step
         self.assertEqual(step(6, 1000, -256), 744)              # the Sampler too
@@ -413,11 +498,11 @@ class TPlumbing(unittest.TestCase):
         hook(0x40071da4, 'icon', 5); hook(0x40071c10, 'text', 9)
         e.uc.mem_write(0x40072102, bytes.fromhex('70284e75'))   # width: 40
         e.uc.mem_write(0x400720f8, bytes.fromhex('70074e75'))   # the font's handle: 7
-        names = ('WSHP', 'FM', 'GRAN', 'PD', 'CHIP', 'NOIS', 'PART', 'STRG')
+        names = NAMES
         rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
-        for eng in range(8):
+        for eng in range(10):
             calls.clear()
-            e.run('mi_draw', stack=[0x1000, 4096 * eng + 2048, 0x5555, 0x60, 0x22, 0])
+            e.run('mi_draw', stack=[0x1000, mid(eng), 0x5555, 0x60, 0x22, 0])
             fills = [c for c in calls if c[0] == 'fill']
             self.assertEqual(fills[0][1:], (0x5555, 14, 1, 50, 37, 0))      # black behind
             self.assertEqual(fills[1][1:], (0x5555, 70, 22, 122, 28, 0))    # stock pips off
@@ -427,9 +512,9 @@ class TPlumbing(unittest.TestCase):
             self.assertEqual(e.r32(icon[2] + 16),
                              s[f'mi_ic_{names[eng].lower()}'])
             pips = [c for c in calls if c[0] in ('box', 'fill')][2:]
-            self.assertEqual(len(pips), 8)
+            self.assertEqual(len(pips), 10)
             for i, p in enumerate(pips):
-                self.assertEqual(p[1:], (0x5555, 73 + 6 * i, 0x17, 77 + 6 * i, 0x1b, 1))
+                self.assertEqual(p[1:], (0x5555, 72 + 5 * i, 0x17, 75 + 5 * i, 0x1b, 1))
                 self.assertEqual(p[0], 'fill' if i == eng else 'box', (eng, i))
             text = [c for c in calls if c[0] == 'text'][0]
             self.assertEqual(text[1:5], (0x5555, 7, 96 - 20, 0x22))          # centred on 96
@@ -457,8 +542,8 @@ class TPlumbing(unittest.TestCase):
         e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 336)
         e.w32(e.arr('trk_mach', 2), MI)
         e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))   # the selected track: 2
-        names = ('wshp', 'fm', 'gran', 'pd', 'chip', 'nois', 'part', 'strg')
-        for eng in (FM, STRG, WSHP, NOIS, PD, CHIP, PART, GRAN):
+        names = [n.lower() for n in NAMES]
+        for eng in (FM, STRG, WSHP, NOIS, MODL, PD, CHIP, PART, SWRM, GRAN):
             dials(e, 2, eng, 0, 0, 0)
             e.run('mi_watch')
             self.assertEqual(e.r32(TB + 308 + 16), s[f'mi_ic_{names[eng]}'], eng)

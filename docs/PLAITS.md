@@ -3,7 +3,7 @@
 *Plaits Edition only* (branch `plaits`). This is a separate firmware build,
 so the VA Edition stays as it is.
 
-PLAITS is one machine with eight sound engines and four knobs. It is after
+PLAITS is one machine with ten sound engines and four knobs. It is after
 Mutable Instruments **Plaits**, Emilie Gillet's macro-oscillator module. It
 sits after the drums on the machine page: the twelfth machine, index 11.
 
@@ -37,14 +37,21 @@ be p-locked per step, or swept by an LFO.
 
 **Choosing the engine.** Turning Contour shows the engine selection screen:
 - the engine's picture on the left, white on black;
-- eight pips, one per engine, the selected one filled;
-- the engine's name (WSHP, FM, GRAN, PD, CHIP, NOIS, PART, STRG), centred
+- ten pips, one per engine, the selected one filled;
+- the engine's name (WSHP, FM, SWRM, GRAN, PD, CHIP, NOIS, MODL, PART,
+  STRG), centred
   under the pips, instead of a number.
 
 It takes four clicks of the knob to move one engine, so you can land on
 the one you want; turning back starts the count again, a fast turn moves
 one engine, and it stops at either end. A p-lock or an LFO on Contour picks engines too: underneath it is still
-0..127, 16 values an engine.
+0..127, about 13 values an engine.
+
+**Older projects.** Before SWRM and MODL the eight engines took 16 values
+each. Every Contour setting the knob made then (the middle of an engine's
+16) still picks the same engine. A p-lock or LFO that sat near an edge
+between two engines may now land on a neighbour, SWRM or MODL among them:
+check patterns that sweep the engine.
 
 **The machine page's picture follows the engine.** On the machine page,
 PLAITS' picture is the selected track's engine:
@@ -53,10 +60,12 @@ PLAITS' picture is the selected track's engine:
 |---|---|
 | WSHP | a triangle folding inside a frame |
 | FM | two operators: two rings joined by a diagonal line |
+| SWRM | a swarm of short sawtooth teeth at different heights |
 | GRAN | a cloud of grain squares rising diagonally |
 | PD | a trapezoid wave: slanted edges, flat tops |
 | CHIP | a square wave |
 | NOIS | speckle thinning out to the right (filtered noise) |
+| MODL | a mallet striking a bar on two supports, rings above it |
 | PART | scattered dust |
 | STRG | three strings from their pegs, the middle one plucked |
 
@@ -70,10 +79,12 @@ of the stock ones, so none runs past its box (`build.py` checks this).
 |---|---|---|---|---|
 | WSHP | waveshaping | **SHPE** Waveshape | **FOLD** Fold | **ASYM** Asymmetry (triangle to ramp) |
 | FM | 2-op FM | **RATI** Ratio | **INDX** Mod Index | **FDBK** Feedback |
+| SWRM | granular cloud | **SPRD** Spread (pitch) | **DENS** Density | **DUR** Duration (grain length) |
 | GRAN | formants (grains) | **FRM2** Formant 2 (its ratio) | **FRMT** Formant | **WDTH** Width (grain shape) |
 | PD | phase distortion | **RATI** Ratio | **DIST** Distort | **ASYM** Asymmetry |
 | CHIP | chiptune arpeggio | **CHRD** Chord | **ARP** Arpeggio (pattern) | **SYNC** Sync (synced ratio) |
 | NOIS | filtered noise | **TYPE** Filt Type (LP - BP - HP) | **CLK** Clock | **RESO** Resonance |
+| MODL | modal resonator | **MATR** Material | **BRIG** Bright | **DEC** Decay |
 | PART | particles (dust) | **SPRD** Spread | **DENS** Density | **RESO** Resonance |
 | STRG | plucked string | **STIF** Stiffness (bridge / dispersion) | **BRIG** Bright | **DAMP** Damping |
 
@@ -93,6 +104,16 @@ engine starts from rest whenever it is selected.
   - INDX: the index, up to two cycles.
   - FDBK above the middle feeds the modulator back on itself (harsher).
     Below the middle, the carrier bends the modulator's frequency.
+- **SWRM** (Plaits' granular cloud, its swarm engine)
+  - Up to six grains, each a sawtooth under a smooth bell envelope, with a
+    pitch of its own.
+  - SPRD spreads their pitches at random about the note, up to +-24
+    semitones. At 0 they are all on the note, in random phases: a chorus.
+  - DENS: how often a grain starts, from about one a second to ~950.
+  - DUR: how long each lasts, 10 ms to 1 s. Long grains at a high density
+    overlap into a steady cloud.
+  - Each trig starts a grain at once, so even a sparse cloud answers the
+    sequencer.
 - **GRAN** (Plaits' grain engine)
   - Two grainlets: a window at the note's pitch, filled with a sine at a
     formant.
@@ -121,6 +142,17 @@ engine starts from rest whenever it is selected.
   - Then a resonant state-variable filter at the note's pitch. TYPE
     sweeps low-pass, band-pass, high-pass; RESO goes from Q 0.5 to 512.
   - Plaits' gain compensation keeps the level even.
+- **MODL** (Plaits' modal resonator)
+  - Eight resonant modes, each a decaying sine, **struck by each trig**.
+  - MATR picks the material by its modes' tuning, blending in turn:
+    a string (1, 2, 3 .. 8: harmonic), a bell (1, 2, 2.4, 3, 4 ..), a drum
+    head (1, 1.59, 2.14, 2.30 ..) and a free bar, marimba-like (1, 2.76,
+    5.40, 8.93 ..). In between, inharmonic metals.
+  - BRIG: how hard the higher modes are struck, and how long they ring
+    against the lowest. Low: a soft mallet, dark. High: a hard one, bright.
+  - DEC: how long it rings, 50 ms to 8 s.
+  - A new trig adds to what still rings, as a struck object does.
+  - Modes above 12 kHz are left out.
 - **PART** (Plaits' particle engine)
   - Random impulses (DENS: from a few a second to a crackle).
   - Each impulse rings one of three resonant band-passes. The band-pass is
@@ -142,13 +174,19 @@ engine starts from rest whenever it is selected.
 
 - **One output.** Plaits' AUX output (the sub, the second variant of each
   engine) is not there.
-- **Trigs, not a TRIG input.** CHIP steps its arpeggio and STRG is struck
-  on every trig, as on a patched Plaits. GRAN, WSHP, FM, PD and NOIS run
+- **Trigs, not a TRIG input.** CHIP steps its arpeggio, STRG and MODL are
+  struck and SWRM starts a grain on every trig, as on a patched Plaits.
+  GRAN, WSHP, FM, PD and NOIS run
   continuously and the amp envelope shapes them. NOIS's clock does not
   resync on a trig.
 - **PART** has three filters to Plaits' six, a one-pole low-pass after
   them, no diffuser below the middle of RESO (Q 1.5 there), and its input
   gain is held to 16.
+- **SWRM** has six grains to Plaits' eight, plain (not band-limited)
+  sawtooths at 48 kHz, and a squared-triangle envelope.
+- **MODL** has eight modes to Plaits' 24 (coupled-form sine oscillators,
+  where Plaits uses band-passes). It is struck by trigs only: no dust
+  excitation without a trig, no strike position.
 - **STRG** has a one-pole damping filter, where Plaits has a two-pole. Its
   dispersion is a one-pole allpass, where Plaits uses a long allpass delay
   line.
@@ -156,8 +194,8 @@ engine starts from rest whenever it is selected.
   - **VA**, the bass drum, snare and hi-hat: this firmware has its own.
   - **Wavetable:** its data alone is ~100 KB.
   - **Speech:** data and CPU.
-  - **Modal, additive, chords, swarm and six-op FM:** each is more CPU
-    than a track can spend.
+  - **Additive, chords and six-op FM:** each is more CPU than a track can
+    spend. Modal and swarm are here in smaller form (above).
 
 ## How it works
 
@@ -175,11 +213,12 @@ The code is in `src/plaits.inc`, the tables are from
 - `sampler_render` calls `mi_fill(track, step, 11)`. It writes the same
   64-sample window, then the same tail.
 - `mi_fill` turns the step into the note's phase increment, as the VA does.
-  It picks the engine from Contour (`mi_eng`) and clears the track's
+  It picks the engine from Contour, value x 10 / 32768 (`mi_eidx`, kept in
+  `mi_eng`) and clears the track's
   128-byte state when the engine changes. Then it jumps to the engine.
 
-**Rates.** WSHP, FM, GRAN, PD and CHIP run at the render's 96 kHz. NOIS,
-PART and STRG run at 48 kHz, the rate the stock decimator brings every
+**Rates.** WSHP, FM, GRAN, PD and CHIP run at the render's 96 kHz. SWRM,
+NOIS, MODL, PART and STRG run at 48 kHz, the rate the stock decimator brings every
 render down to. They write each sample twice. That:
 - halves their work;
 - doubles their filters' coefficients, so the integer states keep their
@@ -202,6 +241,26 @@ render down to. They write each sample twice. That:
     cents.
   - It stays within about 6 cents of the note, 65 Hz to 523 Hz, at every
     setting.
+- **SWRM's grains** are 20 bytes each in the track's state: phase,
+  increment, envelope position and step (Q32, so a 1 s grain still moves),
+  and the pitch ratio, which is applied to the note afresh each block. A
+  grain is started when a random number falls under the density's chance
+  (Q32 a sample), in the first free slot.
+- **MODL's modes:**
+  - Each is x += e y, y -= e x, e = 2 sin(pi f / fs) (a coupled-form
+    oscillator: exactly in tune, and its amplitude stays put). e is Q18,
+    from a series. x and y are Q21 at a strike, with headroom for the
+    ellipse the form traces; the product drops y's low 10 bits.
+  - Struck: each mode's y gets its share of the strike (1, b, b^2 ...,
+    shared so they add up to the same level), then x and y are held to
+    +-2^21.
+  - The decay is a multiply each block (r = 1 - k, Q16, at full
+    precision): k = 6036 x 2^(-88 DEC / 12) / 16384 (to -60 dB in 75 to
+    12,000 blocks), times 1 + slope x the mode's index for the higher ones.
+  - The four materials' ratios are a table (Q11, up to 32x), blended
+    linearly by MATR.
+  - Each mode runs its 32 samples in registers, adding into the window's
+    first half; then the sum is spread to 96 kHz from the end.
 - **STRG's delay line** is Pluck's (the Sampler's Karplus-Strong mode),
   8 KiB a track. A track cannot be both at once. Each one zeroes the line
   whenever the other has used it since.
@@ -242,19 +301,21 @@ rebuilt the table to twelve entries.
   Start/End) is `mi_draw`. The stock screen has already drawn the name on
   the left and five pips. `mi_draw` blacks out the picture slot (centre
   32, 19) and blits the engine's picture there with the machine page's
-  routine (0x40071da4). It clears the five pips and draws eight (from x 73,
-  6 apart, y 23..27). It draws the name in the big font, centred on x 96
+  routine (0x40071da4). It clears the five pips and draws ten (from x 72,
+  5 apart, 4 wide, y 23..27). It draws the name in the big font, centred on x 96
   by its measured width. Other sets put the stock words back.
 - `fine_hook` sends id 0x4a to `mi_eng_step`. On a PLAITS track the turn is
   counted (`mi_eacc`) and every four clicks (1,024) is one engine, landing
-  on the middle of the next or previous engine's values.
+  on the middle of the next or previous engine's values ((2 e + 1) x
+  1638).
 
 **Space.** The blob grows to ~113 KB: seven of the filesystem's sixteen
 16 KiB cache blocks, one more than the VA Edition. LFO 3 and 4's
 per-pattern blocks ([LFO2.md](LFO2.md)) add 11.5 KB and take an eighth;
 quantised mute, the alternative send effects ([SENDFX.md](SENDFX.md)) and
 LFOs to MIDI CC ([LFOCC.md](LFOCC.md)) follow. The per-pattern blocks have
-since moved to the sample region, so the blob is ~120 KB, with ~10 KB spare.
+since moved to the sample region, so the blob is ~125 KB, with ~5.7 KB spare
+after SWRM and MODL.
 Eight blocks stay the filesystem's.
 
 **CPU** (`tests/test_plaits.py`, `VA_TEST_VERBOSE=1`): the worst block of
@@ -264,10 +325,12 @@ Eight blocks stay the filesystem's.
 |---|---|
 | WSHP | ~3,850 |
 | FM | ~3,880 |
+| SWRM | ~6,000 (six grains playing; ~2,900 sparse) |
 | GRAN | ~5,840 |
 | PD | ~5,020 |
 | CHIP | ~880 |
 | NOIS | ~3,020 |
+| MODL | ~5,220 (struck every block; ~5,000 ringing) |
 | PART | ~6,830 |
 | STRG | ~3,550 (plus ~2,000 once, zeroing its line) |
 
@@ -289,6 +352,14 @@ Host-verified in `tests/test_plaits.py` (Unicorn ColdFire V4e).
   - INDX brightens it.
   - At ratio 2 every partial is a harmonic.
   - Feedback either way changes the sound.
+- **SWRM:**
+  - With no spread, the note is the fundamental and every grain's ratio is
+    1.
+  - SPRD gives many ratios, all within +-24 semitones.
+  - DENS raises the energy over 20x.
+  - A trig sounds a grain in the first block; at DUR 0 it is silent after
+    10 ms, at the top it still sounds at 250 ms.
+  - No DC.
 - **GRAN:**
   - The note is the fundamental.
   - FRMT moves the spectrum's centroid by over 2x.
@@ -307,6 +378,17 @@ Host-verified in `tests/test_plaits.py` (Unicorn ColdFire V4e).
   - TYPE moves the energy from low to high.
   - A resonant band-pass peaks at the note.
   - A slow clock is smoother.
+- **MODL:**
+  - A string's modes: the note within 3 cents, the 2nd and 3rd harmonics
+    within 5.
+  - A bar's: partials at 1, 2.76 and 5.40 times the note (within 15 cents),
+    and nothing at 2x.
+  - In tune within 2 cents at 33, 131, 523 and 2093 Hz.
+  - Struck at once. DEC 0 is down 60 dB within 0.1 s; at the top it is
+    down only 7.5 dB after 1 s.
+  - BRIG raises the centroid over 1.5x.
+  - No trig, no sound. Struck every block, the states stay bounded.
+  - Modes over 12 kHz are silent.
 - **PART:**
   - Density raises the energy.
   - No DC.
@@ -354,7 +436,7 @@ Needs hardware:
      follows.
 2. **Parameter page.**
    - Turning Contour shows the engine's picture on the left (white on
-     black), eight pips with the engine's filled, and its name centred.
+     black), ten pips with the engine's filled, and its name centred.
    - Four clicks move one engine.
    - The other three labels change with it (if they only change on leaving
      and re-entering the page, tell us).
@@ -369,8 +451,14 @@ Needs hardware:
    - Each trig plucks it, and it is in tune.
    - Switch a track from a Sampler in Pluck mode to PLAITS STRG and back:
      no noise burst from the other's leftovers.
-6. **CPU page:** six PLAITS tracks on PART (the heaviest) with no dropouts.
-7. **Saving:** sample loading and project saving still work normally, with
+6. **SWRM:** DENS low gives single grains on each trig; DENS and DUR up
+   give a cloud. **MODL:** each trig strikes it; turn MATR from string to
+   bar, and DEC from a click to a long ring.
+7. **Older projects:** a pattern saved with PLAITS before this build keeps
+   its engines.
+8. **CPU page:** six PLAITS tracks on PART (the heaviest) with no dropouts.
+   Then SWRM with DENS and DUR at the top, and MODL with fast trigs.
+9. **Saving:** sample loading and project saving still work normally, with
    two fewer filesystem cache blocks.
 
 ## Credits and licence
