@@ -279,8 +279,9 @@ class TOperators(unittest.TestCase):
         self.assertTrue(0.4 < r[5][0] < 0.75 and 0.2 < r[5][1] < 0.45, r[5])   # FB6: a saw's
 
     def test_macros_at_64_and_on_carriers_alone(self):
-        """64 is the voice as it is; Bright and Mod Env leave a voice of
-        carriers alone; Amp Env leaves its modulators alone"""
+        """64 is the voice as it is; Bright leaves a voice of carriers alone,
+        and Sweep a voice without feedback below the middle; Shape leaves
+        silent modulators silent"""
         v = one(alg=1, op1=op(ol=99, r=(60, 50, 99, 60)), op2=op(ol=80, r=(50, 40, 99, 60)))
         def out(voice=v, **d):
             e = emu()
@@ -290,7 +291,7 @@ class TOperators(unittest.TestCase):
         ref = out()
         self.assertTrue(np.array_equal(ref, out(color=64, shape=64, sweep=64)))
         c = one(alg=32, op6=op(ol=99, r=(60, 50, 99, 60)))
-        self.assertTrue(np.array_equal(out(c), out(c, color=0, sweep=127)))
+        self.assertTrue(np.array_equal(out(c), out(c, color=0, sweep=0)))
         m = one(alg=1, op2=op(ol=80, r=(50, 40, 99, 60)))   # a modulator alone: silent
         self.assertEqual(np.abs(out(m, shape=0)).max(), 0)
 
@@ -314,34 +315,51 @@ class TOperators(unittest.TestCase):
         b = render(e, 200)[2000:]
         self.assertLess(abs(20 * np.log10(amp_at(a, 523.25) / amp_at(b, 523.25))), 1.0)
 
-    def test_mod_env(self):
-        """Sweep: an envelope on the modulators over the voice's - below the
-        middle the tone starts bright and closes (a pluck), above it starts
-        dark and opens (a swell); Shape the same on the carriers' level"""
-        def bright(sweep, at):
-            e = emu()
-            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=85)))
-            dials(e, 0, sweep=sweep)
-            x = render(e, int(at * 1500) + 100)
-            w = x[int(at * FS):int(at * FS) + 4096]
-            return sum(amp_at(w, 261.63 * n) for n in (2, 3, 4)) / amp_at(w, 261.63)
-        held = bright(64, 0.5)
-        self.assertGreater(bright(20, 0.02), 0.5 * held)       # a pluck: bright first...
-        self.assertLess(bright(20, 0.5), 0.05 * held)          # ...then closed
-        self.assertLess(bright(110, 0.05), 0.2 * held)         # a swell: dark first...
-        self.assertGreater(bright(110, 1.2), 0.8 * held)       # ...then open
-        self.assertLess(bright(0, 0.3), bright(40, 0.3))       # lower: quicker
+    def test_env_time(self):
+        """Shape moves every stage of every operator's own envelope: a decay
+        is shorter below the middle, longer above"""
         def level(shape, at):
             e = emu()
-            load(e, 0, one(op1=op(ol=99)))
+            load(e, 0, one(alg=1, op1=op(ol=99, r=(99, 50, 99, 60), l=(99, 0, 0, 0)),
+                           op2=op(ol=80, r=(99, 50, 99, 60), l=(99, 0, 0, 0))))
             dials(e, 0, shape=shape)
             x = render(e, int(at * 1500) + 100)
             return rms(x[int(at * FS):int(at * FS) + 4096])
-        full = level(64, 0.5)
-        self.assertGreater(level(40, 0.02), 0.5 * full)        # Amp Env down: from full...
-        self.assertLess(level(40, 0.5), 0.05 * full)           # ...decaying (-90 dB in 1.5 s)
-        self.assertLess(level(10, 0.2), level(40, 0.2))        # lower: shorter
-        self.assertLess(level(120, 0.1), 0.3 * full)           # up: swelling
+        a = [level(k, 0.4) for k in (0, 32, 64, 96)]
+        self.assertEqual(a, sorted(a))                         # longer and longer
+        self.assertLess(a[0], 0.01 * a[2])
+        self.assertGreater(a[3], 3 * a[2])
+        self.assertGreater(level(127, 2.0), 10 * level(64, 2.0))   # (its attack slower too)
+
+    def test_feedback_macro(self):
+        """Sweep sets the feedback: the voice's at 64, none at 0, 7 at 127,
+        in steps between"""
+        e = emu()
+        def fb(sweep, voice_fb):
+            load(e, 0, one(alg=32, fb=voice_fb, op6=op(ol=99)))
+            dials(e, 0, sweep=sweep)
+            render(e, 1)
+            return e.r32(e.sym['dx_tst'] + 0)          # (the shift is a local:
+        def h2(sweep, voice_fb):                        # measured by its sound)
+            e2 = emu()
+            load(e2, 0, one(alg=32, fb=voice_fb, op6=op(ol=99)))
+            dials(e2, 0, sweep=sweep)
+            x = render(e2, 200)[2000:]
+            return amp_at(x, 523.25) / amp_at(x, 261.63)
+        def same(a, b):
+            return np.array_equal(a, b)
+        def out(sweep, voice_fb):
+            e2 = emu()
+            load(e2, 0, one(alg=32, fb=voice_fb, op6=op(ol=99)))
+            dials(e2, 0, sweep=sweep)
+            return render(e2, 100)
+        self.assertTrue(same(out(64, 4), out(127, 4)) is False)
+        self.assertTrue(same(out(0, 4), out(64, 0)))           # 0: none
+        self.assertTrue(same(out(127, 0), out(64, 7)))         # 127: 7
+        self.assertTrue(same(out(32, 4), out(64, 2)))          # halfway down: half
+        self.assertTrue(same(out(96, 4), out(64, 6)))          # 4 + 3 x 32/63 = 5.5 -> 6
+        r = [h2(k, 3) for k in (0, 40, 64, 90, 127)]
+        self.assertEqual(r, sorted(r))
 
 class TEnvelopes(unittest.TestCase):
     def env(self, r=(99, 99, 99, 99), l=(99, 99, 99, 0), shape=64, blocks=300, hold=None, **k):
@@ -939,6 +957,78 @@ class TPlumbing(unittest.TestCase):
         self.assertEqual((e.visits['dx_params'], e.visits['mi_params'], e.visits['dr_params'],
                           e.visits['va_params']), (3, 0, 0, 0))          # three runs above
 
+    def test_algorithm_on_settings_shape(self):
+        """SETTINGS held on a DX track: Shape's slot (position 3) carries the
+        Algorithm parameter (0x0a, k=26); not on other machines, not when
+        released. Its word picks the algorithm, and turning it under SETTINGS
+        is a chord (no Config Menu on release)."""
+        import test_va as V
+        e = emu(); s = e.sym
+        sd = s['sampler_descr']
+        e.uc.mem_write(sd, bytes(range(76)))
+        e.w8(s['descr_done'], 1)
+        e.w32(s['set_held'], 1)
+        e.run_to_any('descr_hook', (s['table_lookup_b_fixed'], RET), stack=[DX + 1])
+        self.assertEqual(e.d(0), s['alg_descr'])
+        d = bytes(e.uc.mem_read(s['alg_descr'], 76))
+        self.assertEqual(d[:20] + d[24:], bytes(range(76))[:20] + bytes(range(76))[24:])
+        self.assertEqual(struct.unpack('>I', d[20:24])[0], 0x0a)
+        e.run('descr_b_hook', RET, stack=[DX])
+        self.assertEqual(e.d(0), s['alg_descr'])
+        e.run_to_any('descr_hook', (s['table_lookup_b_fixed'], RET), stack=[12])   # PLAITS
+        self.assertEqual(e.d(0), sd)
+        e.w32(s['set_held'], 0)
+        e.run_to_any('descr_hook', (s['table_lookup_b_fixed'], RET), stack=[DX + 1])
+        self.assertEqual(e.d(0), sd)
+        e.run('descr_b_hook', RET, stack=[DX])
+        self.assertEqual(e.d(0), sd)
+        # the word -> dx_algo, a chord only under SETTINGS
+        for w, alg, held in ((0, 0, 0), (3 << 8, 0, 1), (4 << 8, 1, 1), (64 << 8, 16, 0),
+                             (127 << 8, 32, 1), (0xffff, 0, 0)):
+            e.w32(s['mod_used'], 0)
+            e.w32(s['set_held'], held)
+            e.w16(V.td(3) + 52, w)
+            V.run_pre(e, 3, DX, trig=False)
+            self.assertEqual(e.r8(s['dx_algo'] + 3), alg, w)
+            self.assertEqual(e.r32(s['mod_used']), held if alg else 0, w)
+        e.w32(s['set_held'], 0)
+        e.w8(s['dx_algo'] + 3, 0)
+
+    def test_algorithm_override_plays(self):
+        def out(alg):
+            e = emu()
+            load(e, 0, one(alg=1, op1=op(ol=99), op3=op(ol=99)))   # alg 1: carriers 1, 3
+            e.w8(e.sym['dx_algo'], alg)
+            x = render(e, 40)
+            e.w8(e.sym['dx_algo'], 0)
+            return x
+        self.assertTrue(np.array_equal(out(0), out(1)))         # 1 = the voice's own here
+        self.assertFalse(np.array_equal(out(0), out(3)))        # alg 3: OP3 modulates
+        e = emu()
+        load(e, 0, one(alg=1, op4=op(ol=99)))                   # OP4: a modulator in 1...
+        e.w8(e.sym['dx_algo'], 32)                              # ...a carrier in 32
+        self.assertGreater(np.abs(render(e, 40)[1000:]).max(), 6000)
+        e.w8(e.sym['dx_algo'], 0)
+
+    def test_algorithm_values_and_commit(self):
+        import test_va as V
+        e = emu(); s = e.sym
+        rd = lambda a: bytes(e.uc.mem_read(a, 16)).split(b'\0')[0].decode()
+        def fmt(v):
+            e.run('dx_algfmt', 0x40000e6e, stack=[0x1000, v, 0x2000])
+            return rd(e.r32(e.sp() + 12))
+        self.assertEqual([fmt(v << 8) for v in (0, 3, 4, 64, 127)], ['VCE', 'VCE', 'A1', 'A16', 'A32'])
+        T = V.T6Commit()                                         # a track becomes DX:
+        e.uc.mem_write(T.STUB, b'\x20\x3c' + struct.pack('>I', T.SOUND) + b'\x4e\x75')
+        vt = SCRATCH + 0x43000
+        e.w32(vt + 40, T.STUB)
+        e.w32(T.OBJ, vt)
+        e.uc.mem_write(T.SOUND, bytes(100))
+        e.w8(T.SOUND + 38, DX)
+        e.w32(T.SOUND + 72, 0x12345678)                          # a Sampler's state
+        e.run('mc_commit_hook', 0x40014144, regs={A[2]: T.OBJ})
+        self.assertEqual(e.r32(T.SOUND + 72), 0)                 # the voice's algorithm
+
     def test_render_calls_dx_fill(self):
         import test_va as V
         e = emu()
@@ -957,9 +1047,9 @@ class TPlumbing(unittest.TestCase):
         e.w32(SWEEP, 0x11112222)
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[DX])
         self.assertEqual([rd(e.r32(pt + off + 52)) for off in (2576, 3472, 4088, 4144)],
-                         ['BRIG', 'AENV', 'MENV', 'VOIC'])
+                         ['BRIG', 'TIME', 'FDBK', 'VOIC'])
         self.assertEqual([rd(e.r32(pt + off + 44)) for off in (2576, 3472, 4088, 4144)],
-                         ['Bright', 'Amp Env', 'Mod Env', 'Voice'])
+                         ['Bright', 'Env Time', 'Feedback', 'Voice'])
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP), e.r32(COLOR)),
                          (s['dx_vfmt'], s['dx_offmt'], s['dx_offmt']))
         self.assertEqual(e.r32(0x40a73460 + 12), s['dx_draw'])   # the knob screen's

@@ -19,16 +19,16 @@ machines. **Turn Decay up** for DX: the track's Amp Decay comes after the
 voice's own envelopes and cuts the note short, so a low Decay turns a pad
 into a click, or into silence if its attack is slow.
 
-The voice always plays as its cartridge has it: its algorithm, ratios,
-feedback and envelopes are the voice's own, as on a DX7 (or Dexed). The
-three macros only move it, from the middle, in directions that keep it the
-same sound:
+The voice plays as its cartridge has it, as on a DX7 (or Dexed): its
+algorithm, ratios, feedback and envelopes are the voice's own. Nothing is
+added on top: the three macros move the voice's own settings from the
+middle, and **SETTINGS** + **Shape** picks another algorithm.
 
 | knob | label | does |
 |---|---|---|
 | **Color** | **BRIG** | Bright: the modulators' output levels, up to 12 dB down or up. Down is rounder and darker, up brighter and more biting. The carriers, and so the loudness, stay. |
-| **Shape** | **AENV** | Amp Env: an envelope of its own on the carriers, over the voice's. Down from the middle the note decays: a long fade near the middle, a short pluck at 0 (silent after 80 ms). Up it swells in: from 5 ms just above the middle to about 1.3 s at 127. |
-| **Sweep** | **MENV** | Mod Env: the same on the modulators, so on the tone. Down the sound starts bright and closes (a pluck, quicker lower down); up it starts dark and opens (a swell, slower higher up). |
+| **Shape** | **TIME** | Env Time: every envelope of the voice, every stage of every operator, faster or slower. Down is shorter and snappier (up to 32x), up longer and slower (up to about 1000x; an instant attack becomes a slow swell). |
+| **Sweep** | **FDBK** | Feedback: the voice's own in the middle; down less, to none at 0 (smoother); up more, to the most (7) at 127 (grittier, then noisy). |
 | **Contour** | **VOIC** | the voice: 1 to 63 of the built-in bank, or 1 to 32 of a cartridge you loaded. The parameter page shows its number; turning Contour shows its name. |
 
 Each macro shows **0** in the middle (the voice exactly as it is), and
@@ -36,6 +36,13 @@ Each macro shows **0** in the middle (the voice exactly as it is), and
 saved, like any machine knob.
 
 The defaults are the three macros in the middle and voice 1 (Tooropulse).
+
+**The algorithm.** Hold **SETTINGS** and turn **Shape**: the parameter page
+shows **ALGO** on Shape's place, from **VCE** (the voice's own) through
+**A1** to **A32**, and the routing changes at once. Let go of SETTINGS and
+Shape is Env Time again. The algorithm is kept with the pattern (and
+stays when Contour picks another voice); a track that becomes DX starts
+at VCE.
 
 **The built-in bank.** Until you load a cartridge of your own, Contour picks
 among 63 built-in voices (the parameter page shows the number, the knob
@@ -194,13 +201,12 @@ msfa.
     key to lift). A stage whose target is the level already (or an attack
     to level 0) first holds for a time set by its rate, as the DX7 does
     (msfa's ACCURATE_ENVELOPE statics, `dx_stat`).
-  - its **level** gets the macros: a carrier Amp Env's envelope, a
-    modulator Bright's offset ((Color - 64) x 8, in 1/256 octave: 16
-    output-level steps either way) and Mod Env's envelope. A macro's
-    envelope (`dx_menv`) is a level offset from the blocks since the note:
-    below the middle a fall of `dx_mslp[k]` a block down to -3840
-    (silence), over 80 ms at 0 to 8 s at 63; above it a rise from -2048
-    (-48 dB) to 0, over 5 ms at 65 to 1.3 s at 127. Then it loses
+    Shape offsets every rate (`dx_roff`, `DX_ROFF`): (64 - k) x 20 / 64
+    below the middle (up to +20 steps) and (64 - k) x 40 / 63 above it
+    (down to -40, but not below rate 8, a 10 s attack, unless the voice's
+    own rate is).
+  - its **level** gets Bright's offset if it is a modulator ((Color - 64)
+    x 8, in 1/256 octave: 16 output-level steps either way), and loses
     msfa's amplitude modulation: level x amf[(AM depth x AMS) >> 42]
     (`dx_amf`, `dx_amsq`).
   - its **gain** is 2^((level - 3840) / 256), moves at most a quarter of
@@ -253,8 +259,20 @@ and the feedback.
   again when its token changes, or goes back to the built-in one; a file it
   cannot read is not tried again until the token changes.
 
-**The labels and values.** `apply_names` set 7 puts up BRIG / AENV / MENV /
-VOIC (Bright, Amp Env, Mod Env, Voice). Color's, Shape's and Sweep's values
+**The algorithm,** SETTINGS + Shape: `build.py` turns the placeholder
+param id 0x0a into a common parameter at index 26 (trackData+52 / sound+72,
+the high word of the Sampler's packed state, unused on a DX track and saved
+with the pattern by `snd_save_post`). While SETTINGS is held (`set_held`),
+`descr_hook` and `descr_b_hook` hand a DX track `alg_descr`: its descriptor
+with 0x0a at position 3. `dx_params` turns the word into `dx_algo[t]`
+((w >> 8) x 33 / 128: 0 the voice's, 1..32), and marks a chord
+(`mod_used`) when it changes under SETTINGS, so the release opens no Config
+Menu; `dx_play` uses it in place of the voice's byte. Its value prints
+through `dx_algfmt` (the UI record of id 0x0a), and `mc_commit_hook`
+clears sound+72 when a track becomes DX.
+
+**The labels and values.** `apply_names` set 7 puts up BRIG / TIME / FDBK /
+VOIC (Bright, Env Time, Feedback, Voice). Color's, Shape's and Sweep's values
 print the macro's offset, 0 in the middle (`dx_offmt`; Sweep's formatter is
 swapped in and back), Contour's
 the voice's number (`dx_vfmt`, in place of PLAITS' formatter while DX's
@@ -300,12 +318,16 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
     OL 99, 91 and 75 (indices 4 pi, 2 pi, pi / 2).
   - Feedback brightens step by step; FB6 has a sawtooth's 2nd and 3rd
     harmonics.
-- **Macros:** all three at 64 are the voice exactly; Bright and Mod Env
-  leave a voice of carriers alone, Amp Env its modulators. Bright brightens
-  step by step, and at 127 is the modulator 16 levels up (within 1 dB).
-  Mod Env down starts bright and closes (quicker lower), up starts dark
-  and opens. Amp Env down decays the note (shorter lower), up swells it in
-  (over 0.4 s at 127 for an instant attack).
+- **Macros:** all three at 64 are the voice exactly; Bright leaves a voice
+  of carriers alone. Bright brightens step by step, and at 127 is the
+  modulator 16 levels up (within 1 dB). Env Time makes a decay shorter
+  step by step down and longer up. Feedback is none at 0, 7 at 127, half
+  the voice's halfway down, and brightens step by step.
+- **Algorithm:** with SETTINGS held, DX's descriptor (both lookups) has
+  Algorithm (param 0x0a) in Shape's place and nothing else changed; not on
+  other machines, not after release. The word (k=26) gives VCE for 0..3 and
+  A1..A32 above; turning it under SETTINGS marks a chord; the override
+  plays (an OP4 carrier in A32 only); a track becoming DX clears it.
 - **Notes:** a new trig starts from silence, the last note's gain ramping
   down first; on a DX track `amp_hook` fades in over 96 samples with
   Attack 0, on the other machines not.
@@ -315,7 +337,8 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
 - **Gate:** one- and two-block gates hold the note; three or more release
   it.
 - **Envelopes:**
-  - A faster R1 rises sooner; Amp Env down peaks sooner, up later.
+  - A faster R1 rises sooner; Env Time 0 is over 4x faster than 64, 127
+    slower.
   - L2 70 under L1 99 is 21 dB down, and holds.
   - The level holds while the gate is held, and falls after it is released.
   - A new note mid-attack starts from where it was.
@@ -354,7 +377,7 @@ Needs hardware:
 
 1. **Machine page:** DX is the thirteenth machine, the fifth marker on the
    second line, with its card and picture.
-2. **Parameter page:** BRIG / AENV / MENV / VOIC; the macros show 0 in the
+2. **Parameter page:** BRIG / TIME / FDBK / VOIC; the macros show 0 in the
    middle and -64..+63, Contour the voice number and its name. No label
    runs out of its box. PLAITS' Contour and Chord's still show theirs.
 3. **The built-in voices** play and sound as described; Pitch and notes
@@ -365,9 +388,11 @@ Needs hardware:
    gate is the one thing here the emulator cannot show: tell us what you
    hear.)
 5. **Macros:** on any voice, Bright darkens or brightens it without
-   changing its loudness; Amp Env turns it into a pluck (down) or a swell
-   (up); Mod Env makes the tone close after the attack (down) or open
-   slowly (up). None of them breaks a voice.
+   changing its loudness; Env Time makes it snappier (down) or longer and
+   slower (up); Feedback smooths it (down) or roughens it (up). **SETTINGS**
+   + Shape shows ALGO, VCE / A1..A32, changes the routing, and releasing
+   SETTINGS opens no Config Menu; the algorithm comes back with the
+   pattern. None of them breaks a voice.
 6. **No clicks:** with Attack at 0, trigs on any voice start without a
    click, including a pad held from the previous trig.
 7. **Cartridges:** send a cartridge with the DX Cartridge Sender (or a

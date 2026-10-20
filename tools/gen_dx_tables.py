@@ -26,10 +26,6 @@ Levien, Apache 2.0) models it.
            0.0209 exp(-0.396 L) / 7 x L octaves (L the note's log2 Hz) x ln 2
   dx_stat  msfa's static hold per rate (ACCURATE_ENVELOPE's statics, samples
            at 44.1 kHz, x 44100 / 48000 as msfa's sr_multiplier)
-  dx_mslp  the macros' envelopes (dx_menv): per knob 0..127, the level's slope
-           a block, Q8 (1/256 octave << 8): a decay to silence over 80 ms
-           (0) to 8 s (63), none at 64, a swell from -48 dB over 5 ms (65)
-           to 1.3 s (127)
   dx_amf   msfa's amplitude modulation curve, Q16 of the level taken off:
            exp(12.2 + 0.07 k) x 16 / 2^28 for k = 0..64 (k = depth / 2^18)
   dx_cart  the built-in bank: BANK voices in the DX7's packed 128-byte format
@@ -361,19 +357,6 @@ def main():
     st = [x * round(44100 / 48000 * (1 << 24)) >> 24 for x in st]
     for i in range(0, 100, 10):
         lines.append('    .long ' + ', '.join(str(x) for x in st[i:i + 10]))
-    lines.append('dx_mslp:')
-    sl = []
-    for k in range(128):
-        if k < 64:                               # a decay to -3840 over T
-            t = 0.08 * 2 ** (k / 63 * math.log2(100))
-            sl.append(round(3840 * 256 / (t * 1500)))
-        elif k == 64:
-            sl.append(0)
-        else:                                    # a swell from -2048 over T
-            t = 0.005 * 2 ** ((k - 65) / 62 * 8)
-            sl.append(round(2048 * 256 / (t * 1500)))
-    for i in range(0, 128, 16):
-        lines.append('    .long ' + ', '.join(str(x) for x in sl[i:i + 16]))
     lines.append('dx_pegr:')
     lines.append('    .byte ' + ', '.join(str(x) for x in PEG_RATE))
     lines.append('dx_pegl:')

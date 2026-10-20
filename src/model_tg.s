@@ -256,6 +256,8 @@ sampler_descr:
 sampler_descr_atk:
     .space 76
     .align 2
+alg_descr:      .space 76         | DX's, with Shape's slot carrying Algorithm
+                                  | (id 0x0a) while SETTINGS is held
 other_descr:                      | a stock machine's descriptor, with
     .space 76                     | Attack swapped in while Track is held
     .align 2
@@ -4153,6 +4155,15 @@ dh_ours:
     | never stuck, because something else owns that word between our writes.
     | mod_held is refreshed by atk_watch, which tick_hook drives on key input,
     | so the swap follows the button within a frame.
+    | SETTINGS held on DX: Shape's slot is the algorithm (dx_alg_descr).
+    movel   %a0,%sp@-
+    lea.l   set_held,%a0
+    tstl    %a0@
+    movea.l %sp@+,%a0
+    beqs    dh_nset
+    cmpil   #DX_MACH+1,%d0
+    beqw    dx_alg_descr
+dh_nset:
     movel   %a0,%sp@-
     lea.l   mod_held,%a0
     tstl    %a0@
@@ -4204,6 +4215,27 @@ dh_cp:
     rts
 dh_stock:
     jmp     table_lookup_a_fixed
+
+| -> d0 = alg_descr: DX's descriptor (sampler_descr) with position 3, Shape,
+| carrying Algorithm (param id 0x0a, k=26: dx_params reads it). Built each
+| time, as other_descr is; keeps the rest.
+dx_alg_descr:
+    movel   %a0,%sp@-
+    movel   %a1,%sp@-
+    movel   %d1,%sp@-
+    lea.l   sampler_descr,%a0
+    lea.l   alg_descr,%a1
+    moveq   #18,%d1               | 19 longs = 76 bytes
+1:  movel   %a0@+,%a1@+
+    subql   #1,%d1
+    bpls    1b
+    moveq   #0x0a,%d1
+    movel   %d1,alg_descr+20      | position 3: Algorithm, not Shape
+    movel   %sp@+,%d1
+    movea.l %sp@+,%a1
+    movea.l %sp@+,%a0
+    movel   #alg_descr,%d0
+    rts
 
 | ---- make the Sampler's four machine params visible as LFO destinations ----
 | The LFO destination list is BUILT, not tabulated. 0x40061866 walks trackData
@@ -9562,6 +9594,10 @@ an_done:
     bnes    an_fmt                | 0..127, drawn as the stock ones are
     movel   #0x4004a440,%d0
 an_fmt:
+    movel   %d0,%sp@-             | id 0x0a, DX's Algorithm: VCE, A1..A32
+    movel   #dx_algfmt,%d0
+    movel   %d0,0x40a71b5c
+    movel   %sp@+,%d0
     movel   %d0,0x40a7296c        | id 0x2e: Start
     movel   %d0,0x40a72fac        | id 0x3e: End
     | ...and the page's own renderer, which is what draws Pitch's decimals in
@@ -9829,6 +9865,12 @@ dbh_ours:
     lea.l   descr_done,%a1
     tstb    %a1@
     beqs    dbh_pass
+    lea.l   set_held,%a1          | SETTINGS held on DX: the algorithm on
+    tstl    %a1@                  | Shape's slot
+    beqs    dbh_nset
+    cmpil   #DX_MACH,%d0
+    beqw    dx_alg_descr
+dbh_nset:
     lea.l   mod_held,%a1
     tstl    %a1@
     bnes    dbh_atk
@@ -19492,7 +19534,10 @@ mch_ndr:
     bcss    mch_nva
     cmpil   #MACH_LAST,%d0
     bhis    mch_nva
-    subql   #DR_KICK,%d0
+    cmpil   #DX_MACH,%d0          | DX: the algorithm word (sound+72, k=26,
+    bnes    1f                    | the Sampler's packed state elsewhere)
+    clrl    %a0@(72)              | starts as the voice's
+1:  subql   #DR_KICK,%d0
     lsll    #3,%d0
     lea.l   dr_defaults,%a1
     adda.l  %d0,%a1

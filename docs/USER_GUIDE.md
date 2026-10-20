@@ -409,16 +409,19 @@ CLAV 1, SINE BASS), and your own cartridges:
    "Cartridge loaded". Contour picks its voices.
 3. The pattern keeps it, and loads it again with the project.
 
-The voice always plays as its cartridge has it (its own algorithm, ratios,
-feedback and envelopes). The three macros move it from the middle (**0**,
-the voice exactly) without breaking it:
+The voice plays as its cartridge has it (its own algorithm, ratios,
+feedback and envelopes); the three macros move its own settings from the
+middle (**0**, the voice exactly), nothing is added on top:
 
 | knob | label | does |
 |---|---|---|
 | **Color** | **BRIG** | Bright: the modulators up or down, up to 12 dB: darker or brighter, same loudness |
-| **Shape** | **AENV** | Amp Env: down the note decays (a pluck at 0), up it swells in (about 1.3 s at 127) |
-| **Sweep** | **MENV** | Mod Env: the same on the tone: down it starts bright and closes, up it starts dark and opens |
+| **Shape** | **TIME** | Env Time: all the voice's envelopes shorter (down) or longer (up) |
+| **Sweep** | **FDBK** | Feedback: the voice's in the middle, less down (none at 0), more up (most at 127) |
 | **Contour** | **VOIC** | the voice, 1 to 63 of the bank (1 to 32 of your cartridge); the page shows its name |
+
+**Algorithm:** hold **SETTINGS** and turn **Shape** (it reads **ALGO**):
+**VCE** is the voice's own, then **A1** to **A32**. Kept with the pattern.
 
 **Turn Decay up** on a DX track: the track's Amp Decay comes after the
 voice's envelopes, so a low Decay cuts a pad short (or silences it, if its
@@ -548,6 +551,7 @@ are included (build with `--no-tweaks` to leave them out):
 | anywhere | **SETTINGS** + return | master FX off |
 | anywhere | **SETTINGS** + **PAGE** | Send FX: the delay's and reverb's effects |
 | anywhere | **PRESET** + Decay / Sweep / Contour | Attack / Filter / Resonance |
+| DX track | **SETTINGS** + Shape | the algorithm: VCE (the voice's), A1 to A32 |
 | LFO menu | **LFO** (tap again) | LFO 2, then LFO 3, then LFO 4; once more closes the menu |
 | LFO menu | hold **LFO** + turn a knob | that parameter becomes the destination of the LFO showing |
 | LFO menu | **MIDI CC** row: press **DATA**, turn, press again | the CC the LFO showing sends (OFF, 0-127), switched on at the second press |

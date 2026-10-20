@@ -262,7 +262,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat','dx_alg','dx_e2','dx_sin','dx_sol','dx_exps','dx_pms','dx_cart','dx_own','dx_swap','dx_amsq','dx_lfor','dx_x2','dx_dtn','dx_amf','dx_pegr','dx_pegl','dx_mslp','dx_stat','dx_p','dx_swf0','dx_sbuf','dx_nbuf','dx_hash','dx_ptick','dx_veld','dx_vel','dx_rxlen','dx_rxmsg','dx_rxpath','dx_gate','dx_bus1','dx_bus2',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat','dx_alg','dx_e2','dx_sin','dx_sol','dx_exps','dx_pms','dx_cart','dx_own','dx_swap','dx_amsq','dx_lfor','dx_x2','dx_dtn','dx_amf','dx_pegr','dx_pegl','dx_algo','dx_stat','dx_p','dx_swf0','dx_sbuf','dx_nbuf','dx_hash','dx_ptick','dx_veld','dx_vel','dx_rxlen','dx_rxmsg','dx_rxpath','dx_gate','dx_bus1','dx_bus2',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
               'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
@@ -612,6 +612,16 @@ for _id,_k,_dflt,_sort,_ln,_sn in ((0x0c,24,32512,36,'str_gfilter','str_gflt'),
     d[_E-BASE:_E-BASE+56]=struct.pack('>14I', 7, _k, 0, 32512, _dflt, 0,
         0xffffffff, 0xffffffff, 0, 0x600, _sort, sym[_ln], 0x40129882, sym[_sn])
     print(f"  param id 0x{_id:02x} -> k={_k}, trackData+{2*_k}")
+# DX's Algorithm (SETTINGS + Shape on a DX track, descr_hook): placeholder
+# 0x0a, common, at index 26 - trackData+52 / sound+72, the high word of the
+# Sampler's packed state, which a DX track does not use (mc_commit_hook
+# clears it when a track becomes DX). 0..32512, 0 = the voice's algorithm.
+_E=0x4010dce0+0x0a*56
+assert bytes(d[_E-BASE:_E-BASE+8])==bytes.fromhex("ffffffffffffffff"), \
+    "param id 0x0a is not the Error placeholder any more"
+d[_E-BASE:_E-BASE+56]=struct.pack('>14I', 7, 26, 0, 32512, 0, 0,
+    0xffffffff, 0xffffffff, 0, 0x400, 38, sym['s_dxalg'], 0x40129882, sym['s_dxalgs'])
+print(f"  param id 0x0a -> DX Algorithm (k=26, trackData+52)")
 # ...kept out of the Sampler's LFO destination list: paramIdFor's common-map
 # lookup `lea 0x40a79394,%a0` at 0x4005a6d0 goes through sampler_com_gate,
 # which replays it and the `movel %a0@(0,%a2:l:4),%d0 ; bras 0x4005a6fc` after.
