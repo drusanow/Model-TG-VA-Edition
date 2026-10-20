@@ -53,8 +53,8 @@ keeps working.
   voices, checked against msfa voice by voice: 63 built in (Legowelt's free
   "Magic DX7" cartridge, a DX9 cartridge and its own), or your cartridges. The voice plays as its
   cartridge has it; three macros move it without breaking it: Color is
-  Bright (the modulators' levels), Shape Amp Env (the carriers' attack and
-  release), Sweep Mod Env (the modulators' attack and decay), and Contour
+  Bright (the modulators' levels), Shape Amp Env (a decay or a swell on the
+  level), Sweep Mod Env (the same on the tone), and Contour
   picks the voice ([docs/DX.md](docs/DX.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean

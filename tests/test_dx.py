@@ -315,21 +315,33 @@ class TOperators(unittest.TestCase):
         self.assertLess(abs(20 * np.log10(amp_at(a, 523.25) / amp_at(b, 523.25))), 1.0)
 
     def test_mod_env(self):
-        """Sweep moves the modulators' attack and first decay: the tone's
-        movement - a brass swell slower or quicker, a pluck's bite shorter"""
-        def bright(sweep, at, r, l):
+        """Sweep: an envelope on the modulators over the voice's - below the
+        middle the tone starts bright and closes (a pluck), above it starts
+        dark and opens (a swell); Shape the same on the carriers' level"""
+        def bright(sweep, at):
             e = emu()
-            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=85, r=r, l=l)))
+            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=85)))
             dials(e, 0, sweep=sweep)
             x = render(e, int(at * 1500) + 100)
             w = x[int(at * FS):int(at * FS) + 4096]
             return sum(amp_at(w, 261.63 * n) for n in (2, 3, 4)) / amp_at(w, 261.63)
-        swell = ((40, 99, 99, 99), (99, 99, 99, 0))
-        self.assertGreater(bright(0, 0.05, *swell), bright(64, 0.05, *swell))
-        self.assertGreater(bright(64, 0.05, *swell), bright(127, 0.05, *swell))
-        bite = ((99, 45, 99, 99), (99, 40, 40, 0))
-        self.assertLess(bright(0, 0.15, *bite), bright(64, 0.15, *bite))
-
+        held = bright(64, 0.5)
+        self.assertGreater(bright(20, 0.02), 0.5 * held)       # a pluck: bright first...
+        self.assertLess(bright(20, 0.5), 0.05 * held)          # ...then closed
+        self.assertLess(bright(110, 0.05), 0.2 * held)         # a swell: dark first...
+        self.assertGreater(bright(110, 1.2), 0.8 * held)       # ...then open
+        self.assertLess(bright(0, 0.3), bright(40, 0.3))       # lower: quicker
+        def level(shape, at):
+            e = emu()
+            load(e, 0, one(op1=op(ol=99)))
+            dials(e, 0, shape=shape)
+            x = render(e, int(at * 1500) + 100)
+            return rms(x[int(at * FS):int(at * FS) + 4096])
+        full = level(64, 0.5)
+        self.assertGreater(level(40, 0.02), 0.5 * full)        # Amp Env down: from full...
+        self.assertLess(level(40, 0.5), 0.05 * full)           # ...decaying (-90 dB in 1.5 s)
+        self.assertLess(level(10, 0.2), level(40, 0.2))        # lower: shorter
+        self.assertLess(level(120, 0.1), 0.3 * full)           # up: swelling
 
 class TEnvelopes(unittest.TestCase):
     def env(self, r=(99, 99, 99, 99), l=(99, 99, 99, 0), shape=64, blocks=300, hold=None, **k):
@@ -368,15 +380,38 @@ class TEnvelopes(unittest.TestCase):
         held = self.env(r=(99, 99, 99, 60), l=(99, 99, 99, 0), blocks=600)
         self.assertGreater(held[-1], 0.9 * held[:40].max())  # no release, no fall
 
-    def test_retrig_keeps_the_level(self):
+    def test_retrig_starts_from_silence(self):
+        """a new trig is a new note from level 0, as in Dexed (msfa's
+        Env::init): a held pad does not come back at its sustain under the
+        track's restarting Amp Decay - but its gain still ramps down"""
         e = emu()
         load(e, 0, one(op1=op(ol=99, r=(30, 99, 99, 99))))
-        dials(e, 0)
-        a = render(e, 300)
-        b = render(e, 2)                                     # a new note mid-attack
-        self.assertLess(abs(np.abs(b[:200]).max() - np.abs(a[-200:]).max()),
-                        0.1 * np.abs(a[-200:]).max())        # no jump to silence
+        a = render(e, 600)
+        b = render(e, 40)                                    # a new note
+        top = np.abs(a[-200:]).max()
+        self.assertLess(np.abs(b[64 * 6:64 * 7]).max(), 0.1 * top)   # back to silence...
+        self.assertGreater(np.abs(b[:64]).max(), 0.5 * top)          # ...not at once
 
+    def test_dx_always_fades_in(self):
+        """amp_hook: Attack 0 on a DX track still ramps over 96 samples (2 ms);
+        on other machines it is full from the first sample"""
+        e = emu()
+        BUF = SCRATCH + 0x60000
+        for mach, want in ((DX, True), (1, False)):
+            e.w32(e.arr('trk_mach', 2), mach)
+            e.w32(e.arr('atk_step', 2), 0)
+            e.w32(e.arr('atk_gain', 2), 0)
+            for i in range(32):
+                e.w32(BUF + 4 * i, 0x40000000)
+            e.run('ah_found', e.sym['ah_flt'], regs={D[3]: 2, A[2]: BUF})
+            x = [e.rs32(BUF + 4 * i) for i in range(32)]
+            if want:
+                self.assertEqual(x[0], 0)
+                self.assertEqual(x, sorted(x))
+                self.assertAlmostEqual(x[31] / 0x40000000, 31 / 96, delta=0.01)
+                self.assertEqual(e.r32(e.arr('atk_gain', 2)), 32 * 174763)
+            else:
+                self.assertEqual(x, [0x40000000] * 32)
 
 class TPitchEg(unittest.TestCase):
     """msfa's PitchEnv: pitchenv_tab[L] << 19 octaves (Q24), from L4 at the

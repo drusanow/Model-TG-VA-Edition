@@ -416,8 +416,8 @@ the voice exactly) without breaking it:
 | knob | label | does |
 |---|---|---|
 | **Color** | **BRIG** | Bright: the modulators up or down, up to 12 dB: darker or brighter, same loudness |
-| **Shape** | **AENV** | Amp Env: the carriers' attack and release, snappier (down) or slower (up: a swell of about a second) |
-| **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, how the tone moves: a quicker bite (down) or a slower swell (up) |
+| **Shape** | **AENV** | Amp Env: down the note decays (a pluck at 0), up it swells in (about 1.3 s at 127) |
+| **Sweep** | **MENV** | Mod Env: the same on the tone: down it starts bright and closes, up it starts dark and opens |
 | **Contour** | **VOIC** | the voice, 1 to 63 of the bank (1 to 32 of your cartridge); the page shows its name |
 
 **Turn Decay up** on a DX track: the track's Amp Decay comes after the

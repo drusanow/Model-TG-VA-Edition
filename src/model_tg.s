@@ -11980,7 +11980,13 @@ ah_find:
 ah_found:
     lea.l   atk_step,%a3
     movel   %a3@(0,%d3:l:4),%d4
-    beqs    ah_flt                | attack 0: full level from the first sample
+    bnes    ah_atk
+    lea.l   trk_mach,%a3          | attack 0: full level from the first sample -
+    movel   %a3@(0,%d3:l:4),%d0   | except DX, which always fades in over 2 ms
+    cmpil   #DX_MACH,%d0          | (96 samples): the stock envelope restarts
+    bnew    ah_flt                | at full on a trig, over a voice that may
+    movel   #174763,%d4           | still sound
+ah_atk:
     lea.l   atk_gain,%a3
     movel   %a3@(0,%d3:l:4),%d5
     cmpil   #16777216,%d5

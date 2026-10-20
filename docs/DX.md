@@ -27,8 +27,8 @@ same sound:
 | knob | label | does |
 |---|---|---|
 | **Color** | **BRIG** | Bright: the modulators' output levels, up to 12 dB down or up. Down is rounder and darker, up brighter and more biting. The carriers, and so the loudness, stay. |
-| **Shape** | **AENV** | Amp Env: the carriers' attack and release. Down is snappier (up to 32x faster), up slower: an instant attack swells over about a second at 127, and releases ring longer. |
-| **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, the way the tone moves. Down is a quicker bite and a shorter "pluck", up a slower swell (brass, pads). |
+| **Shape** | **AENV** | Amp Env: an envelope of its own on the carriers, over the voice's. Down from the middle the note decays: a long fade near the middle, a short pluck at 0 (silent after 80 ms). Up it swells in: from 5 ms just above the middle to about 1.3 s at 127. |
+| **Sweep** | **MENV** | Mod Env: the same on the modulators, so on the tone. Down the sound starts bright and closes (a pluck, quicker lower down); up it starts dark and opens (a swell, slower higher up). |
 | **Contour** | **VOIC** | the voice: 1 to 63 of the built-in bank, or 1 to 32 of a cartridge you loaded. The parameter page shows its number; turning Contour shows its name. |
 
 Each macro shows **0** in the middle (the voice exactly as it is), and
@@ -102,12 +102,14 @@ sound is near noise).
    pattern can hold another cartridge. Deleting the file leaves those
    patterns on the built-in cartridge.
 
-**Notes and the gate.** Each trig is a new note on the same voice: the
-envelopes start their attack from wherever they are, and the operators
-restart their phase if the voice has key sync on - unless they still sound,
-where the jump would click. No operator's level jumps: it moves at most a
-quarter of full scale a block (0 to full in about 2.7 ms), so instant
-attacks and releases don't click. The envelopes hold at their sustain level
+**Notes and the gate.** Each trig is a new note on the same voice, from
+silence, as in Dexed: the envelopes start again from level 0 (the last
+note's gain ramps down meanwhile), and the operators restart their phase
+if the voice has key sync on - unless they still sound, where the jump
+would click. No operator's level jumps: it moves at most a quarter of full
+scale a block (0 to full in about 2.7 ms), and the track always fades in
+over at least 2 ms, even with Attack at 0 (the stock amp envelope restarts
+at full on every trig), so attacks don't click. The envelopes hold at their sustain level
 (L3) while the note is held, and go to R4/L4 when it is released (the
 trig's length, from a MIDI keyboard or a sequencer). A gate shorter than
 three blocks (2 ms) is taken for a trig's pulse rather than a note length:
@@ -191,14 +193,14 @@ msfa.
     lower it is, from 1716 at least; falling linearly; stage 3 waits for the
     key to lift). A stage whose target is the level already (or an attack
     to level 0) first holds for a time set by its rate, as the DX7 does
-    (msfa's ACCURATE_ENVELOPE statics, `dx_stat`). The macros offset the
-    rates of the stages they move: Amp Env a carrier's attack and release,
-    Mod Env a modulator's attack and first decay, by (64 - k) x 20 / 64
-    below the middle (up to +20 steps) and (64 - k) x 40 / 63 above it
-    (down to -40, but not below rate 16, a 2.7 s attack, unless the
-    voice's own rate is).
-  - its **level** gets Bright's offset if it is a modulator ((Color - 64)
-    x 8, in 1/256 octave: 16 output-level steps either way), and loses
+    (msfa's ACCURATE_ENVELOPE statics, `dx_stat`).
+  - its **level** gets the macros: a carrier Amp Env's envelope, a
+    modulator Bright's offset ((Color - 64) x 8, in 1/256 octave: 16
+    output-level steps either way) and Mod Env's envelope. A macro's
+    envelope (`dx_menv`) is a level offset from the blocks since the note:
+    below the middle a fall of `dx_mslp[k]` a block down to -3840
+    (silence), over 80 ms at 0 to 8 s at 63; above it a rise from -2048
+    (-48 dB) to 0, over 5 ms at 65 to 1.3 s at 127. Then it loses
     msfa's amplitude modulation: level x amf[(AM depth x AMS) >> 42]
     (`dx_amf`, `dx_amsq`).
   - its **gain** is 2^((level - 3840) / 256), moves at most a quarter of
@@ -299,19 +301,21 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   - Feedback brightens step by step; FB6 has a sawtooth's 2nd and 3rd
     harmonics.
 - **Macros:** all three at 64 are the voice exactly; Bright and Mod Env
-  leave a voice of carriers alone. Bright brightens step by step, and at
-  127 is the modulator 16 levels up (within 1 dB); Mod Env down makes a
-  slow modulator attack brighter early and a modulator decay shorter, up
-  the opposite; Amp Env up turns an instant attack into a pad (over 0.4 s),
-  down makes an attack faster.
+  leave a voice of carriers alone, Amp Env its modulators. Bright brightens
+  step by step, and at 127 is the modulator 16 levels up (within 1 dB).
+  Mod Env down starts bright and closes (quicker lower), up starts dark
+  and opens. Amp Env down decays the note (shorter lower), up swells it in
+  (over 0.4 s at 127 for an instant attack).
+- **Notes:** a new trig starts from silence, the last note's gain ramping
+  down first; on a DX track `amp_hook` fades in over 96 samples with
+  Attack 0, on the other machines not.
 - **Pitch envelope:** a held level is msfa's pitch (L 62: 12/32 octave up,
   within 3 cents); it starts at L4, lands on L1, and goes back to L4 after
   the release.
 - **Gate:** one- and two-block gates hold the note; three or more release
   it.
 - **Envelopes:**
-  - A faster R1 rises sooner; Amp Env 0 is over 4x faster than 64, 127
-    slower.
+  - A faster R1 rises sooner; Amp Env down peaks sooner, up later.
   - L2 70 under L1 99 is 21 dB down, and holds.
   - The level holds while the gate is held, and falls after it is released.
   - A new note mid-attack starts from where it was.
@@ -360,18 +364,21 @@ Needs hardware:
    keyboard, a held key holds the sustain and letting go releases it. (The
    gate is the one thing here the emulator cannot show: tell us what you
    hear.)
-5. **Macros:** Bright darkens or brightens E.PIANO MT without changing its
-   loudness; Amp Env makes FM PLUCK 1 snappier or a pad; Mod Env makes
-   BRASS SWEL swell slower or bite quicker. None of them breaks a voice.
-6. **Cartridges:** send a cartridge with the DX Cartridge Sender (or a
+5. **Macros:** on any voice, Bright darkens or brightens it without
+   changing its loudness; Amp Env turns it into a pluck (down) or a swell
+   (up); Mod Env makes the tone close after the attack (down) or open
+   slowly (up). None of them breaks a voice.
+6. **No clicks:** with Attack at 0, trigs on any voice start without a
+   click, including a pad held from the previous trig.
+7. **Cartridges:** send a cartridge with the DX Cartridge Sender (or a
    librarian), then FUNCTION + PRESET on a DX track: it is in `/DX7/`, it
    loads ("Cartridge loaded"), and Contour shows its voice names. Save the
    project, load another, come back: the cartridge is still there. Another
    pattern can have another. Elektron Transfer still connects and works.
-7. **Velocity:** E.PIANO MT and FM PLUCK 1 with soft and hard trigs (or
+8. **Velocity:** E.PIANO MT and FM PLUCK 1 with soft and hard trigs (or
    velocity p-locks, or a MIDI keyboard): harder is brighter, not only
    louder.
-8. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
+9. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
    no dropouts.
 
 ## Credits and licence
