@@ -94,6 +94,11 @@ class Emu:
         # the sample region (Pluck's delay lines, the retrig histories, the
         # slice tables live at its top); host pages are only touched if used
         uc.mem_map(0x48000000, 0x08000000)
+        # the overlay, where boot_extra_hook copies it
+        if 'ovl_start' in self.sym:
+            lo = self.sym['ovl_lma'] - BLOB
+            uc.mem_write(self.sym['ovl_start'],
+                         self.blob[lo:lo + self.sym['ovl_end'] - self.sym['ovl_start']])
         self.uc = uc
         self.visits = {}
         self._watch = {}
@@ -129,10 +134,14 @@ class Emu:
 
     def count_instructions(self, start, stop, regs=None, stack=()):
         n = [0]
-        h = self.uc.hook_add(UC_HOOK_CODE, lambda uc, a, s, u: n.__setitem__(0, n[0] + 1),
-                             begin=BLOB, end=BLOB + len(self.blob))
+        count = lambda uc, a, s, u: n.__setitem__(0, n[0] + 1)
+        hs = [self.uc.hook_add(UC_HOOK_CODE, count, begin=BLOB, end=BLOB + len(self.blob))]
+        if 'ovl_start' in self.sym:                       # and the overlay's code
+            hs.append(self.uc.hook_add(UC_HOOK_CODE, count, begin=self.sym['ovl_start'],
+                                       end=self.sym['ovl_end']))
         self.run(start, stop, regs, stack)
-        self.uc.hook_del(h)
+        for h in hs:
+            self.uc.hook_del(h)
         return n[0]
 
     def run(self, start, stop=RET, regs=None, stack=(), limit=20_000_000):

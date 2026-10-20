@@ -47,6 +47,31 @@ boot_extra_hook:
     | caches; nothing in stock touches ACR1 afterwards.
     movel   #0x4c03e000,%d4
     movec   %d4,%acr1
+    | The overlay (`.section .ovl`, build.py): the image carries it after our
+    | blob, at ovl_lma, inside what the clear below zeroes. Copy it up to where
+    | it runs (ovl_start, the top of the sample region - nothing there is
+    | cleared or loaded) and sum it on the way: ovl_ok = 1 if the sum is the one
+    | build.py wrote into ovl_want. Caches are still off, so nothing stale.
+    lea.l   ovl_lma,%a0
+    lea.l   ovl_start,%a1
+    moveq   #0,%d4                  | the sum
+1:  cmpal   #ovl_end,%a1
+    bccs    2f
+    movel   %a0@+,%d5
+    movel   %d5,%a1@+
+    addl    %d5,%d4
+    bras    1b
+2:  moveq   #0,%d5
+    cmpl    ovl_want,%d4
+    bnes    3f
+    moveq   #1,%d5
+3:  movel   %d5,ovl_ok
+    lea.l   sfx_desc,%a0            | the result, on the Send FX menu's title
+    movel   #sfx_title,%a0@
+    tstl    %d5
+    bnes    4f
+    movel   #ovl_bad_title,%a0@
+4:
     lea.l   0x4019b590,%a0          | where stock's own clear starts (0x400004ba)
     moveq   #0,%d4
     moveq   #0,%d5
@@ -84,6 +109,13 @@ l34_clear:
 | (cycles_sampler_catalog_uihook.s) - see that file's own header
 | comment for the full design rationale.
 | ---------------------------------------------------------------
+
+    .align  4
+    .globl  ovl_want, ovl_ok
+ovl_want:   .long 0                 | the overlay's sum (written by build.py)
+ovl_ok:     .long 0                 | 1: the copy at boot matched it
+ovl_bad_title: .asciz "OVL ERROR"
+    .align  2
 
 sampler_lazy_init_trampoline:
     movel   4(%a7),%d0             | the page being drawn: nm_tick keeps its

@@ -15,6 +15,28 @@ image.
   of our code at `0x401ab750` (in filesystem cache blocks the firmware gives up
   to us), redirects stock code into it with small asserted patches, applies the
   vendored tweaks, and repacks.
+- **The overlay** (Plaits Edition). Code and tables in `.section .ovl` run
+  from the top of the sample region instead of the cache blocks:
+  - `build.py` links them at `OVL_BASE` (`model_tg.s`: just below LFO 3/4's
+    per-pattern blocks, 256 KB at most, in the block the data cache holds
+    through ACR1) and carries them in the image straight after the resident
+    blob (`ovl_lma` = `reserved_end`).
+  - `boot_extra_hook` copies them up before the boot clear, which then zeroes
+    the staging copy like any other BSS. It sums the copy against `ovl_want`
+    (written by `build.py`) and sets `ovl_ok`. On a mismatch the Send FX
+    menu's title reads **OVL ERROR**.
+  - Samples stop at `OVL_BASE` (`PCM_TOP`): 256 KB of sample memory.
+  - The limit is the image, not the overlay: the bootstrap (section 2, left
+    as stock) unpacks the main OS from `0x40200000` down to `0x40000400`, so
+    the image must end below `0x40200000`. That leaves ~346 KB for all our
+    code, resident and overlay, against ~125 KB today. `build.py` asserts it.
+  - Calls between the blob and the overlay must be `jsr`/`jmp` (absolute):
+    a `bsr`/`bra` across fails the link. Labels the other side uses need
+    `.globl` if they are in another source file.
+  - PLAITS (`plaits.inc`) is the first thing moved there.
+  - `build.py --space-test` pads the overlay with incompressible bytes to
+    4 KB short of the limit: a firmware as large as one can get, to check
+    on a Cycles that the updater and the bootstrap take it.
 - `src/model_tg.s` is the bulk: the Sampler machine, its modes, pages, effects,
   resampling, retrig, master FX and the stock-machine optimisations.
 - `src/va_synth.inc` (VA Edition), included by `model_tg.s`: the VA machine

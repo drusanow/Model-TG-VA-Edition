@@ -9893,7 +9893,13 @@ dbh_pass:
     SFX_RBUF    = SFX_DBUF - 0x20000 | ... the spring's and RESO's
     L34_KITS    = SFX_RBUF - 0x5000 | LFO 3/4, the send FX and MIDI CC of each kit
                                   | (lfo2.inc: lfo34_kits, cleared at boot)
-    PCM_TOP     = L34_KITS        | samples and takes stay below this
+    OVL_MAX     = 0x40000         | the overlay: code and tables run from here
+    OVL_BASE    = L34_KITS - OVL_MAX | (build.py links `.section .ovl` here;
+                                  | boot_extra_hook copies it up from the image)
+    PCM_TOP     = OVL_BASE        | samples and takes stay below this
+    .globl  ovl_vma, ovl_max
+    ovl_vma     = OVL_BASE
+    ovl_max     = OVL_MAX
     PCM_CACHED  = 0x4C000000      | from here up the data cache holds it (ACR1,
                                   | set in boot_extra_hook): files go here
                                   | first. Below, the 16 MiB block shared with
@@ -20886,9 +20892,11 @@ msg_buf:    .space 64
     .align 2
     .include "drums.inc"
 
-| ---- PLAITS (machine 11) -----------------------------------------------------
-    .align 2
+| ---- PLAITS (machine 11): in the overlay (build.py), run from the sample region
+    .section .ovl,"ax"
+    .align 4
     .include "plaits.inc"
+    .text
 
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2

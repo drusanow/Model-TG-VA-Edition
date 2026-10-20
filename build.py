@@ -45,6 +45,9 @@ _ap.add_argument("--flasher", metavar="FILE",
 _ap.add_argument("--check-flasher", metavar="FILE",
                  help="with --assemble-only: check that FILE's appended code is exactly "
                       "what src/ assembles to, and that it was made from committed source")
+_ap.add_argument("--space-test", action="store_true",
+                 help="pad the overlay with pseudo-random bytes up to 4 KiB short of the "
+                      "bootstrap's limit: a test that the Cycles takes the largest image")
 _ap.add_argument("--assemble-only", action="store_true",
                  help="assemble, link and self-check src/ only - no stock firmware needed")
 args=_ap.parse_args()
@@ -90,19 +93,68 @@ def _as(srcfile,tag):
     subprocess.run([CROSS+"as","-march=cfv4e","-o",o,srcfile],cwd=proto,check=True)
     return o
 _objs=[_as(src,"b"), _as("phase1.s","a"), _as("track_table.s","s")]
+# ---- the overlay -------------------------------------------------------------
+# Code and tables in `.section .ovl` run from the top of the sample region
+# (OVL_BASE, model_tg.s: cached, past PCM_TOP), not from the cache blocks. The
+# image carries them straight after the resident blob (their load address), and
+# boot_extra_hook copies them up before the boot clear zeroes the staging copy.
+# The bootstrap (section 2) unpacks the main OS from 0x40200000 down to
+# 0x40000400, so the whole image must end below 0x40200000.
+IMG_LIMIT=0x40200000
+_ovl_vma=next(int(_l.split()[0],16) for _l in subprocess.run([CROSS+"nm",_objs[0]],
+              capture_output=True,text=True,check=True).stdout.splitlines()
+              if _l.split()[-1]=="ovl_vma")
+_lds=os.path.join(BUILD,"_b.ld")
 def _link(res_end):
-    subprocess.run([CROSS+"ld",f"-Ttext=0x{BLOB:x}",
+    open(_lds,"w").write(f"""SECTIONS {{
+  .text 0x{BLOB:x} : {{ *(.text) }}
+  .ovl 0x{_ovl_vma:x} : AT(0x{BLOB:x} + ALIGN(SIZEOF(.text), 16))
+      {{ ovl_start = .; *(.ovl) . = ALIGN(16); ovl_end = .; }}
+  ovl_lma = LOADADDR(.ovl);
+  res_size = SIZEOF(.text);
+}}
+""")
+    _r=subprocess.run([CROSS+"ld","-T",_lds,
                     f"--defsym=blob_start=0x{BLOB:x}",f"--defsym=reserved_end=0x{res_end:x}",
-                    "-o",elf,*_objs],check=True,stderr=subprocess.DEVNULL)
+                    "-o",elf,*_objs],capture_output=True,text=True)
+    if _r.returncode:
+        raise SystemExit("link failed (a bsr/bra between the blob and the overlay? use jsr/jmp):\n"
+                         +_r.stderr[-3000:])
     subprocess.run([CROSS+"objcopy","-O","binary",elf,binf],check=True)
-    return open(binf,'rb').read()
+    _ls={_l.split()[2]:int(_l.split()[0],16) for _l in subprocess.run([CROSS+"nm",elf],
+         capture_output=True,text=True,check=True).stdout.splitlines() if len(_l.split())==3}
+    return open(binf,'rb').read(), _ls
 # reserved_end is only an operand, so the size cannot depend on it: link once
 # to measure, once for real, and check that held.
-_probe=_link(0)
-RES_END=BLOB+((len(_probe)+15)&~15)
-_real=_link(RES_END)
+_probe,_ps=_link(0)
+RES_END=BLOB+((_ps['res_size']+15)&~15)
+_real,_rs=_link(RES_END)
 assert len(_real)==len(_probe), "blob size changed between the two link passes"
-print(f"  one blob: {len(_real):,} B at 0x{BLOB:08x}, reserved_end 0x{RES_END:08x}")
+if args.space_test:
+    # filler that does not compress, so the .syx is as large as such an image gets
+    import random as _rnd
+    _pad=(IMG_LIMIT-0x1000)-(RES_END+_rs['ovl_end']-_rs['ovl_start'])
+    _pad=min(_pad, _rs['ovl_max']-(_rs['ovl_end']-_rs['ovl_start'])) & ~15
+    _g=_rnd.Random(0x5ACE)
+    open(os.path.join(BUILD,"_pad.bin"),"wb").write(bytes(_g.getrandbits(8) for _ in range(_pad)))
+    open(os.path.join(BUILD,"_pad.s"),"w").write('    .section .ovl,"a"\n    .incbin "_pad.bin"\n')
+    subprocess.run([CROSS+"as","-march=cfv4e","-o",os.path.join(BUILD,"_pad.o"),"_pad.s"],
+                   cwd=BUILD,check=True)
+    _objs.append(os.path.join(BUILD,"_pad.o"))
+    _real,_rs=_link(RES_END)
+    print(f"  SPACE TEST: {_pad:,} B of filler in the overlay")
+OVL_VMA,OVL_LMA,OVL_SIZE=_rs['ovl_start'],_rs['ovl_lma'],_rs['ovl_end']-_rs['ovl_start']
+assert OVL_LMA==RES_END, (hex(OVL_LMA),hex(RES_END))
+assert OVL_SIZE<=_rs['ovl_max'], f"overlay {OVL_SIZE:,} B, over its {_rs['ovl_max']:,} B in the sample region"
+IMG_END=OVL_LMA+OVL_SIZE
+assert IMG_END<=IMG_LIMIT, f"image ends 0x{IMG_END:08x}, past 0x{IMG_LIMIT:08x} where the bootstrap unpacks it"
+print(f"  one blob: {RES_END-BLOB:,} B at 0x{BLOB:08x}, reserved_end 0x{RES_END:08x}")
+print(f"  overlay: {OVL_SIZE:,} B, loaded at 0x{OVL_LMA:08x}, runs at 0x{OVL_VMA:08x}; "
+      f"image ends 0x{IMG_END:08x} ({IMG_LIMIT-IMG_END:,} B short of 0x{IMG_LIMIT:08x})")
+def blob_off(a):
+    """an address of ours -> its offset in the blob (resident or overlay)"""
+    if OVL_VMA<=a<OVL_VMA+OVL_SIZE: return a-OVL_VMA+OVL_LMA-BLOB
+    return a-BLOB
 # Every stack frame must be freed with the size it was allocated with. Scoping
 # by label gives false positives (local labels like pf_ret: look like functions),
 # so just require that each allocation size has a matching free size somewhere -
@@ -237,8 +289,8 @@ for _l in _nm.splitlines():
     _p=_l.split()
     if len(_p)!=3 or _p[1] not in 'tT' or _p[2] in _BYTE_DATA: continue
     _a=int(_p[0],16)
-    if _a%2==0 or not (BLOB<=_a<BLOB+len(blob)): continue
-    _bs=blob[_a-BLOB:_a-BLOB+96]; _z=_bs.find(b'\0')
+    if _a%2==0 or not (BLOB<=_a<BLOB+len(blob) or OVL_VMA<=_a<OVL_VMA+OVL_SIZE): continue
+    _bs=blob[blob_off(_a):blob_off(_a)+96]; _z=_bs.find(b'\0')
     if _z<1 or not all(32<=_c<127 or _c==10 for _c in _bs[:_z]):
         _odd.append(f"{_p[0]} {_p[2]}")
 if _odd:
@@ -322,7 +374,15 @@ if hashlib.sha256(_stock).hexdigest()!=STOCK_SHA256:
 assert BASE+len(_stock)==STOCK_END, (hex(BASE+len(_stock)), "unexpected stock size")
 d=_stock+bytearray(BLOB-STOCK_END)+blob
 end=BASE+len(d)
-assert end==RES_END, f"image ends 0x{end:08x} but the boot clear resumes at 0x{RES_END:08x}"
+assert end==IMG_END, f"image ends 0x{end:08x}, the overlay at 0x{IMG_END:08x}"
+end=RES_END                       # what the cache blocks must hold: the resident part
+# the overlay's sum, which boot_extra_hook checks its copy against (ovl_ok)
+_ov=bytes(d[OVL_LMA-BASE:OVL_LMA-BASE+OVL_SIZE])
+_osum=sum(struct.unpack(f'>{OVL_SIZE//4}I',_ov)) & 0xffffffff
+_o=sym['ovl_want']-BASE
+assert bytes(d[_o:_o+4])==bytes(4)
+d[_o:_o+4]=struct.pack('>I',_osum)
+print(f"  overlay sum 0x{_osum:08x} -> ovl_want (checked at boot: OVL ERROR on Send FX if not)")
 
 # ---- Phase 1 stock-area patches -----------------------------------------
 # Derived from the base image, each asserted against the STOCK bytes it
@@ -855,7 +915,7 @@ assert d[o]==6, d[o]
 # including the filesystem's chunk-blanking buffer. Check the BUILT hook, not
 # the source, since that is exactly where the mismatch hid last time.
 _h=sym['boot_extra_hook']-BASE
-_hook=bytes(d[_h:_h+64])
+_hook=bytes(d[_h:_h+160])
 for _need,_what in ((b'\x41\xf9'+struct.pack('>I',0x4019b590),'starts at 0x4019b590'),
                     (b'\xb1\xfc'+struct.pack('>I',BLOB),      f'skips from 0x{BLOB:08x}'),
                     (b'\x20\x7c'+struct.pack('>I',RES_END),   f'resumes at 0x{RES_END:08x}'),

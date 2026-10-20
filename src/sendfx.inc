@@ -1119,6 +1119,7 @@ srot_out:
     .align 4
 | four lines: a heading, then its effect under it (either turns it), so the
 | label and the value never share a line
+    .globl  sfx_desc, sfx_title
 sfx_desc:     .long sfx_title, sfx_vname, 4, sfx_items
 sfx_items:    .long sfx_lab_d, sfx_val_e, sfx_rot_d, new_slot2_invoker
               .long sfx_lab_e, sfx_val_d, sfx_rot_d, new_slot2_invoker
