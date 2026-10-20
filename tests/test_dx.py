@@ -330,6 +330,48 @@ class TEnvelopes(unittest.TestCase):
                         0.1 * np.abs(a[-200:]).max())        # no jump to silence
 
 
+class TVelocity(unittest.TestCase):
+    def level(self, vel, kvs, **k):
+        e = emu()
+        load(e, 0, one(op1=op(ol=99, kvs=kvs), **k))
+        dials(e, 0)
+        e.w8(e.sym['dx_vel'], vel)
+        return rms(render(e, 100)[2000:])
+
+    def test_carrier_level_follows_msfa(self):
+        ref = self.level(100, 7)
+        self.assertLess(self.level(1, 7), ref * 10 ** (-70 / 20))   # -79 dB: silent, or near
+        for vel in (40, 64, 100, 127):
+            got = 20 * np.log10(self.level(vel, 7) / ref)
+            want = (G.scale_velocity(vel, 7) - G.scale_velocity(100, 7)) / 256 * 6.0206
+            self.assertAlmostEqual(got, want, delta=0.3, msg=vel)
+        self.assertAlmostEqual(self.level(1, 0), self.level(127, 0), delta=1)   # KVS 0: none
+        self.assertGreater(20 * np.log10(self.level(127, 7) / self.level(100, 7)), 4.5)  # above OL 99
+
+    def test_modulator_velocity_brightens(self):
+        def bright(vel):
+            e = emu()
+            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=70, kvs=7)))   # index < 2
+            dials(e, 0)
+            e.w8(e.sym['dx_vel'], vel)
+            x = render(e, 100)[2000:]
+            return sum(amp_at(x, 261.63 * n) for n in (2, 3, 4)) / amp_at(x, 261.63)
+        self.assertLess(bright(30), bright(80))
+        self.assertLess(bright(80), bright(127))
+
+    def test_taken_at_the_note(self):
+        e = emu()
+        load(e, 0, one(op1=op(ol=99, kvs=7)))
+        dials(e, 0)
+        e.w8(e.sym['dx_vel'], 127)
+        a = rms(render(e, 60)[2000:])
+        e.w8(e.sym['dx_vel'], 20)                       # no new note: unchanged
+        b = rms(render(e, 60, trig=False)[1000:])
+        self.assertAlmostEqual(a, b, delta=a * 0.02)
+        c = rms(render(e, 60)[2000:])                    # the next note takes it
+        self.assertLess(c, a * 0.5)
+
+
 class TLfo(unittest.TestCase):
     def test_pitch_and_amp_mod(self):
         e = emu()                                            # vibrato: PMD 99 PMS 7

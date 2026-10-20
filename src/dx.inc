@@ -27,14 +27,16 @@ DX_TS   = 512                     | bytes of state per track (DX_TST)
 DX_OP   = 192                     | ... where the six operators start, 48 each
 DX_OPS  = 48
 | track state:
-|   +0 the voice loaded (-1 none)      +12/+16 feedback's last two outputs
+|   +0 the voice loaded (-1 none)      +4 the note's velocity (0..127)
+|   +12/+16 feedback's last two outputs
 |   +20 key down                       +24 the note (MIDI number, transposed)
 |   +28 LFO phase  +32 its delay phase  +36 its sample-and-hold value
 |   +40 pitch EG level (Q16 of Q8 semitones)  +44 its stage  +48 its target
 |   +52 has played                     +56 its own cartridge loaded (dx_cv)
 |   +60 voice changed (dx_load)        +64 the voice, 128 bytes (VMEM)
 |   +192 six operators, OP6 first:
-|        +0 phase  +4 increment  +8 gain (Q31)  +12 level (1/256 oct << 16)
+|        +0 phase  +4 increment  +8 gain (Q14 << 16: 2.0 the most)
+|        +12 level (1/256 oct << 16)
 |        +16 target  +20 spare  +24 stage (4 = done)  +28 rising
 |        +32 four target levels (words)  +40 four rates (bytes, qrate)
 |        +44 ratio (Q16), or bit 31 + a fixed increment (48 kHz)
@@ -191,6 +193,24 @@ ds_op:
     moveq   #0,%d4
 1:  DX_MAX  %d4, 127
     lsll    #5,%d4                | OUTL
+    | + the velocity, by this operator's sensitivity (msfa's ScaleVelocity):
+    | ((KVS (veld[vel / 2] - 239) + 7) >> 3) << 4, at least 0 in all
+    movel   %a5@(4),%d0           | the note's velocity
+    lsrl    #1,%d0
+    lea.l   dx_veld,%a1
+    mvzb    %a1@(0,%d0:l),%d0
+    subil   #239,%d0
+    mvzb    %a0@(13),%d1
+    lsrl    #2,%d1
+    andil   #7,%d1
+    mulsl   %d1,%d0
+    addql   #7,%d0
+    asrl    #3,%d0
+    lsll    #4,%d0
+    addl    %d0,%d4
+    bpls    20f
+    moveq   #0,%d4
+20:
     | the four target levels: ((scaleoutlevel(L) >> 1) << 6) + OUTL - 4256
     moveq   #0,%d5
 2:  mvzb    %a0@(4,%d5:l),%d0
@@ -544,6 +564,11 @@ dx_fill:
 3:  | ---- the note ----
     tstl    %sp@(32)
     beqs    6f
+    lea.l   dx_vel,%a0            | its velocity (dx_params)
+    moveq   #0,%d0
+    moveb   %a0@(0,%d6:l),%d0
+    DX_MAX  %d0, 127
+    movel   %d0,%a5@(4)
     bsr     dx_noteon
     bras    7f
 6:  tstl    %a5@(20)
@@ -680,8 +705,8 @@ dx_opl:
     mulu.w  %d1,%d2
     lsrl    #8,%d2
     subl    %d2,%d0
-4:  movel   #3840,%d1             | the gain: 2^((L - 3840) / 256), Q15
-    subl    %d0,%d1
+4:  movel   #4096,%d1             | the gain: 2^((L - 3840) / 256), Q14 - an
+    subl    %d0,%d1               | octave over full scale for velocity
     bgts    5f
     movel   #32767,%d0
     bras    6f
@@ -770,7 +795,7 @@ dx_n1:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     addl    %d0,%a2@+
     subql   #1,%d6
@@ -787,7 +812,7 @@ dx_n0:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     movel   %d0,%a2@+
     subql   #1,%d6
@@ -811,7 +836,7 @@ dx_i1:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     addl    %d0,%a2@+
     subql   #1,%d6
@@ -831,7 +856,7 @@ dx_i0:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     movel   %d0,%a2@+
     subql   #1,%d6
@@ -858,7 +883,7 @@ dx_f1:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     movea.l %d7,%a1
     movel   %d0,%d7
@@ -881,7 +906,7 @@ dx_f0:
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
-    asrl    #7,%d0
+    asrl    #6,%d0
     addl    %d5,%d4
     movea.l %d7,%a1
     movel   %d0,%d7
@@ -1934,6 +1959,8 @@ dx_amsw:   .byte 0, 66, 109, 255  | amplitude modulation sensitivity, Q8
     .include "dx_tables.inc"
     .align 2
 dx_p:      .space 6*16            | the four dials, Q15
+dx_vel:    .byte 100,100,100,100,100,100 | each track's note velocity (dx_params)
+    .align 2
 dx_hash:   .space 6*4             | the cartridge each track holds (its file's
                                   | hash; 0 the built-in one)
 dx_ptick:  .long 0                | dx_probe's block count

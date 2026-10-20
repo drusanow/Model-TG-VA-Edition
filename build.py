@@ -262,7 +262,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat','dx_alg','dx_e2','dx_sin','dx_sol','dx_exps','dx_pms','dx_cart','dx_swap','dx_amsw','dx_p','dx_swf0','dx_sbuf','dx_hash','dx_ptick','dx_rxlen','dx_rxmsg','dx_rxpath','dx_gate','dx_bus1','dx_bus2',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat','dx_alg','dx_e2','dx_sin','dx_sol','dx_exps','dx_pms','dx_cart','dx_swap','dx_amsw','dx_p','dx_swf0','dx_sbuf','dx_hash','dx_ptick','dx_veld','dx_vel','dx_rxlen','dx_rxmsg','dx_rxpath','dx_gate','dx_bus1','dx_bus2',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
               'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
@@ -284,7 +284,7 @@ print(f"  every 16-bit branch lands on a label")
 # mach_nbuf (19 bytes, no .balign after it) left gm_val_*/gm_rot_* odd, and
 # the options menu threw an exception at its first row. So any label at an
 # odd address must be a string: printable, NUL-terminated.
-_BYTE_DATA={'qry_yes','qry_none','key_state','dx_sol','dx_exps','dx_pms','dx_amsw'}   # .byte data, not code
+_BYTE_DATA={'qry_yes','qry_none','key_state','dx_sol','dx_exps','dx_pms','dx_amsw','dx_veld','dx_vel'}   # .byte data, not code
 _odd=[]
 for _l in _nm.splitlines():
     _p=_l.split()

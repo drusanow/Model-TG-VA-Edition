@@ -16,11 +16,12 @@ Levien, Apache 2.0) models it.
   dx_sol   msfa's scaleoutlevel below 20 (output levels 0..19)
   dx_exps  msfa's exponential keyboard level scaling curve (33 groups)
   dx_pms   pitch modulation sensitivity 0..7 (msfa's pitchmodsenstab)
+  dx_veld  msfa's velocity curve (velocity_data, 64 steps of velocity / 2)
   dx_cart  the built-in cartridge: 32 voices in the DX7's packed 128-byte
            format (VMEM), all of them made here - INIT VOICE and a handful of
            simple original sounds. No Yamaha voice is included.
 
-The numbers of dx_sol, dx_exps and dx_pms are msfa's (Apache License 2.0;
+The numbers of dx_sol, dx_exps, dx_pms and dx_veld are msfa's (Apache License 2.0;
 see docs/DX.md for the notice). Rerun after changing anything here; CI
 checks that the file is up to date.
 """
@@ -108,6 +109,18 @@ LEVELLUT = [0, 5, 9, 13, 17, 20, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 42, 43,
 EXP_SCALE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 16, 19, 23, 27, 33, 39, 47, 56, 66, 80,
              94, 110, 126, 142, 158, 174, 190, 206, 222, 238, 250]
 PMS = [0, 10, 20, 33, 55, 92, 153, 255]
+VELD = [0, 70, 86, 97, 106, 114, 121, 126, 132, 138, 142, 148, 152, 156, 160, 163,
+        166, 170, 173, 174, 178, 181, 184, 186, 189, 190, 194, 196, 198, 200, 202,
+        205, 206, 209, 211, 214, 216, 218, 220, 222, 224, 225, 227, 229, 230, 232,
+        233, 235, 237, 238, 240, 241, 242, 243, 244, 246, 246, 248, 249, 250, 251,
+        252, 253, 254]
+assert len(VELD) == 64
+
+
+def scale_velocity(vel, sens):
+    """msfa's ScaleVelocity: the output level's change, in 1/256 octave"""
+    v = VELD[max(0, min(127, vel)) >> 1] - 239
+    return ((sens * v + 7) >> 3) << 4
 
 
 # ---- the built-in voices ------------------------------------------------------
@@ -222,6 +235,9 @@ def main():
     lines.append('    .byte ' + ', '.join(str(x) for x in EXP_SCALE))
     lines.append('dx_pms:')
     lines.append('    .byte ' + ', '.join(str(x) for x in PMS))
+    lines.append('dx_veld:')
+    for i in range(0, 64, 16):
+        lines.append('    .byte ' + ', '.join(str(x) for x in VELD[i:i + 16]))
     lines.append('    .align 2')
     lines.append('dx_cart:')
     c = voices()
