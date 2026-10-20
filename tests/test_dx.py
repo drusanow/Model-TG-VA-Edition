@@ -607,6 +607,78 @@ class TCartridges(unittest.TestCase):
         self.assertEqual(rd(), 'Not a DX7\ncartridge')
 
 
+def fnv(data):
+    h = 0x811c9dc5
+    for c in data:
+        h = ((h ^ c) * 0x01000193) & 0xffffffff
+    return h
+
+
+class TSysexReceive(unittest.TestCase):
+    MSG = SCRATCH + 0x80000
+
+    def send(self, e, msg, port=0x10):
+        e.uc.mem_write(self.MSG, msg)
+        posts = []
+        e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: posts.append(1),
+                      begin=0x40001fba, end=0x40001fba)
+        hit = e.run_to_any('dx_sysex', (0x400812f6, RET), stack=[self.MSG, len(msg), port])
+        return hit, len(posts)
+
+    def test_dumps_are_kept_and_the_rest_goes_on(self):
+        vs = [G.voice('E.PIANO MT', [op(ol=99)])] + [G.voice('V%d' % i, [op()]) for i in range(31)]
+        for port in (0x10, 0x04):                       # MIDI IN, USB
+            e = emu(); s = e.sym
+            hit, posts = self.send(e, bulk(vs), port)
+            self.assertEqual((hit, posts), (RET, 1))
+            self.assertEqual(e.r32(s['dx_rxlen']), 4104)
+            self.assertEqual(bytes(e.uc.mem_read(s['dx_base'] + 0xC000, 4104)), bulk(vs))
+        e = emu(); s = e.sym
+        one_v = bytes([0xf0, 0x43, 0x05, 0x00, 0x01, 0x1b]) + vced('LEAD 1', [op(ol=99)]) + b'\x00\xf7'
+        self.assertEqual(self.send(e, one_v), (RET, 1))
+        self.assertEqual(e.r32(s['dx_rxlen']), 163)
+        for msg in (bytes([0xf0, 0x7e, 0x7f, 0x06, 0x01, 0xf7]),          # identity: stock
+                    bytes([0xf0, 0x00, 0x20, 0x3c, 0x10, 0x00, 0x01, 0xf7]),  # Elektron's
+                    bytes([0xf0, 0x43, 0x10, 0x09, 0x20, 0x00]) + bytes(4096) + b'\x00\xf7',  # n >= 16
+                    bulk(vs)[:-10] + b'\xf7',                            # short
+                    bytes([0xf0, 0x43, 0x00, 0x01, 0x20, 0x00]) + bytes(4096) + b'\x00\xf7'):  # format 1
+            e = emu()
+            self.assertEqual(self.send(e, msg), (0x400812f6, 0), msg[:6].hex())
+            self.assertEqual(e.r32(e.sym['dx_rxlen']), 0)
+        e = emu(); s = e.sym                            # one at a time
+        self.send(e, bulk(vs))
+        other = bulk([G.voice('OTHER', [op()])] * 32)
+        self.assertEqual(self.send(e, other), (RET, 0))
+        self.assertEqual(bytes(e.uc.mem_read(s['dx_base'] + 0xC000, 4104)), bulk(vs))
+
+    def test_file_name_and_write(self):
+        vs = [G.voice('E.PIANO/MT', [op(ol=99)])] + [G.voice('V', [op()])] * 31
+        e = emu(); s = e.sym
+        self.send(e, bulk(vs))
+        calls = {}
+        for fn in (0x4007bc5e, 0x4007bb0a, 0x4007bc1c):
+            e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.setdefault(a, struct.unpack(
+                '>3I', uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 4, 12))), begin=fn, end=fn)
+        e.uc.mem_write(0x4007bc5e, bytes.fromhex('70004e75'))   # open: ok
+        e.run('dx_rx_write', stack=[0, 0])
+        path = bytes(e.uc.mem_read(calls[0x4007bc5e][0], 40)).split(b'\0')[0].decode()
+        h = fnv(b''.join(vs)) & 0xffff
+        self.assertEqual(path, '/DX7/E.PIANO_MT %04X.syx' % h)
+        self.assertEqual(calls[0x4007bb0a][:2], (s['dx_base'] + 0xC000, 4104))   # all of it
+        self.assertIn(0x4007bc1c, calls)                                         # closed
+        self.assertEqual(e.r32(s['dx_rxlen']), 0)
+        e = emu(); s = e.sym                            # one voice, a blank name
+        one_v = bytes([0xf0, 0x43, 0, 0, 1, 0x1b]) + vced('', [op(ol=99)]) + b'\x00\xf7'
+        self.send(e, one_v)
+        e.run('dx_rx_path')
+        name = bytes(e.uc.mem_read(e.d(0) if False else s['dx_rxpath'], 40)).split(b'\0')[0].decode()
+        self.assertEqual(name, '/DX7/CART %04X.syx' % (fnv(one_v[6:161]) & 0xffff))
+
+    def test_hook_installed_in_the_dispatch_table(self):
+        b = open(os.path.join(REPO, 'build.py')).read()
+        self.assertIn("PHASE1.append((0x40112950,'400812f6',_p('dx_sysex')))", b)
+
+
 class TPlumbing(unittest.TestCase):
     def test_pre_routes_dx(self):
         import test_va as V

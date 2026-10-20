@@ -1544,6 +1544,231 @@ dpr_n:
 dpr_out:
     rts
 
+| ---- cartridges arriving as SysEx: saved on the drive -----------------------
+| The MIDI task hands every complete SysEx message, from USB and from MIDI IN,
+| to one handler through the pointer at 0x40112950 (the SysEx entry of the
+| dispatch table 0x400803e2 reads; stock: 0x400812f6, which answers the
+| universal and Elektron messages and drops the rest). build.py points it
+| here: (ptr to F0, length with F0 and F7, port), entered by jmp with the
+| return address on top. A DX7 bulk dump (4104 bytes) or one-voice dump (163)
+| is copied out - the stock frees or reuses its buffer at once - and a UI
+| message writes it as /DX7/<its first voice's name> <4 hex digits>.syx;
+| anything else goes on to the stock handler, untouched. One at a time: a
+| dump that arrives while the last one is still being written is dropped.
+    .globl  dx_sysex
+dx_sysex:
+    movea.l %sp@(4),%a0
+    moveb   %a0@(1),%d0
+    cmpib   #0x43,%d0             | Yamaha's
+    bnew    dxs_stock
+    moveb   %a0@(2),%d0
+    andil   #0xf0,%d0
+    bnew    dxs_stock
+    movel   %sp@(8),%d1
+    moveb   %a0@(3),%d0
+    cmpib   #0x09,%d0
+    bnes    1f
+    moveb   %a0@(4),%d0
+    cmpib   #0x20,%d0
+    bnew    dxs_stock
+    tstb    %a0@(5)
+    bnew    dxs_stock
+    cmpil   #4104,%d1
+    beqs    dxs_take
+    braw    dxs_stock
+1:  tstb    %d0                   | 00 01 1B: one voice
+    bnew    dxs_stock
+    moveb   %a0@(4),%d0
+    cmpib   #0x01,%d0
+    bnew    dxs_stock
+    moveb   %a0@(5),%d0
+    cmpib   #0x1b,%d0
+    bnew    dxs_stock
+    cmpil   #163,%d1
+    bnew    dxs_stock
+dxs_take:
+    tstl    dx_rxlen
+    bnes    dxs_out               | still writing the last one
+    lea.l   DX_RXBUF,%a1
+    movel   %d1,%d0
+    subql   #1,%d0
+3:  moveb   %a0@+,%a1@+
+    subql   #1,%d0
+    bpls    3b
+    movel   %d1,dx_rxlen
+    lea.l   dx_rxmsg,%a0          | the UI task writes it (as lcc_post posts)
+    tstl    %a0@(0x18)
+    bnes    dxs_out
+    movel   %a0,%sp@-
+    pea     1
+    jsr     ALLOC
+    addql   #4,%sp
+    movea.l %sp@+,%a0
+    movel   %d0,%a0@(4)
+    clrl    %a0@(8)
+    movel   #GENERIC_MANAGER,%d1
+    movel   %d1,%a0@(0x0c)
+    movel   #dx_rx_write,%d1
+    movel   %d1,%a0@(0x10)
+    clrl    %a0@(0x14)
+    moveq   #1,%d0
+    movel   %d0,%a0@(0x18)
+    moveq   #6,%d0                | type 6: run the callback
+    moveb   %d0,%a0@
+    movel   %a0,%sp@-
+    pea     MQ_MAIN
+    jsr     0x40001fba
+    addql   #8,%sp
+dxs_out:
+    rts
+dxs_stock:
+    jmp     0x400812f6
+
+| (closure, arg), in the UI task: the dump in DX_RXBUF to its file
+    .globl  dx_rx_write
+dx_rx_write:
+    linkw   %fp,#-40
+    lea.l   %sp@(-12),%sp
+    moveml  %d2-%d3/%a2,%sp@
+    clrl    dx_rxmsg+0x18
+    bsr     dx_rx_path            | -> a0 = the path
+    movel   %a0,%sp@-
+    jsr     0x4007c18e
+    movel   %sp@,%d0
+    movel   %d0,%sp@-
+    jsr     0x40095284            | its folder
+    addql   #4,%sp
+    tstl    %d0
+    beqs    1f
+    pea     %fp@(-17)
+    movel   %d0,%sp@-
+    pea     %fp@(-24)
+    jsr     0x400f980c            | as a String
+    lea.l   %sp@(12),%sp
+    pea     %fp@(-24)
+    jsr     0x4007c262            | made, if it is not there
+    addql   #4,%sp
+    pea     %fp@(-24)
+    jsr     0x400f7d5c
+    addql   #4,%sp
+1:  movel   %sp@+,%d3             | the path
+    pea     %fp@(-16)
+    pea     0x401272db            | "w"
+    movel   %d3,%sp@-
+    jsr     0x4007bc5e
+    lea.l   %sp@(12),%sp
+    tstl    %d0
+    bnes    2f
+    movel   dx_rxlen,%d2
+    movel   %d2,%sp@-
+    clrl    %sp@-
+    pea     %fp@(-16)
+    jsr     0x4007bb76
+    lea.l   %sp@(12),%sp
+    pea     %fp@(-16)
+    movel   %d2,%sp@-
+    pea     DX_RXBUF
+    jsr     0x4007bb0a
+    lea.l   %sp@(12),%sp
+    pea     %fp@(-16)
+    jsr     0x4007e2f6
+    addql   #4,%sp
+    pea     %fp@(-16)
+    jsr     0x4007bc1c
+    addql   #4,%sp
+2:  clrl    dx_rxlen              | the next one may come
+    moveml  %sp@,%d2-%d3/%a2
+    unlk    %fp
+    rts
+
+| -> a0 = dx_rxpath: "/DX7/" + the first voice's name (letters, digits,
+| - and . kept, others _, trailing spaces off; "CART" if none) + " " + 4 hex
+| digits of the data's FNV-1a hash + ".syx". Clobbers d0/d1/a1.
+dx_rx_path:
+    movel   %d2,%sp@-
+    movel   %d3,%sp@-
+    lea.l   DX_RXBUF+6,%a0        | the data
+    movel   #4096,%d2
+    lea.l   %a0@(118),%a1         | a bulk dump's first voice's name
+    movel   dx_rxlen,%d0
+    cmpil   #4104,%d0
+    beqs    1f
+    movel   #155,%d2
+    lea.l   %a0@(145),%a1         | one voice's
+1:  movel   #0x811c9dc5,%d0       | FNV-1a over the data
+    movel   #0x01000193,%d3
+    subql   #1,%d2
+2:  moveq   #0,%d1
+    moveb   %a0@+,%d1
+    eorl    %d1,%d0
+    mulul   %d3,%d0
+    subql   #1,%d2
+    bpls    2b
+    movel   %d0,%d3               | the hash, kept
+    lea.l   dx_rxpath,%a0
+    moveb   #47,%a0@+             | /DX7/
+    moveb   #68,%a0@+
+    moveb   #88,%a0@+
+    moveb   #55,%a0@+
+    moveb   #47,%a0@+
+    movel   %a0,%d2               | where the name starts
+    moveq   #9,%d1
+3:  moveb   %a1@+,%d0
+    cmpib   #48,%d0
+    bcss    5f
+    cmpib   #58,%d0
+    bcss    4f                    | 0..9
+    cmpib   #65,%d0
+    bcss    5f
+    cmpib   #91,%d0
+    bcss    4f                    | A..Z
+    cmpib   #97,%d0
+    bcss    5f
+    cmpib   #123,%d0
+    bcss    4f                    | a..z
+5:  cmpib   #32,%d0
+    beqs    4f
+    cmpib   #45,%d0
+    beqs    4f
+    cmpib   #46,%d0
+    beqs    4f
+    moveq   #95,%d0               | _
+4:  moveb   %d0,%a0@+
+    subql   #1,%d1
+    bpls    3b
+6:  cmpl    %a0,%d2               | trailing spaces off
+    beqs    7f
+    moveb   %a0@(-1),%d0
+    cmpib   #32,%d0
+    bnes    8f
+    subql   #1,%a0
+    bras    6b
+7:  moveb   #67,%a0@+             | CART
+    moveb   #65,%a0@+
+    moveb   #82,%a0@+
+    moveb   #84,%a0@+
+8:  moveb   #32,%a0@+
+    moveq   #12,%d2               | 4 hex digits
+9:  movel   %d3,%d0
+    lsrl    %d2,%d0
+    andil   #15,%d0
+    addil   #48,%d0
+    cmpil   #58,%d0
+    bcss    10f
+    addql   #7,%d0
+10: moveb   %d0,%a0@+
+    subql   #4,%d2
+    bpls    9b
+    moveb   #46,%a0@+             | .syx
+    moveb   #115,%a0@+
+    moveb   #121,%a0@+
+    moveb   #120,%a0@+
+    clrb    %a0@
+    lea.l   dx_rxpath,%a0
+    movel   %sp@+,%d3
+    movel   %sp@+,%d2
+    rts
+
 | ---- the labels and the values the page shows ------------------------------
 | Rows as mi_swap's (apply_names set 7).
     .align 2
@@ -1712,3 +1937,6 @@ dx_p:      .space 6*16            | the four dials, Q15
 dx_hash:   .space 6*4             | the cartridge each track holds (its file's
                                   | hash; 0 the built-in one)
 dx_ptick:  .long 0                | dx_probe's block count
+dx_rxlen:  .long 0                | a dump waiting in DX_RXBUF (its length)
+dx_rxmsg:  .space 0x1c            | the UI-task message that writes it
+dx_rxpath: .space 40              | its file's path

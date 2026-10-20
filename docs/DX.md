@@ -9,8 +9,7 @@ detune, output levels and keyboard scaling, feedback, the LFO and the pitch
 envelope.
 
 **Status: verified on the host only (see [Verification](#verification)).
-Not yet tested on hardware: back up first.** Loading your own cartridges is
-the next step; this build plays the built-in one.
+Not yet tested on hardware: back up first.**
 
 ## Using it
 
@@ -46,6 +45,26 @@ cartridge made for this firmware, so no Yamaha voice is included:
 | 8 | SOFT PAD 1 | a slow, slightly detuned pad |
 | 9-32 | INIT VOICE | |
 
+**Your own cartridges.**
+
+1. **Put them on the Cycles.** Send DX7 `.syx` files to it over USB or MIDI
+   IN, from anything that sends SysEx: the
+   [DX Cartridge Sender](../flasher/dx.html) page (Chrome or Edge, next to
+   the web flasher), a SysEx librarian, or Dexed's "send" to a DX7. The
+   Cycles saves each dump in its `/DX7/` folder as
+   `<first voice's name> <4 hex digits>.syx`: a 32-voice cartridge, or a
+   single voice (which becomes voice 1 of a cartridge, INIT VOICE after it).
+   Send them one at a time, a second or two apart (the page does).
+2. **Load one onto a track.** Select a DX track, press **FUNCTION** +
+   **PRESET**, open `DX7` and choose a cartridge: "Cartridge loaded". Contour
+   now picks its 32 voices. Files from anywhere on the drive work too: a
+   bulk dump, a single voice, or a bare 4096-byte bank.
+3. **It stays with the pattern.** The pattern remembers the cartridge (its
+   sound's name reads `DX7` and the file's id) and loads it again with the
+   pattern or the project, as a Sampler track remembers its sample. Another
+   pattern can hold another cartridge. Deleting the file leaves those
+   patterns on the built-in cartridge.
+
 **Notes and the gate.** Each trig is a new note on the same voice: the
 envelopes start their attack from wherever they are (no click), and the
 operators restart their phase if the voice has key sync on. The envelopes
@@ -66,9 +85,11 @@ when it is released (the trig's length).
   brings every machine to (the DX7 ran at 49 kHz).
 - **Envelope timing** follows msfa's rate formula, scaled to this machine's
   blocks (within 0.4%).
-- **Loading cartridges** is not in this build yet. The plan: send DX7
-  `.syx` files to the Cycles, see them in the preset browser, and load one
-  with **FUNCTION** + **PRESET** onto a DX track; the pattern then keeps it.
+- **Cartridges** are loaded whole: a pattern holds one cartridge per
+  track, and Contour picks among its voices. Editing a voice on the Cycles
+  is limited to the three macros.
+- **Receiving** keeps one dump at a time: one that arrives while the last
+  is still being written is dropped (a second apart is plenty).
 
 ## How it works
 
@@ -130,6 +151,32 @@ cleared at boot.
 against the DX7's diagrams: its carriers, which operator modulates which,
 and the feedback.
 
+**Cartridges.**
+- **Receiving:** the MIDI task hands every complete SysEx message, from
+  USB and MIDI IN, to one handler through the pointer at `0x40112950`, the
+  SysEx entry of its dispatch table (stock `0x400812f6`, which answers the
+  universal and Elektron messages and drops everything else). `build.py`
+  points it at `dx_sysex`, which copies a DX7 bulk dump (4104 bytes) or
+  one-voice dump (163) out (the stock frees or reuses its buffer at once)
+  into `DX_RXBUF`, and posts a UI-task message. Anything else goes on to
+  the stock handler, untouched. Both paths assemble a whole message first
+  (MIDI IN up to 32,767 bytes, USB in a chain of 152-byte blocks).
+- **Saving:** `dx_rx_write`, in the UI task, writes it to
+  `/DX7/<name> <hash>.syx` (making the folder if needed) with the stock
+  file calls, as LFO CC's files are written. The name is the first voice's
+  (letters, digits, `-` and `.` kept), the hash the data's FNV-1a.
+- **Loading:** in the preset browser, the stock preset parse fails on such
+  a file, as on a sample; `preset_fail_hook` hands a DX track's file to
+  `dx_cload`. It finds the file by its hash in the inode table and reads
+  its first 16 KiB as the sample loader does (`DX_FBUF`). The first bulk
+  dump, one-voice dump (packed from the 155-byte to the 128-byte format) or
+  bare 4096-byte bank becomes the track's cartridge (`DX_CARTS`), 7-bit.
+- **The pattern:** `dx_nstore` writes "DX7" + the file's hash into the
+  sound's name, saved with the kit as the Sampler's "SMP" token is.
+  `dx_probe` (from `led_hook`, every 16th block) reads a track's cartridge
+  again when its token changes, or goes back to the built-in one; a file it
+  cannot read is not tried again until the token changes.
+
 **The labels and values.** `apply_names` set 7 puts up ALGO / ENV / FBHM /
 VOIC. Color's value prints the algorithm (`dx_algfmt`), Sweep's the feedback
 or the shift (`dx_swfmt`, Sweep's formatter swapped in and back), Contour's
@@ -179,6 +226,17 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   voice (copied into the track), and different voices sound different.
 - **Values:** Color prints VCE, A1..A32; Sweep FB0..FB7, VCE, +0..+24;
   Contour the voice's name, from the built-in or the track's own cartridge.
+- **Cartridges,** on a stand-in drive: a bulk dump with junk around it,
+  a single voice (packed to exactly the generator's 128 bytes, INIT VOICE
+  after it), a bare bank, 7-bit masking; a file that is no DX7 cartridge,
+  a missing one, a cut-short one. The token is written and read back; the
+  probe loads a pattern's cartridge, goes back to the built-in one, and
+  does not reread. The preset browser loads onto a DX track and says so.
+- **Receiving:** bulk and one-voice dumps from MIDI IN and USB are kept
+  and posted; identity, Elektron, wrong-channel, short and other-format
+  messages go on to the stock handler; one at a time. The file is
+  `/DX7/<name> <hash>.syx`, written whole and closed; a blank name is
+  CART.
 - **Bounds:** random voices, knobs, notes and gates stay within full scale.
 - **Plumbing:** `sampler_pre` routes 12 to `dx_params` (and the gate), the
   render calls `dx_fill`, the labels and the three formatters go in for DX
@@ -200,7 +258,12 @@ Needs hardware:
    cannot show.)
 5. **Color** turned while playing changes the routing at once; **Shape**
    makes FM PLUCK 1 snappier or a pad; **Sweep** adds feedback or clang.
-6. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
+6. **Cartridges:** send a cartridge with the DX Cartridge Sender (or a
+   librarian), then FUNCTION + PRESET on a DX track: it is in `/DX7/`, it
+   loads ("Cartridge loaded"), and Contour shows its voice names. Save the
+   project, load another, come back: the cartridge is still there. Another
+   pattern can have another. Elektron Transfer still connects and works.
+7. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
    no dropouts.
 
 ## Credits and licence

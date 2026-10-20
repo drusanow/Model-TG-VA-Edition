@@ -9913,12 +9913,13 @@ dbh_pass:
     OVL_MAX     = 0x40000         | the overlay: code and tables run from here
     OVL_BASE    = L34_KITS - OVL_MAX | (build.py links `.section .ovl` here;
                                   | boot_extra_hook copies it up from the image)
-    DX_BASE     = OVL_BASE - 0xC000 | DX (dx.inc): six cartridges of 4 KiB,
+    DX_BASE     = OVL_BASE - 0xE000 | DX (dx.inc): six cartridges of 4 KiB,
     DX_CARTS    = DX_BASE         | then the six tracks' state (DX_TS each);
     DX_TST      = DX_BASE + 0x6000 | cleared at boot (boot_extra_hook),
     DX_FBUF     = DX_BASE + 0x8000 | then 16 KiB for a cartridge file read
     DX_FBSZ     = 0x4000
-    DX_END      = DX_BASE + 0xC000
+    DX_RXBUF    = DX_BASE + 0xC000 | and 4 KiB+ for a dump arriving as SysEx
+    DX_END      = DX_BASE + 0xE000
     PCM_TOP     = DX_BASE         | samples and takes stay below this
     .globl  dx_base, dx_tst, dx_end
     dx_base     = DX_BASE

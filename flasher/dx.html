@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DX Cartridge Sender</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<meta name="description" content="Send DX7 cartridges (.syx) to a Model:Cycles running Model-TG Plaits Edition, for its DX machine.">
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #1c1c1a; --muted: #62625d; --card: #ffffff; --line: #deded8;
+    --accent: #2f6f4f; --accent-fg: #ffffff; --warn-bg: #fff6e0; --warn-line: #e8c56a;
+    --err: #a3281f; --bar: #e6e6e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --fg: #ececea; --muted: #a2a29c; --card: #1f1f1e; --line: #33332f;
+      --accent: #5fb38a; --accent-fg: #0f1a14; --warn-bg: #2b2412; --warn-line: #7a6326;
+      --err: #ff8a80; --bar: #33332f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; margin: 0 0 16px;
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  .card p { margin: 0 0 10px; }
+  .card p:last-child { margin-bottom: 0; }
+  ol { margin: 0; padding-left: 1.3em; }
+  li { margin: 0 0 6px; }
+  a { color: var(--accent); }
+  select { font: inherit; padding: 6px 8px; max-width: 100%; }
+  .drop {
+    display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 22px 16px;
+    text-align: center; cursor: pointer; color: var(--muted); position: relative;
+  }
+  .drop.over, .drop:focus-within { border-color: var(--accent); color: var(--fg); }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .drop strong { color: var(--fg); }
+  .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+  #status { min-height: 1.5em; color: var(--muted); white-space: pre-line; }
+  #status.err { color: var(--err); }
+  .btn {
+    display: inline-block; background: var(--accent); color: var(--accent-fg); border: 0;
+    border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  ul.files { margin: 8px 0 0; padding-left: 1.2em; color: var(--muted); }
+  footer { color: var(--muted); font-size: 0.85rem; margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>DX Cartridge Sender</h1>
+  <p class="sub">For the DX machine of Model-TG Plaits Edition.</p>
+
+  <div class="card">
+    <h2>How it works</h2>
+    <ol>
+      <li>Connect the Cycles over USB and open this page in Chrome or Edge (Web MIDI with
+        SysEx). Allow MIDI access when asked.</li>
+      <li>Choose the Cycles' MIDI port and drop DX7 <code>.syx</code> files: 32-voice
+        cartridges, single voices, or bare 4096-byte banks.</li>
+      <li>Press <strong>Send</strong>. The Cycles saves each one in its <code>/DX7/</code>
+        folder, named after its first voice.</li>
+      <li>On the Cycles, select a DX track, press <strong>FUNCTION</strong> +
+        <strong>PRESET</strong>, open <code>DX7</code> and choose a cartridge. Contour picks
+        its voices; the pattern keeps it.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>1. MIDI port</h2>
+    <p><select id="port"><option>Asking for MIDI access…</option></select></p>
+  </div>
+
+  <div class="card">
+    <h2>2. Cartridges</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".syx,.SYX,.bin" multiple>
+      <strong>Choose .syx files</strong> or drop them here
+    </label>
+    <ul class="files" id="list"></ul>
+  </div>
+
+  <div class="card">
+    <h2>3. Send</h2>
+    <p><button class="btn" id="send" disabled>Send</button></p>
+    <div class="bar"><div id="prog"></div></div>
+    <p id="status"></p>
+  </div>
+
+  <footer>Only the DX7 dumps in each file are sent (F0 43 … F7), one every two seconds so the
+    Cycles has saved the last one. Nothing is sent anywhere but your MIDI port.</footer>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let access = null, dumps = [];
+
+function status(text, err) {
+  $("status").textContent = text;
+  $("status").className = err ? "err" : "";
+}
+
+// The DX7 dumps in a file: 32-voice bulk dumps (F0 43 0n 09 20 00, 4104 bytes),
+// one-voice dumps (F0 43 0n 00 01 1B, 163 bytes), or a bare 4096-byte bank
+// (wrapped as a bulk dump, with its checksum).
+function dumpsIn(bytes) {
+  const out = [];
+  for (let i = 0; i + 6 <= bytes.length; i++) {
+    if (bytes[i] !== 0xf0 || bytes[i + 1] !== 0x43 || (bytes[i + 2] & 0xf0)) continue;
+    const f = (bytes[i + 3] << 16) | (bytes[i + 4] << 8) | bytes[i + 5];
+    const n = f === 0x092000 ? 4104 : f === 0x00011b ? 163 : 0;
+    if (n && i + n <= bytes.length && bytes[i + n - 1] === 0xf7) {
+      out.push(bytes.slice(i, i + n));
+      i += n - 1;
+    }
+  }
+  if (!out.length && bytes.length === 4096) {
+    const m = new Uint8Array(4104);
+    m.set([0xf0, 0x43, 0x00, 0x09, 0x20, 0x00]);
+    let sum = 0;
+    for (let k = 0; k < 4096; k++) { m[6 + k] = bytes[k] & 0x7f; sum += m[6 + k]; }
+    m[4102] = (-sum) & 0x7f;
+    m[4103] = 0xf7;
+    out.push(m);
+  }
+  return out;
+}
+
+function firstName(d) {
+  const at = d.length === 4104 ? 6 + 118 : 6 + 145;
+  return String.fromCharCode(...d.slice(at, at + 10)).replace(/[^\x20-\x7e]/g, "?").trim();
+}
+
+async function addFiles(files) {
+  for (const f of files) {
+    const b = new Uint8Array(await f.arrayBuffer());
+    const found = dumpsIn(b);
+    const li = document.createElement("li");
+    if (!found.length) {
+      li.textContent = `${f.name}: no DX7 cartridge in it`;
+    } else {
+      for (const d of found) dumps.push({ file: f.name, data: d });
+      li.textContent = `${f.name}: ` + found.map((d) =>
+        (d.length === 4104 ? "32 voices, " : "1 voice, ") + `"${firstName(d)}"`).join("; ");
+    }
+    $("list").appendChild(li);
+  }
+  $("send").disabled = !dumps.length || !access;
+}
+
+function fillPorts() {
+  const sel = $("port");
+  sel.innerHTML = "";
+  const outs = [...access.outputs.values()];
+  for (const o of outs) {
+    const opt = document.createElement("option");
+    opt.value = o.id;
+    opt.textContent = o.name;
+    if (/cycles|elektron/i.test(o.name)) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (!outs.length) sel.innerHTML = "<option>No MIDI output: connect the Cycles</option>";
+  $("send").disabled = !dumps.length || !outs.length;
+}
+
+async function send() {
+  const out = access.outputs.get($("port").value);
+  if (!out) return status("Choose the Cycles' MIDI port.", true);
+  $("send").disabled = true;
+  for (let i = 0; i < dumps.length; i++) {
+    status(`Sending ${i + 1} of ${dumps.length}: "${firstName(dumps[i].data)}" (${dumps[i].file})`);
+    out.send(dumps[i].data);
+    $("prog").style.width = `${100 * (i + 1) / dumps.length}%`;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  status(`Sent ${dumps.length}. On the Cycles: FUNCTION + PRESET, folder DX7.`);
+  $("send").disabled = false;
+}
+
+$("file").addEventListener("change", (ev) => addFiles(ev.target.files));
+const drop = $("drop");
+drop.addEventListener("dragover", (ev) => { ev.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (ev) => {
+  ev.preventDefault();
+  drop.classList.remove("over");
+  addFiles(ev.dataTransfer.files);
+});
+$("send").addEventListener("click", send);
+
+if (!navigator.requestMIDIAccess) {
+  $("port").innerHTML = "<option>This browser has no Web MIDI: use Chrome or Edge</option>";
+} else {
+  navigator.requestMIDIAccess({ sysex: true }).then((a) => {
+    access = a;
+    fillPorts();
+    a.onstatechange = fillPorts;
+  }, () => {
+    $("port").innerHTML = "<option>MIDI access refused</option>";
+  });
+}
+</script>
+</body>
+</html>

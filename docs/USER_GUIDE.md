@@ -396,8 +396,15 @@ LFO on Contour near an engine's edge may now reach its neighbour. Details:
 *Plaits Edition only.* The thirteenth machine: one 6-operator FM voice per
 track, after the DX7 (as Dexed's engine models it). It plays DX7 voices; this
 build has a built-in cartridge of its own voices (INIT VOICE, E.PIANO MT,
-SYN BASS 1, GLASS BELL, BRASS SWEL, DRAWBARS 1, FM PLUCK 1, SOFT PAD 1).
-Loading your own cartridges is coming.
+SYN BASS 1, GLASS BELL, BRASS SWEL, DRAWBARS 1, FM PLUCK 1, SOFT PAD 1), and
+your own cartridges:
+
+1. Send DX7 `.syx` files to the Cycles over USB or MIDI IN (the
+   [DX Cartridge Sender](../flasher/dx.html) page, a SysEx librarian, or
+   Dexed). Each is saved in `/DX7/`, named after its first voice.
+2. On a DX track, **FUNCTION** + **PRESET**, open `DX7`, choose one:
+   "Cartridge loaded". Contour picks its voices.
+3. The pattern keeps it, and loads it again with the project.
 
 | knob | label | does |
 |---|---|---|
