@@ -419,6 +419,194 @@ class TVoices(unittest.TestCase):
         self.assertLess(worst, 7200)
 
 
+# ---- a drive, as the sample loader reads it (model_tg.s: load_at) ------------
+TABLE_BLOCK, DATA_BASE = 1835088, 1851472
+SOUNDS = SCRATCH + 0x70000                      # stand-ins for the tracks' sounds
+
+
+class Drive:
+    """readBlocks (0x4008b24a) and sound_obj answered from Python: files by
+    hash in the inode table's first page, their data in 16 KiB chunks"""
+    def __init__(self, e):
+        self.e, self.blocks, self.files, self.reads = e, {}, [], 0
+        e.uc.hook_add(UC_HOOK_CODE, self._read, begin=0x4008b24a, end=0x4008b24a)
+        so = e.sym['sound_obj']
+        e.uc.hook_add(UC_HOOK_CODE, self._sound, begin=so, end=so)
+
+    def add(self, hsh, data):
+        chunk = 5 + 4 * len(self.files)
+        self.files.append((hsh, len(data), chunk))
+        for i in range(0, len(data) + 511, 512):
+            self.blocks[DATA_BASE + chunk * 32 + i // 512] = data[i:i + 512].ljust(512, b'\0')
+
+    def _read(self, uc, addr, size, _):
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        block, n, dest = struct.unpack('>3I', uc.mem_read(sp + 4, 12))
+        self.reads += 1
+        if TABLE_BLOCK <= block < TABLE_BLOCK + 128 * 128:
+            page = bytearray(n)
+            if block == TABLE_BLOCK:
+                for i, (h, size_, chunk) in enumerate(self.files):
+                    r = 128 * (i + 3)
+                    page[r:r + 4] = struct.pack('>I', 0x00020001)
+                    page[r + 4:r + 8] = struct.pack('>I', size_)
+                    page[r + 12:r + 16] = struct.pack('>I', h)
+                    page[r + 36:r + 44] = struct.pack('>II', (size_ + 16383) // 16384, chunk)
+            uc.mem_write(dest, bytes(page))
+        else:
+            uc.mem_write(dest, b''.join(self.blocks.get(block + i, bytes(512))
+                                        for i in range(n // 512)))
+        uc.reg_write(UC_M68K_REG_D0, 0)
+
+    def _sound(self, uc, addr, size, _):
+        t = uc.reg_read(UC_M68K_REG_D0)
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        uc.reg_write(UC_M68K_REG_D0, SOUNDS + 0x100 * t if t < 6 else 0)
+        uc.reg_write(UC_M68K_REG_PC, struct.unpack('>I', uc.mem_read(sp, 4))[0])
+        uc.reg_write(UC_M68K_REG_A7, sp + 4)
+
+
+def bulk(voices, ch=0):
+    data = b''.join(voices)
+    return bytes([0xf0, 0x43, ch, 0x09, 0x20, 0x00]) + data + \
+        bytes([(-sum(data)) & 0x7f, 0xf7])
+
+
+def vced(name, ops, alg=1, fb=0, oks=1, peg_r=(99,) * 4, peg_l=(50,) * 4,
+         lfo=(35, 0, 0, 0, 1, 0), pms=3, tr=24):
+    """one voice, unpacked (155 bytes), from the generator's op() dicts"""
+    ops = list(ops) + [op()] * (6 - len(ops))
+    b = bytearray()
+    for o in reversed(ops):
+        b += bytes(o['r']) + bytes(o['l']) + bytes([o['bp'], o['ld'], o['rd'], o['lc'], o['rc'],
+                                                    o['rs'], o['ams'], o['kvs'], o['ol'], o['mode'],
+                                                    o['coarse'], o['fine'], o['det']])
+    b += bytes(peg_r) + bytes(peg_l) + bytes([alg - 1, fb, oks]) + bytes(lfo[:4]) + \
+        bytes([lfo[4], lfo[5], pms, tr]) + name.ljust(10)[:10].encode()
+    assert len(b) == 155
+    return bytes(b)
+
+
+class TCartridges(unittest.TestCase):
+    H = 0xABCD1234
+
+    def cart(self, e, t):
+        return bytes(e.uc.mem_read(e.sym['dx_base'] + 4096 * t, 4096))
+
+    def st(self, e, t, off):
+        return e.r32(e.sym['dx_tst'] + 512 * t + off)
+
+    def load(self, data, t=2):
+        e = emu()
+        d = Drive(e)
+        d.add(0x11111111, b'not this one')
+        d.add(self.H, data)
+        e.run('dx_cload', regs={D[0]: t, D[1]: self.H})
+        return e, e.d(0)
+
+    def test_bulk_dump(self):
+        vs = [G.voice('V%d' % i, [op(ol=60 + i)]) for i in range(32)]
+        e, r = self.load(b'\xf8\x00' + bulk(vs, ch=3) + b'\xf0\x7e\xf7')  # junk around it
+        self.assertEqual(r, 0)
+        self.assertEqual(self.cart(e, 2), b''.join(vs))
+        self.assertEqual((self.st(e, 2, 56), self.st(e, 2, 60)), (1, 1))
+        dials(e, 2, voice=7)                            # it plays: voice 8 is V7
+        render(e, 2, t=2)
+        self.assertEqual(bytes(e.uc.mem_read(e.sym['dx_tst'] + 512 * 2 + 64 + 118, 10)),
+                         b'V7'.ljust(10))
+
+    def test_single_voice_and_bare_bank(self):
+        ops = [op(ol=99, coarse=3, fine=21, det=11, r=(90, 80, 70, 60), l=(99, 88, 77, 0),
+                  bp=41, ld=12, rd=34, lc=1, rc=2, rs=5, ams=2, kvs=6, mode=0),
+               op(ol=77, mode=1, coarse=2, fine=50)]
+        kw = dict(alg=17, fb=6, oks=0, peg_r=(10, 20, 30, 40), peg_l=(45, 55, 65, 50),
+                  lfo=(33, 44, 55, 66, 1, 3), pms=5, tr=30)
+        one_v = vced('VCED TEST', ops, **kw)
+        msg = bytes([0xf0, 0x43, 0x00, 0x00, 0x01, 0x1b]) + one_v + bytes([0, 0xf7])
+        e, r = self.load(msg)
+        self.assertEqual(r, 0)
+        c = self.cart(e, 2)
+        self.assertEqual(c[:128], G.voice('VCED TEST', ops, **kw))   # packed exactly
+        self.assertEqual(c[128:256], G.voices()[:128])                # then INIT VOICE
+        self.assertEqual(c[-128:], G.voices()[:128])
+        vs = [G.voice('BANK%d' % i, [op(ol=99)]) for i in range(32)]
+        e, r = self.load(b''.join(vs))
+        self.assertEqual((r, self.cart(e, 2)), (0, b''.join(vs)))
+
+    def test_not_a_cartridge_or_missing(self):
+        e, r = self.load(b'RIFF' + bytes(5000))
+        self.assertEqual((r, self.st(e, 2, 56)), (2, 0))
+        e, r = self.load(bytes([0xf0, 0x41, 0, 9, 0x20, 0]) + bytes(4098))   # Roland's
+        self.assertEqual(r, 2)
+        e = emu()
+        Drive(e).add(0x22222222, bulk([G.voice('X', [op()])] * 32))
+        e.run('dx_cload', regs={D[0]: 1, D[1]: self.H})
+        self.assertEqual(e.d(0), 1)
+        e.run('dx_cload', regs={D[0]: 1, D[1]: 0})
+        self.assertEqual(e.d(0), 1)
+        e, r = self.load(bulk([G.voice('Y', [op()])] * 32)[:3000])        # cut short
+        self.assertEqual(r, 2)
+
+    def test_7bit_data(self):
+        vs = [bytes(range(128))] * 32
+        raw = bytearray(b''.join(vs))
+        raw[5] |= 0x80                                   # a stray top bit: dropped
+        e, r = self.load(bytes(raw))
+        self.assertEqual(r, 0)
+        self.assertEqual(self.cart(e, 2)[5], 5)
+
+    def test_token_and_probe(self):
+        e = emu(); s = e.sym
+        d = Drive(e)
+        vs = [G.voice('PROBE%d' % i, [op(ol=99)]) for i in range(32)]
+        d.add(self.H, bulk(vs))
+        for t in range(6):                               # DX on tracks 1 and 4
+            e.w8(SOUNDS + 0x100 * t + 38, DX if t in (1, 4) else 6)
+        e.run('dx_nstore', regs={D[0]: 1, D[1]: self.H})
+        self.assertEqual(bytes(e.uc.mem_read(SOUNDS + 0x100 + 4, 12)), b'DX7ABCD1234\0')
+        self.assertEqual(e.r32(s['dx_hash'] + 4), self.H)
+        e.uc.mem_write(SOUNDS + 0x400 + 4, b'DX7ABCD1234\0')   # track 4: as a pattern
+        e.uc.mem_write(SOUNDS + 0x300 + 4, b'DX7ABCD1234\0')   # track 3 is no DX
+        for _ in range(16):
+            e.run('dx_probe')
+        self.assertEqual(self.cart(e, 4), b''.join(vs))
+        self.assertEqual((self.st(e, 4, 56), e.r32(s['dx_hash'] + 16)), (1, self.H))
+        self.assertEqual(self.st(e, 3, 56), 0)
+        n = d.reads
+        for _ in range(32):                              # nothing new: no reads
+            e.run('dx_probe')
+        self.assertEqual(d.reads, n)
+        e.uc.mem_write(SOUNDS + 0x400 + 4, b'Init\0')     # a pattern without one:
+        for _ in range(16):                              # the built-in cartridge
+            e.run('dx_probe')
+        self.assertEqual((self.st(e, 4, 56), self.st(e, 4, 60)), (0, 1))
+        e.uc.mem_write(SOUNDS + 0x400 + 4, b'DX7DEADBEEF\0')  # gone from the drive:
+        for _ in range(16):                              # built-in, and no retries
+            e.run('dx_probe')
+        self.assertEqual(self.st(e, 4, 56), 0)
+        n = d.reads
+        for _ in range(32):
+            e.run('dx_probe')
+        self.assertEqual(d.reads, n)
+
+    def test_preset_browser_loads_onto_a_dx_track(self):
+        e = emu(); s = e.sym
+        d = Drive(e)
+        vs = [G.voice('BROWSE%d' % i, [op(ol=99)]) for i in range(32)]
+        d.add(self.H, bulk(vs))
+        e.w8(SOUNDS + 0x200 + 38, DX)                    # track 2 is a DX
+        e.w32(s['sel_hash'], self.H)
+        rd = lambda: bytes(e.uc.mem_read(s['msg_buf'], 32)).split(b'\0')[0].decode()
+        e.run('preset_fail_hook', regs={D[0]: 1}, stack=[0, 0, 2])
+        self.assertEqual(rd(), 'Cartridge\nloaded')
+        self.assertEqual(self.cart(e, 2), b''.join(vs))
+        self.assertEqual(bytes(e.uc.mem_read(SOUNDS + 0x200 + 4, 11)), b'DX7ABCD1234')
+        e.w32(s['sel_hash'], 0x11111111)                 # a file that is no cartridge
+        d.add(0x11111111, b'hello' * 10)
+        e.run('preset_fail_hook', regs={D[0]: 1}, stack=[0, 0, 2])
+        self.assertEqual(rd(), 'Not a DX7\ncartridge')
+
+
 class TPlumbing(unittest.TestCase):
     def test_pre_routes_dx(self):
         import test_va as V

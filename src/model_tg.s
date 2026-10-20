@@ -9913,10 +9913,12 @@ dbh_pass:
     OVL_MAX     = 0x40000         | the overlay: code and tables run from here
     OVL_BASE    = L34_KITS - OVL_MAX | (build.py links `.section .ovl` here;
                                   | boot_extra_hook copies it up from the image)
-    DX_BASE     = OVL_BASE - 0x8000 | DX (dx.inc): six cartridges of 4 KiB,
+    DX_BASE     = OVL_BASE - 0xC000 | DX (dx.inc): six cartridges of 4 KiB,
     DX_CARTS    = DX_BASE         | then the six tracks' state (DX_TS each);
-    DX_TST      = DX_BASE + 0x6000 | cleared at boot (boot_extra_hook)
-    DX_END      = DX_BASE + 0x8000
+    DX_TST      = DX_BASE + 0x6000 | cleared at boot (boot_extra_hook),
+    DX_FBUF     = DX_BASE + 0x8000 | then 16 KiB for a cartridge file read
+    DX_FBSZ     = 0x4000
+    DX_END      = DX_BASE + 0xC000
     PCM_TOP     = DX_BASE         | samples and takes stay below this
     .globl  dx_base, dx_tst, dx_end
     dx_base     = DX_BASE
@@ -19570,6 +19572,7 @@ led_hook:
     jsr     atk_watch
     jsr     gran_watch
     jsr     mi_watch
+    jsr     dx_probe
     jsr     slice_watch
     jsr     name_probe
     jsr     load_pending
@@ -20513,6 +20516,16 @@ preset_fail_hook:
     bccw    pf_need
     lea.l   sel_track,%a0
     movel   %d2,%a0@
+    movel   %d2,%d0               | a DX track: a cartridge (dx.inc)
+    jsr     sound_obj
+    tstl    %d0
+    beqs    pf_ndx
+    movea.l %d0,%a0
+    moveq   #0,%d0
+    moveb   %a0@(38),%d0
+    cmpil   #DX_MACH,%d0
+    beqw    pf_dx
+pf_ndx:
     jsr     any_sampler
     tstl    %d0
     beqw    pf_need
@@ -20553,6 +20566,28 @@ pf_okn:
     moveb   %d1,%a1@+
     clrb    %a1@
     braw    pf_after
+pf_dx:
+    lea.l   sel_hash,%a0
+    movel   %a0@,%d3
+    lea.l   msg_dx_nf,%a0
+    beqw    pf_msg
+    movel   %d2,%d0
+    movel   %d3,%d1
+    jsr     dx_cload
+    lea.l   msg_dx_nf,%a0
+    cmpil   #1,%d0
+    beqw    pf_msg
+    lea.l   msg_dx_no,%a0
+    cmpil   #2,%d0
+    beqw    pf_msg
+    lea.l   msg_dx_rd,%a0
+    tstl    %d0
+    bnew    pf_msg
+    movel   %d2,%d0
+    movel   %d3,%d1
+    jsr     dx_nstore             | the pattern keeps it
+    lea.l   msg_dx_ok,%a0
+    braw    pf_msg
 pf_need:
     lea.l   msg_need,%a0
     bras    pf_msg
@@ -20902,6 +20937,10 @@ sel_size:   .long 0
 msg_ok:     .asciz "Sample loaded\nto track "
 msg_need:   .asciz "Select sample\nmachine first!"
 msg_bad:    .asciz "Sample load\nfailed"
+msg_dx_ok:  .asciz "Cartridge\nloaded"
+msg_dx_no:  .asciz "Not a DX7\ncartridge"
+msg_dx_nf:  .asciz "Cartridge\nnot found"
+msg_dx_rd:  .asciz "Cartridge\nread error"
 msg_e_nf:   .asciz "Not in sample\nindex"
 msg_e_mem:  .asciz "Not enough\nmemory"
 msg_e_fmt:  .asciz "Not 48kHz\nmono"

@@ -1141,6 +1141,409 @@ dx_peg:
     movel   %sp@+,%d2
     rts
 
+| ---- cartridges: a file from the drive onto a track -------------------------
+| d0 = track, d1 = a file's hash (the browser's sel_hash, or a pattern's
+| token) -> d0 = 0 loaded, 1 not found, 2 not a DX7 file, 3 a read error.
+| The file is found in the inode table and its first 16 KiB read as the
+| sample loader does (load_at: TBL_BUF, readBlocks 0x4008b24a), into DX_FBUF.
+| Then the first of these, scanning it, becomes the track's cartridge:
+|   F0 43 0n 09 20 00 + 4096 bytes   a 32-voice bulk dump (VMEM)
+|   F0 43 0n 00 01 1B + 155 bytes    one voice (VCED): voice 1, INIT after it
+|   exactly 4096 bytes               a bare VMEM bank
+| UI context only (the browser, dx_probe). Keeps d2-d7/a2-a6.
+    .globl  dx_cload
+dx_cload:
+    lea.l   %sp@(-32),%sp
+    moveml  %d2-%d7/%a2-%a3,%sp@
+    movel   %d0,%d6               | track
+    movel   %d1,%d2               | hash
+    beqw    dcl_nf
+    movea.l #TBL_BUF,%a3
+    movel   #TABLE_BLOCK,%d7
+dcl_page:
+    movel   #TABLE_END,%d0
+    cmpl    %d7,%d0
+    blsw    dcl_nf
+    movel   %a3,%sp@-
+    pea     65536
+    movel   %d7,%sp@-
+    jsr     0x4008b24a
+    lea.l   %sp@(12),%sp
+    tstl    %d0
+    bnew    dcl_rd
+    movea.l %a3,%a2
+    movel   #512,%d3
+dcl_rec:
+    movel   %a2@,%d0
+    cmpil   #0x00020001,%d0
+    bnes    1f
+    movel   %a2@(12),%d0
+    cmpl    %d2,%d0
+    beqs    dcl_found
+1:  lea.l   %a2@(128),%a2
+    subql   #1,%d3
+    bnes    dcl_rec
+    addil   #128,%d7
+    bras    dcl_page
+dcl_found:
+    movel   %a2@(4),%d3           | its size, at most 16 KiB of it
+    beqw    dcl_no
+    cmpil   #DX_FBSZ,%d3
+    blss    2f
+    movel   #DX_FBSZ,%d3
+2:  movel   %a2@(40),%d7          | its first chunk -> block
+    lsll    #5,%d7
+    addil   #DATA_BASE,%d7
+    movel   %d3,%d0
+    addil   #511,%d0
+    andil   #0xfffffe00,%d0
+    pea     DX_FBUF
+    movel   %d0,%sp@-
+    movel   %d7,%sp@-
+    jsr     0x4008b24a
+    lea.l   %sp@(12),%sp
+    tstl    %d0
+    bnew    dcl_rd
+    | a bulk dump?
+    lea.l   DX_FBUF,%a2
+    movel   %d3,%d4
+    subil   #4104,%d4             | the last start it could have
+    bmis    dcl_one
+3:  bsr     dx_is_hdr
+    cmpil   #0x0920,%d0
+    bnes    4f
+    tstb    %a2@(5)
+    beqs    dcl_bulk
+4:  addql   #1,%a2
+    subql   #1,%d4
+    bpls    3b
+dcl_one:
+    lea.l   DX_FBUF,%a2           | one voice?
+    movel   %d3,%d4
+    subil   #163,%d4
+    bmis    dcl_raw
+5:  bsr     dx_is_hdr
+    cmpil   #0x0001,%d0
+    bnes    6f
+    moveb   %a2@(5),%d0
+    cmpib   #0x1b,%d0
+    beqs    dcl_vced
+6:  addql   #1,%a2
+    subql   #1,%d4
+    bpls    5b
+dcl_raw:
+    cmpil   #4096,%d3             | a bare bank
+    bnew    dcl_no
+    lea.l   DX_FBUF-6,%a2
+dcl_bulk:
+    bsr     dx_cart_of            | -> a1 = the track's cartridge, unloaded
+    lea.l   %a2@(6),%a0
+    movel   #4095,%d0
+7:  moveb   %a0@+,%d1
+    andil   #0x7f,%d1
+    moveb   %d1,%a1@+
+    subql   #1,%d0
+    bpls    7b
+    braw    dcl_ok
+dcl_vced:
+    bsr     dx_cart_of
+    lea.l   %a2@(6),%a0
+    bsr     dx_vced               | voice 1
+    lea.l   %a1@(128),%a1         | INIT VOICE for the rest
+    moveq   #30,%d1
+8:  lea.l   dx_cart,%a0
+    moveq   #31,%d0
+9:  movel   %a0@+,%a1@+
+    subql   #1,%d0
+    bpls    9b
+    subql   #1,%d1
+    bpls    8b
+dcl_ok:
+    movel   %d6,%d0               | in use: the track reloads its voice
+    moveq   #9,%d1
+    lsll    %d1,%d0
+    lea.l   DX_TST,%a0
+    adda.l  %d0,%a0
+    moveq   #1,%d0
+    movel   %d0,%a0@(56)
+    movel   %d0,%a0@(60)
+    moveq   #0,%d0
+    bras    dcl_out
+dcl_nf:
+    moveq   #1,%d0
+    bras    dcl_out
+dcl_no:
+    moveq   #2,%d0
+    bras    dcl_out
+dcl_rd:
+    moveq   #3,%d0
+dcl_out:
+    moveml  %sp@,%d2-%d7/%a2-%a3
+    lea.l   %sp@(32),%sp
+    rts
+
+| a2 -> d0 = (byte 3 << 8) | byte 4 if a2 holds F0 43 0n (n a channel),
+| else -1. Clobbers d1.
+dx_is_hdr:
+    moveq   #-1,%d0
+    moveb   %a2@,%d1
+    cmpib   #0xf0,%d1
+    bnes    1f
+    moveb   %a2@(1),%d1
+    cmpib   #0x43,%d1
+    bnes    1f
+    moveb   %a2@(2),%d1
+    andil   #0xf0,%d1
+    bnes    1f
+    moveq   #0,%d0
+    moveb   %a2@(3),%d0
+    lsll    #8,%d0
+    moveb   %a2@(4),%d1
+    andil   #0xff,%d1
+    orl     %d1,%d0
+1:  rts
+
+| d6 = track -> a1 = its cartridge (DX_CARTS + 4 KiB x track), marked not
+| loaded while it is written (the audio reads the built-in one meanwhile).
+| Clobbers d0/a0.
+dx_cart_of:
+    movel   %d6,%d0
+    moveq   #9,%d1
+    lsll    %d1,%d0
+    lea.l   DX_TST,%a0
+    clrl    %a0@(56,%d0:l)
+    movel   %d6,%d0
+    moveq   #12,%d1
+    lsll    %d1,%d0
+    lea.l   DX_CARTS,%a1
+    adda.l  %d0,%a1
+    rts
+
+| a0 = one voice unpacked (VCED, 155 bytes) -> a1 = it packed (VMEM, 128).
+| Keeps a0/a1. Clobbers d0/d1.
+dx_vced:
+    movel   %a2,%sp@-
+    movel   %d2,%sp@-
+    movel   %a0,%sp@-
+    movel   %a1,%sp@-
+    moveq   #5,%d2
+dxv_op:
+    moveq   #10,%d1               | rates, levels, break point, depths
+2:  moveb   %a0@+,%d0
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    subql   #1,%d1
+    bpls    2b
+    moveb   %a0@(1),%d0           | right curve << 2 | left curve
+    andil   #3,%d0
+    lsll    #2,%d0
+    moveb   %a0@,%d1
+    andil   #3,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(9),%d0           | detune << 3 | rate scaling
+    andil   #15,%d0
+    lsll    #3,%d0
+    moveb   %a0@(2),%d1
+    andil   #7,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(4),%d0           | key velocity sens << 2 | amp mod sens
+    andil   #7,%d0
+    lsll    #2,%d0
+    moveb   %a0@(3),%d1
+    andil   #3,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(5),%d0           | output level
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(7),%d0           | coarse << 1 | mode
+    andil   #31,%d0
+    addl    %d0,%d0
+    moveb   %a0@(6),%d1
+    andil   #1,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(8),%d0           | fine
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    lea.l   %a0@(10),%a0          | the next operator (21 bytes in all)
+    subql   #1,%d2
+    bplw    dxv_op
+    moveq   #7,%d1                | the pitch EG
+3:  moveb   %a0@+,%d0
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    subql   #1,%d1
+    bpls    3b
+    moveb   %a0@+,%d0             | algorithm
+    andil   #31,%d0
+    moveb   %d0,%a1@+
+    moveb   %a0@(1),%d0           | osc key sync << 3 | feedback
+    andil   #1,%d0
+    lsll    #3,%d0
+    moveb   %a0@,%d1
+    andil   #7,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    addql   #2,%a0
+    moveq   #3,%d1                | LFO speed, delay, PMD, AMD
+4:  moveb   %a0@+,%d0
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    subql   #1,%d1
+    bpls    4b
+    moveb   %a0@(2),%d0           | PMS << 4 | wave << 1 | sync
+    andil   #7,%d0
+    lsll    #4,%d0
+    moveb   %a0@(1),%d1
+    andil   #7,%d1
+    addl    %d1,%d1
+    orl     %d1,%d0
+    moveb   %a0@,%d1
+    andil   #1,%d1
+    orl     %d1,%d0
+    moveb   %d0,%a1@+
+    addql   #3,%a0
+    moveq   #10,%d1               | transpose and the name
+5:  moveb   %a0@+,%d0
+    andil   #0x7f,%d0
+    moveb   %d0,%a1@+
+    subql   #1,%d1
+    bpls    5b
+    movea.l %sp@+,%a1
+    movea.l %sp@+,%a0
+    movel   %sp@+,%d2
+    movea.l %sp@+,%a2
+    rts
+
+| ---- a pattern's cartridge: its token in the sound's name -------------------
+| As the Sampler's "SMP" token (name_store): the 16 bytes at sound+4 are the
+| preset name, saved with the pattern. A DX track carries "DX7" + the
+| cartridge file's hash in 8 hex digits; none means the built-in cartridge.
+| d0 = track, d1 = hash. Plain stores. Keeps d2-d7/a2-a6.
+    .globl  dx_nstore
+dx_nstore:
+    movel   %d2,%sp@-
+    movel   %d3,%sp@-
+    movel   %d1,%d3
+    lea.l   dx_hash,%a0           | what the track holds now, so dx_probe
+    movel   %d1,%a0@(0,%d0:l:4)   | does not read it again
+    jsr     sound_obj
+    tstl    %d0
+    beqs    3f
+    movea.l %d0,%a0
+    addql   #4,%a0
+    moveb   #68,%a0@+             | DX7
+    moveb   #88,%a0@+
+    moveb   #55,%a0@+
+    moveq   #28,%d2
+1:  movel   %d3,%d0
+    lsrl    %d2,%d0
+    andil   #15,%d0
+    addil   #48,%d0
+    cmpil   #58,%d0
+    bcss    2f
+    addql   #7,%d0
+2:  moveb   %d0,%a0@+
+    subql   #4,%d2
+    bpls    1b
+    clrb    %a0@
+3:  movel   %sp@+,%d3
+    movel   %sp@+,%d2
+    rts
+
+| a0 = a sound -> d0 = the hash its "DX7" token names, or 0. Clobbers d1, a0.
+dx_tok:
+    movel   %d2,%sp@-
+    moveq   #0,%d0
+    moveb   %a0@(4),%d1
+    cmpib   #68,%d1
+    bnes    9f
+    moveb   %a0@(5),%d1
+    cmpib   #88,%d1
+    bnes    9f
+    moveb   %a0@(6),%d1
+    cmpib   #55,%d1
+    bnes    9f
+    lea.l   %a0@(7),%a0
+    moveq   #7,%d2
+1:  moveq   #0,%d1
+    moveb   %a0@+,%d1
+    subil   #48,%d1
+    bmis    8f
+    cmpil   #10,%d1
+    bcss    2f
+    subql   #7,%d1
+    cmpil   #10,%d1
+    bcss    8f
+    cmpil   #16,%d1
+    bccs    8f
+2:  lsll    #4,%d0
+    orl     %d1,%d0
+    subql   #1,%d2
+    bpls    1b
+    bras    9f
+8:  moveq   #0,%d0
+9:  movel   %sp@+,%d2
+    rts
+
+| From led_hook, every 16th block (UI context): each DX track whose token
+| names another cartridge than the one it holds - a pattern changed, a
+| project loaded - reads it (dx_cload), or goes back to the built-in one.
+| A file that cannot be read is not tried again until the token changes.
+    .globl  dx_probe
+dx_probe:
+    addql   #1,dx_ptick
+    moveq   #15,%d0
+    andl    dx_ptick,%d0
+    bnew    dpr_out
+    lea.l   %sp@(-12),%sp
+    moveml  %d2-%d3/%d6,%sp@
+    moveq   #0,%d6
+dpr_l:
+    movel   %d6,%d0
+    jsr     sound_obj
+    tstl    %d0
+    beqs    dpr_n
+    movea.l %d0,%a0
+    moveq   #0,%d1
+    moveb   %a0@(38),%d1
+    cmpil   #DX_MACH,%d1
+    bnes    dpr_n
+    bsr     dx_tok
+    movel   %d0,%d2
+    lea.l   dx_hash,%a0
+    cmpl    %a0@(0,%d6:l:4),%d2
+    beqs    dpr_n
+    movel   %d2,%a0@(0,%d6:l:4)
+    tstl    %d2
+    beqs    dpr_bi
+    movel   %d6,%d0
+    movel   %d2,%d1
+    bsr     dx_cload
+    tstl    %d0
+    beqs    dpr_n
+dpr_bi:
+    movel   %d6,%d0               | the built-in cartridge
+    moveq   #9,%d1
+    lsll    %d1,%d0
+    lea.l   DX_TST,%a0
+    adda.l  %d0,%a0
+    clrl    %a0@(56)
+    moveq   #1,%d0
+    movel   %d0,%a0@(60)
+dpr_n:
+    addql   #1,%d6
+    moveq   #6,%d0
+    cmpl    %d6,%d0
+    bnes    dpr_l
+    moveml  %sp@,%d2-%d3/%d6
+    lea.l   %sp@(12),%sp
+dpr_out:
+    rts
+
 | ---- the labels and the values the page shows ------------------------------
 | Rows as mi_swap's (apply_names set 7).
     .align 2
@@ -1306,3 +1709,6 @@ dx_amsw:   .byte 0, 66, 109, 255  | amplitude modulation sensitivity, Q8
     .include "dx_tables.inc"
     .align 2
 dx_p:      .space 6*16            | the four dials, Q15
+dx_hash:   .space 6*4             | the cartridge each track holds (its file's
+                                  | hash; 0 the built-in one)
+dx_ptick:  .long 0                | dx_probe's block count
