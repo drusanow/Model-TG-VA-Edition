@@ -302,6 +302,13 @@ print("  every odd label is a string")
 # that happened to land 2-mod-4 were the ones that threw exceptions.
 if len(blob) % 16:
     blob += b'\x00' * (16 - len(blob) % 16)
+# the overlay's sum, which boot_extra_hook checks its copy against (ovl_ok)
+_ov=blob[OVL_LMA-BLOB:OVL_LMA-BLOB+OVL_SIZE]
+_osum=sum(struct.unpack(f'>{OVL_SIZE//4}I',_ov)) & 0xffffffff
+_o=blob_off(sym['ovl_want'])
+assert blob[_o:_o+4]==bytes(4)
+blob=blob[:_o]+struct.pack('>I',_osum)+blob[_o+4:]
+print(f"  overlay sum 0x{_osum:08x} -> ovl_want (checked at boot: OVL ERROR on Send FX if not)")
 if args.assemble_only:
     print(f"  assembled, linked and self-checked: {len(blob):,} B blob (no image built)")
     if args.check_flasher:
@@ -376,13 +383,8 @@ d=_stock+bytearray(BLOB-STOCK_END)+blob
 end=BASE+len(d)
 assert end==IMG_END, f"image ends 0x{end:08x}, the overlay at 0x{IMG_END:08x}"
 end=RES_END                       # what the cache blocks must hold: the resident part
-# the overlay's sum, which boot_extra_hook checks its copy against (ovl_ok)
-_ov=bytes(d[OVL_LMA-BASE:OVL_LMA-BASE+OVL_SIZE])
-_osum=sum(struct.unpack(f'>{OVL_SIZE//4}I',_ov)) & 0xffffffff
 _o=sym['ovl_want']-BASE
-assert bytes(d[_o:_o+4])==bytes(4)
-d[_o:_o+4]=struct.pack('>I',_osum)
-print(f"  overlay sum 0x{_osum:08x} -> ovl_want (checked at boot: OVL ERROR on Send FX if not)")
+assert bytes(d[_o:_o+4])==struct.pack('>I',_osum)
 
 # ---- Phase 1 stock-area patches -----------------------------------------
 # Derived from the base image, each asserted against the STOCK bytes it
