@@ -25,6 +25,7 @@
 | model_tg.s.
 DX_TS   = 512                     | bytes of state per track (DX_TST)
 DX_VELW = 0x40fe4cdc              | the OS's note velocity per track, << 8
+DX_GMAX = 0x10000000              | a gain's largest step a block (Q14 << 16)
 DX_OP   = 192                     | ... where the six operators start, 48 each
 DX_OPS  = 48
 | track state:
@@ -439,8 +440,11 @@ dx_noteon:
     moveq   #5,%d2
 5:  moveq   #0,%d1
     bsr     dx_adv
-    btst    #3,%d4
-    beqs    6f
+    btst    #3,%d4                | key sync: from phase 0 - unless it still
+    beqs    6f                    | sounds (over 1/64 of full), where the jump
+    movel   %a2@(8),%d0           | would click
+    cmpil   #0x01000000,%d0
+    bccs    6f
     clrl    %a2@
 6:  lea.l   %a2@(DX_OPS),%a2
     subql   #1,%d2
@@ -640,13 +644,24 @@ dx_play:
     moveq   #9,%d1                | (y0 + y1) << (9 + fb)
     addl    %d2,%d1
 4:  movel   %d1,%sp@(40)
-    | ---- Shape: every rate offset by (64 - s) / 4 ----
+    | ---- Shape: every rate offset, up to +21 (faster, s 0) and -40 (slower,
+    | s 127; 4 rate steps double or halve a time): (64 - s) / 3 below the
+    | middle, (64 - s) x 40 / 63 above it ----
     movel   %a4@(4),%d0
     lsrl    #8,%d0
     moveq   #64,%d1
     subl    %d0,%d1
-    asrl    #2,%d1
-    movel   %d1,%sp@(12)
+    bmis    1f
+    mulu.w  #21846,%d1
+    clrw    %d1
+    swap    %d1                   | / 3
+    bras    2f
+1:  negl    %d1
+    mulu.w  #40,%d1
+    moveq   #63,%d0
+    divul   %d0,%d1
+    negl    %d1
+2:  movel   %d1,%sp@(12)
     | ---- the LFO ----
     bsr     dx_lfo                | -> d0 pitch (Q8 semitones), d1 amp (Q24)
     movel   %d1,%sp@(16)
@@ -734,8 +749,20 @@ dx_opl:
     lsrl    %d0,%d1
     movel   %d1,%d0
 6:  swap    %d0
-    clrw    %d0                   | gain2, Q31
+    clrw    %d0                   | gain2, Q14 << 16
     movel   %a6@(8),%d4           | gain1
+    movel   %d0,%d1               | at most a quarter of full scale a block
+    subl    %d4,%d1               | either way (0 to full in ~2.7 ms): an
+    cmpil   #DX_GMAX,%d1          | envelope's jump would click
+    bles    7f
+    movel   %d4,%d0
+    addil   #DX_GMAX,%d0
+    bras    8f
+7:  cmpil   #-DX_GMAX,%d1
+    bges    8f
+    movel   %d4,%d0
+    subil   #DX_GMAX,%d0
+8:
     movel   %d0,%a6@(8)
     movel   %d0,%d5
     subl    %d4,%d5
@@ -967,10 +994,17 @@ dx_env:
     bhiw    dxe_out                    | done
     tstl    %a5@(20)
     bnew    dxe_out                    | stage 3 waits for the key to lift
-1:  mvzb    %a2@(40,%d1:l),%d0    | its rate, offset by Shape
-    addl    %sp@(20),%d0
-    bpls    2f
-    moveq   #0,%d0
+1:  mvzb    %a2@(40,%d1:l),%d0    | its rate, offset by Shape - which slows
+    movel   %d0,%d2               | it to 16 (a 2.75 s attack) at most,
+    addl    %sp@(20),%d0          | below the voice's own
+    cmpil   #16,%d0
+    bges    2f
+    cmpl    %d2,%d0
+    bges    2f
+    moveq   #16,%d0
+    cmpl    %d2,%d0
+    bles    2f
+    movel   %d2,%d0
 2:  DX_MAX  %d0, 63
     movel   %d0,%d2               | inc = ((4 + (q & 3)) << (q >> 2)) x 118
     andil   #3,%d2
@@ -1904,8 +1938,24 @@ dx_swfmt:
 4:  clrb    %a1@
     braw    dx_sfmt
 
-| Contour: the selected track's voice name, from its cartridge
+| Contour: the voice's number, 1..32 (the name is the knob screen's, dx_draw)
 dx_vfmt:
+    lea.l   dx_sbuf,%a1
+    movel   %sp@(8),%d0
+    bpls    1f
+    moveq   #0,%d0
+1:  moveq   #10,%d1
+    lsrl    %d1,%d0
+    DX_MAX  %d0, 31
+    addql   #1,%d0
+    bsr     dx_num
+    clrb    %a1@
+    braw    dx_sfmt
+
+| value (Contour's) -> a1 = dx_sbuf holding the selected track's voice name,
+| from its cartridge, trailing spaces off; d0 = its length. Clobbers d1/a0.
+dx_vname:
+    movel   %d0,%sp@-
     jsr     0x400cf866            | the selected track
     movel   %d0,%sp@-
     jsr     0x4000eb90
@@ -1924,7 +1974,7 @@ dx_vfmt:
     lsll    #3,%d1                | x 4096 = 512 x 8
     lea.l   DX_CARTS,%a0
     adda.l  %d1,%a0
-1:  movel   %sp@(8),%d0
+1:  movel   %sp@+,%d0
     bpls    2f
     moveq   #0,%d0
 2:  moveq   #10,%d1
@@ -1950,7 +2000,92 @@ dx_vfmt:
     subql   #1,%a1
     bras    4b
 5:  clrb    %a1@
-    braw    dx_sfmt
+    movel   %a1,%d0
+    subil   #dx_sbuf,%d0
+    lea.l   dx_sbuf,%a1
+    rts
+
+| ---- dx_draw: the knob screen while Contour picks the voice ----------------
+| Invoked as mi_draw is (functor, value, ctx, 0x60, y, flag), after the page
+| has drawn the name on the left and its five pips: the pips cleared, the
+| voice's name drawn centred on them (x 96) in the big font if it fits in 56
+| pixels, else in the small one (left at x 66 if even that is too wide).
+    .globl  dx_draw
+dx_draw:
+    linkw   %fp,#-60
+    moveml  %d2-%d7/%a2-%a5,%sp@
+    movel   %fp@(16),%d2          | ctx
+    movel   %fp@(24),%d3          | y
+    clrl    %sp@-                 | the stock pips cleared
+    pea     28
+    pea     122
+    pea     22
+    pea     66
+    movel   %d2,%sp@-
+    jsr     0x40070efc
+    lea.l   %sp@(24),%sp
+    movel   %fp@(12),%d0
+    bsr     dx_vname              | a1 = the name, d0 = its length
+    movel   %d0,%d6
+    beqw    dxd_out
+    lea.l   dx_nbuf,%a4           | (kept: dx_sbuf is reused by formatters)
+    movea.l %a4,%a0
+1:  moveb   %a1@+,%a0@+
+    bnes    1b
+    movel   #FD_BIG,%d7
+    bsr     dxd_width
+    cmpil   #56,%d0
+    bles    2f
+    movel   #FD_SMALL,%d7
+    bsr     dxd_width
+2:  movel   %d0,%d5
+    lsrl    #1,%d5
+    moveq   #96,%d0
+    subl    %d5,%d0
+    cmpil   #66,%d0
+    bges    3f
+    moveq   #66,%d0
+3:  movel   %d0,%d5               | x
+    movel   %d7,%sp@-
+    jsr     0x400720f8
+    addql   #4,%sp
+    movel   %a4,%sp@-             | (ctx, font, x, y, 0, 0, template, "%s", name)
+    pea     0x40124b58
+    movel   %a4,%sp@-
+    clrl    %sp@-
+    clrl    %sp@-
+    movel   %d3,%sp@-
+    movel   %d5,%sp@-
+    movel   %d0,%sp@-
+    movel   %d2,%sp@-
+    jsr     0x40071c10
+    lea.l   %sp@(36),%sp
+dxd_out:
+    moveml  %fp@(-60),%d2-%d7/%a2-%a5
+    unlk    %fp
+    rts
+| d7 = a font, a4 = the name, d6 = its length -> d0 = its width (as mi_draw
+| measures). Uses the frame's String at fp-4.
+dxd_width:
+    movel   %fp,%d4
+    subql   #4,%d4
+    pea     %fp@(-5)
+    movel   %a4,%sp@-
+    movel   %d4,%sp@-
+    jsr     0x400f980c
+    movel   %d7,%sp@-
+    jsr     0x400720f8
+    movel   %d4,%sp@-
+    movel   %d6,%sp@-
+    movel   %d0,%sp@-
+    jsr     0x40072102
+    lea.l   %sp@(28),%sp
+    movel   %d0,%sp@-
+    movel   %d4,%sp@-
+    jsr     0x400f7d5c
+    addql   #4,%sp
+    movel   %sp@+,%d0
+    rts
 
 s_dxc:  .asciz "DX"
 s_dxa:  .asciz "Algorithm"
@@ -1964,6 +2099,7 @@ s_dxvs: .asciz "VOIC"
     .align 2
 dx_swf0: .long 0x400456c8         | Sweep's stock formatter, while ours is in
 dx_sbuf: .space 16
+dx_nbuf: .space 16
 
     .align 2
 dx_amsw:   .byte 0, 66, 109, 255  | amplitude modulation sensitivity, Q8

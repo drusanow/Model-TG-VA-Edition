@@ -324,6 +324,7 @@ class TEnvelopes(unittest.TestCase):
     def test_retrig_keeps_the_level(self):
         e = emu()
         load(e, 0, one(op1=op(ol=99, r=(30, 99, 99, 99))))
+        dials(e, 0)
         a = render(e, 300)
         b = render(e, 2)                                     # a new note mid-attack
         self.assertLess(abs(np.abs(b[:200]).max() - np.abs(a[-200:]).max()),
@@ -370,6 +371,33 @@ class TVelocity(unittest.TestCase):
         self.assertAlmostEqual(a, b, delta=a * 0.02)
         c = rms(render(e, 60)[2000:])                    # the next note takes it
         self.assertLess(c, a * 0.5)
+
+
+class TBuiltIn(unittest.TestCase):
+    def test_voices_equally_loud_and_no_instant_onset(self):
+        louds = {}
+        for v in range(11):
+            e = emu()
+            dials(e, 0, voice=v)
+            e.w8(e.sym['dx_vel'], 100)
+            x = render(e, 1500)
+            louds[v] = max(rms(x[i:i + 9600]) for i in range(0, len(x) - 9600, 4800))
+            first = np.abs(x[:48]).max()                     # the first half millisecond
+            self.assertLess(first, 0.5 * np.abs(x[:4800]).max(), v)
+        db = 20 * np.log10(np.array(list(louds.values())) / louds[0])
+        self.assertLess(np.abs(db).max(), 1.5, db)
+
+    def test_shape_reaches_pads_and_plucks(self):
+        def attack(shape, r1=99):
+            e = emu()
+            load(e, 0, one(op1=op(ol=99, r=(r1, 99, 99, 99))))
+            dials(e, 0, shape=shape)
+            x = render(e, 1500)
+            env = np.array([np.abs(x[i:i + 960]).max() for i in range(0, len(x) - 960, 960)])
+            return int(np.argmax(env > 0.7 * 12288))         # 10 ms steps
+        self.assertLessEqual(attack(64), 1)                  # R1 99: at once
+        self.assertGreater(attack(127), 30)                  # Shape up: a pad, > 0.3 s
+        self.assertLess(attack(0, r1=60), attack(64, r1=60))  # Shape down: faster
 
 
 class TLfo(unittest.TestCase):
@@ -424,11 +452,39 @@ class TVoices(unittest.TestCase):
         self.assertEqual(fmt('dx_algfmt', 127 << 8), 'A32')
         self.assertEqual([fmt('dx_swfmt', v << 8) for v in (0, 8, 63, 64, 65, 127)],
                          ['FB0', 'FB1', 'FB7', 'VCE', '+0', '+24'])
+        self.assertEqual([fmt('dx_vfmt', v << 10) for v in (0, 5, 31)], ['1', '6', '32'])
+        self.assertEqual(fmt('dx_vfmt', 32512), '32')
+
+    def test_knob_screen_names_the_voice(self):
+        e = emu(); s = e.sym
+        calls = []
+        def hook(fn, kind, n):
+            e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.append(
+                (kind,) + struct.unpack('>%di' % n, uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 4, 4 * n))),
+                begin=fn, end=fn)
+        hook(0x40070efc, 'fill', 6); hook(0x40071c10, 'text', 9); hook(0x400720f8, 'font', 1)
+        rd = lambda a: bytes(e.uc.mem_read(a, 16)).split(b'\0')[0].decode()
         e.uc.mem_write(0x40012412, bytes.fromhex('70014e75'))   # the selected track: 1
-        self.assertEqual(fmt('dx_vfmt', 0), 'INIT VOICE')
-        self.assertEqual(fmt('dx_vfmt', 5 << 10), 'DRAWBARS 1')
-        load(e, 1, G.voice('MY VOICE', [op(ol=99)]))
-        self.assertEqual(fmt('dx_vfmt', 0), 'MY VOICE')
+        def draw(width, v):
+            calls.clear()
+            e.w32(SCRATCH + 0x9000, width)                       # the width, from memory:
+            e.uc.mem_write(0x40072102, bytes.fromhex('2039%08x4e75' % (SCRATCH + 0x9000)))
+            e.run('dx_draw', stack=[0x1000, v << 10, 0x5555, 0x60, 0x22, 0])
+            return calls
+        c = draw(40, 5)                                          # fits the big font
+        fills = [x for x in c if x[0] == 'fill']
+        self.assertEqual(fills[0][1:], (0x5555, 66, 22, 122, 28, 0))   # the stock pips off
+        text = [x for x in c if x[0] == 'text'][0]
+        self.assertEqual(rd(text[9] & M32), 'DRAWBARS 1')
+        self.assertEqual(text[3:5], (96 - 20, 0x22))
+        self.assertEqual([x[1] & M32 for x in c if x[0] == 'font'][-1], 0x40ea14dc)   # big
+        c = draw(70, 5)                                          # too wide: small, at 66
+        text = [x for x in c if x[0] == 'text'][0]
+        self.assertEqual([x[1] & M32 for x in c if x[0] == 'font'][-1], 0x40ea14cc)
+        self.assertEqual(text[3], 66)
+        load(e, 1, G.voice('MY VOICE', [op(ol=99)]))             # the track's own cartridge
+        text = [x for x in draw(40, 0) if x[0] == 'text'][0]
+        self.assertEqual(rd(text[9] & M32), 'MY VOICE')
 
     def test_bounds_everywhere(self):
         rnd = random.Random(3)
@@ -588,6 +644,14 @@ class TCartridges(unittest.TestCase):
         self.assertEqual(e.d(0), 1)
         e, r = self.load(bulk([G.voice('Y', [op()])] * 32)[:3000])        # cut short
         self.assertEqual(r, 2)
+
+    def test_behind_a_sample_header(self):
+        """a cartridge uploaded as a WAV through Transfer (flasher/dx.html): the
+        Cycles keeps it behind its 64-byte sample header"""
+        vs = [G.voice('WAV%d' % i, [op(ol=99)]) for i in range(32)]
+        hdr = b'\x00\x00\x00\x01' + struct.pack('>II', 4104, 48000) + bytes(52)
+        e, r = self.load(hdr + bulk(vs))
+        self.assertEqual((r, self.cart(e, 2)), (0, b''.join(vs)))
 
     def test_7bit_data(self):
         vs = [bytes(range(128))] * 32
@@ -766,8 +830,10 @@ class TPlumbing(unittest.TestCase):
                          ['Algorithm', 'Envelope', 'FB / Harm', 'Voice'])
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP), e.r32(COLOR)),
                          (s['dx_vfmt'], s['dx_swfmt'], s['dx_algfmt']))
+        self.assertEqual(e.r32(0x40a73460 + 12), s['dx_draw'])   # the knob screen's
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[11])  # PLAITS
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP)), (s['mi_eng_fmt'], 0x11112222))
+        self.assertEqual(e.r32(0x40a73460 + 12), s['mi_draw'])
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[DX])
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[4])   # Chord
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP), e.r32(COLOR)),

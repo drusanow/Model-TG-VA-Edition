@@ -2370,19 +2370,38 @@ mi_fmtswap:
     beqs    5f
     movel   %d0,mi_fmt0           | the stock one, kept
     movel   %a1,%a0@
-5:  | ...and its knob screen: mi_draw for PLAITS only
+5:  | ...and its knob screen: mi_draw for PLAITS, dx_draw for DX
     lea.l   MI_ENG_DRW,%a0
-    movel   %a0@(12),%d0
+    suba.l  %a1,%a1               | the one wanted
     cmpil   #6,%d1
-    bnes    6f
+    bnes    1f
+    lea.l   mi_draw,%a1
+1:  cmpil   #7,%d1
+    bnes    2f
+    lea.l   dx_draw,%a1
+2:  movel   %a0@(12),%d0
+    cmpl    %a1,%d0
+    beqs    7f                    | already
     cmpil   #mi_draw,%d0
+    beqs    3f
+    cmpil   #dx_draw,%d0
+    bnes    4f
+3:  movel   %a1,%sp@-             | ours, not the one wanted: stock first
+    lea.l   mi_drw0,%a1
+    movel   %a1@(8),%a0@(8)       | the manager first: off before the rest
+    movel   %a1@,%a0@
+    movel   %a1@(4),%a0@(4)
+    movel   %a1@(12),%a0@(12)
+    movea.l %sp@+,%a1
+4:  cmpa.l  #0,%a1
     beqs    7f
+    movel   %a1,%sp@-
     lea.l   mi_drw0,%a1           | the stock function object, kept
     movel   %a0@,%a1@+
     movel   %a0@(4),%a1@+
     movel   %a0@(8),%a1@+
     movel   %a0@(12),%a1@
-    movel   #mi_draw,%d0
+    movel   %sp@+,%d0
     movel   %d0,%a0@(12)          | the invoker first: the manager is the flag
     movel   0x40a727e0,%d0        | Pitch's storage words
     movel   %d0,%a0@
@@ -2390,14 +2409,6 @@ mi_fmtswap:
     movel   %d0,%a0@(4)
     movel   0x40a727e8,%d0        | and manager, last
     movel   %d0,%a0@(8)
-    bras    7f
-6:  cmpil   #mi_draw,%d0
-    bnes    7f
-    lea.l   mi_drw0,%a1
-    movel   %a1@(8),%a0@(8)       | the manager first: off before the rest
-    movel   %a1@,%a0@
-    movel   %a1@(4),%a0@(4)
-    movel   %a1@(12),%a0@(12)
 7:  | ...and DX's Sweep (id 0x49) names feedback and ratio shifts
     lea.l   DX_SWF,%a0
     movel   %a0@,%d0

@@ -148,68 +148,102 @@ def voice(name, ops, alg=1, fb=0, oks=1, peg_r=(99, 99, 99, 99), peg_l=(50, 50, 
     return bytes(b)
 
 
+# Each voice's carriers are moved by TRIM steps of 0.75 dB so the voices play
+# about equally loud (measured in the emulator: tests/test_dx.py checks it).
+TRIM = {'INIT VOICE': 0, 'E.PIANO MT': -7, 'SYN BASS 1': -2, 'GLASS BELL': -2,
+        'BRASS SWEL': -7, 'DRAWBARS 1': -3, 'FM PLUCK 1': 0, 'SOFT PAD 1': -6,
+        'MARIMBA 1': 1, 'CLAV 1': -2, 'SINE BASS': -1}
+
+
+def trimmed(name, ops, alg=1, **k):
+    """voice(), with its carriers' levels moved by TRIM[name]"""
+    carriers = ALGOS[alg][1]
+    t = TRIM.get(name, 0)
+    ops = [dict(o, ol=max(0, min(99, o['ol'] + t))) if i + 1 in carriers else o
+           for i, o in enumerate(ops)]
+    return voice(name, ops, alg=alg, **k)
+
+
 def voices():
     init = voice('INIT VOICE', [op(ol=99)])
     v = [init]
     # electric piano: three carrier/modulator pairs (alg 5), the tine on 14:1
-    v.append(voice('E.PIANO MT', [
-        op(r=(96, 25, 25, 67), l=(99, 75, 0, 0), ol=98, rs=3),
-        op(r=(95, 50, 35, 78), l=(99, 75, 0, 0), ol=78, rs=3, kvs=2),
-        op(r=(95, 20, 20, 50), l=(99, 95, 0, 0), ol=96, rs=3, det=8),
-        op(r=(95, 29, 20, 50), l=(99, 95, 0, 0), ol=74, coarse=14, rs=3, kvs=2),
-        op(r=(95, 20, 20, 50), l=(99, 95, 0, 0), ol=88, det=6, rs=3),
-        op(r=(95, 29, 20, 50), l=(99, 95, 0, 0), ol=68, rs=3)], alg=5, fb=6))
-    # bass: a carrier under a stack of two modulators with feedback (alg 1)
-    v.append(voice('SYN BASS 1', [
-        op(r=(99, 40, 30, 60), l=(99, 80, 70, 0), ol=99, coarse=0),
-        op(r=(99, 55, 20, 60), l=(99, 60, 40, 0), ol=82, coarse=0),
-        op(r=(99, 30, 30, 60), l=(99, 80, 70, 0), ol=90, coarse=0, det=9),
-        op(r=(99, 60, 20, 60), l=(99, 50, 30, 0), ol=80, coarse=1),
-        op(r=(99, 70, 20, 60), l=(99, 40, 20, 0), ol=70, coarse=1),
-        op(r=(99, 70, 20, 60), l=(99, 40, 20, 0), ol=72, coarse=1)], alg=1, fb=5, tr=12))
+    v.append(trimmed('E.PIANO MT', [
+        op(r=(90, 25, 25, 67), l=(99, 75, 0, 0), ol=98, rs=3, kvs=2),
+        op(r=(95, 50, 35, 78), l=(99, 75, 0, 0), ol=78, rs=3, kvs=4),
+        op(r=(90, 20, 20, 50), l=(99, 95, 0, 0), ol=96, rs=3, det=8, kvs=2),
+        op(r=(95, 29, 20, 50), l=(99, 95, 0, 0), ol=74, coarse=14, rs=3, kvs=4),
+        op(r=(90, 20, 20, 50), l=(99, 95, 0, 0), ol=88, det=6, rs=3, kvs=2),
+        op(r=(95, 29, 20, 50), l=(99, 95, 0, 0), ol=68, rs=3, kvs=3)], alg=5, fb=6))
+    # bass: a carrier under a stack of modulators with feedback (alg 1)
+    v.append(trimmed('SYN BASS 1', [
+        op(r=(92, 40, 30, 60), l=(99, 80, 70, 0), ol=99, coarse=0),
+        op(r=(95, 55, 20, 60), l=(99, 60, 40, 0), ol=82, coarse=0, kvs=3),
+        op(r=(92, 30, 30, 60), l=(99, 80, 70, 0), ol=90, coarse=0, det=9),
+        op(r=(95, 60, 20, 60), l=(99, 50, 30, 0), ol=80, coarse=1, kvs=3),
+        op(r=(95, 70, 20, 60), l=(99, 40, 20, 0), ol=70, coarse=1),
+        op(r=(95, 70, 20, 60), l=(99, 40, 20, 0), ol=72, coarse=1)], alg=1, fb=5, tr=12))
     # bell: inharmonic modulator ratios, long decays (alg 5)
-    v.append(voice('GLASS BELL', [
-        op(r=(99, 22, 20, 30), l=(99, 70, 0, 0), ol=98),
-        op(r=(99, 30, 25, 30), l=(99, 60, 0, 0), ol=80, coarse=3, fine=50),
-        op(r=(99, 24, 20, 30), l=(99, 70, 0, 0), ol=92, coarse=2, det=10),
-        op(r=(99, 40, 25, 30), l=(99, 50, 0, 0), ol=76, coarse=7, fine=7),
-        op(r=(99, 18, 18, 30), l=(99, 70, 0, 0), ol=86, coarse=4, det=4),
-        op(r=(99, 35, 25, 30), l=(99, 50, 0, 0), ol=70, coarse=11)], alg=5, fb=3))
+    v.append(trimmed('GLASS BELL', [
+        op(r=(94, 22, 20, 30), l=(99, 70, 0, 0), ol=98),
+        op(r=(95, 30, 25, 30), l=(99, 60, 0, 0), ol=80, coarse=3, fine=50, kvs=3),
+        op(r=(94, 24, 20, 30), l=(99, 70, 0, 0), ol=92, coarse=2, det=10),
+        op(r=(95, 40, 25, 30), l=(99, 50, 0, 0), ol=76, coarse=7, fine=7, kvs=3),
+        op(r=(94, 18, 18, 30), l=(99, 70, 0, 0), ol=86, coarse=4, det=4),
+        op(r=(95, 35, 25, 30), l=(99, 50, 0, 0), ol=70, coarse=11)], alg=5, fb=3))
     # brass: the modulators swell after the carriers (alg 22)
-    v.append(voice('BRASS SWEL', [
+    v.append(trimmed('BRASS SWEL', [
         op(r=(60, 40, 30, 55), l=(99, 92, 90, 0), ol=99),
-        op(r=(55, 35, 30, 55), l=(99, 85, 80, 0), ol=84),
+        op(r=(55, 35, 30, 55), l=(99, 85, 80, 0), ol=84, kvs=3),
         op(r=(60, 40, 30, 55), l=(99, 92, 90, 0), ol=96, det=9),
         op(r=(60, 40, 30, 55), l=(99, 92, 90, 0), ol=94, det=5),
         op(r=(60, 40, 30, 55), l=(99, 92, 90, 0), ol=92, coarse=2),
-        op(r=(45, 30, 30, 55), l=(99, 80, 75, 0), ol=82)], alg=22, fb=7,
+        op(r=(45, 30, 30, 55), l=(99, 80, 75, 0), ol=82, kvs=3)], alg=22, fb=7,
         lfo=(30, 40, 4, 0, 0, 4), pms=4))
     # organ: six carriers on drawbar ratios (alg 32)
-    v.append(voice('DRAWBARS 1', [
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=94, coarse=0),
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=96, coarse=1),
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=90, coarse=2),
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=88, coarse=3),
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=84, coarse=4),
-        op(r=(99, 99, 99, 80), l=(99, 99, 99, 0), ol=76, coarse=8)], alg=32, fb=4,
+    v.append(trimmed('DRAWBARS 1', [
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=94, coarse=0),
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=96, coarse=1),
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=90, coarse=2),
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=88, coarse=3),
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=84, coarse=4),
+        op(r=(88, 99, 99, 70), l=(99, 99, 99, 0), ol=76, coarse=8)], alg=32, fb=4,
         lfo=(70, 0, 3, 0, 0, 4), pms=3))
     # pluck: a fast-decaying stack (alg 1)
-    v.append(voice('FM PLUCK 1', [
-        op(r=(99, 45, 30, 60), l=(99, 0, 0, 0), ol=99, rs=4),
-        op(r=(99, 70, 30, 60), l=(99, 0, 0, 0), ol=88, coarse=3, rs=4),
-        op(r=(99, 45, 30, 60), l=(99, 0, 0, 0), ol=94, rs=4),
-        op(r=(99, 60, 30, 60), l=(99, 0, 0, 0), ol=82, coarse=1, rs=4),
-        op(r=(99, 80, 30, 60), l=(99, 0, 0, 0), ol=72, coarse=5, rs=4),
-        op(r=(99, 80, 30, 60), l=(99, 0, 0, 0), ol=60, coarse=1)], alg=1, fb=4))
-    # pad: slow carriers, slightly detuned pairs (alg 5)
-    v.append(voice('SOFT PAD 1', [
-        op(r=(30, 25, 25, 30), l=(99, 90, 85, 0), ol=94),
-        op(r=(25, 25, 25, 30), l=(99, 80, 75, 0), ol=70, coarse=2),
-        op(r=(30, 25, 25, 30), l=(99, 90, 85, 0), ol=92, det=11),
-        op(r=(25, 25, 25, 30), l=(99, 80, 75, 0), ol=66, coarse=1),
-        op(r=(30, 25, 25, 30), l=(99, 90, 85, 0), ol=90, det=3),
-        op(r=(25, 25, 25, 30), l=(99, 80, 75, 0), ol=64, coarse=3)], alg=5, fb=2,
+    v.append(trimmed('FM PLUCK 1', [
+        op(r=(94, 45, 30, 60), l=(99, 0, 0, 0), ol=99, rs=4),
+        op(r=(97, 70, 30, 60), l=(99, 0, 0, 0), ol=88, coarse=3, rs=4, kvs=4),
+        op(r=(94, 45, 30, 60), l=(99, 0, 0, 0), ol=94, rs=4),
+        op(r=(97, 60, 30, 60), l=(99, 0, 0, 0), ol=82, coarse=1, rs=4, kvs=3),
+        op(r=(97, 80, 30, 60), l=(99, 0, 0, 0), ol=72, coarse=5, rs=4),
+        op(r=(97, 80, 30, 60), l=(99, 0, 0, 0), ol=60, coarse=1)], alg=1, fb=4))
+    # pad: carriers swelling in over ~0.3 s, slightly detuned pairs (alg 5)
+    v.append(trimmed('SOFT PAD 1', [
+        op(r=(48, 30, 25, 40), l=(99, 92, 88, 0), ol=96),
+        op(r=(44, 30, 25, 40), l=(99, 85, 80, 0), ol=72, coarse=2),
+        op(r=(48, 30, 25, 40), l=(99, 92, 88, 0), ol=94, det=11),
+        op(r=(44, 30, 25, 40), l=(99, 85, 80, 0), ol=68, coarse=1),
+        op(r=(48, 30, 25, 40), l=(99, 92, 88, 0), ol=92, det=3),
+        op(r=(44, 30, 25, 40), l=(99, 85, 80, 0), ol=66, coarse=3)], alg=5, fb=2,
         lfo=(25, 50, 5, 0, 0, 4), pms=3))
+    # marimba: a short 4:1 strike over a sine (alg 5, two pairs)
+    v.append(trimmed('MARIMBA 1', [
+        op(r=(95, 38, 30, 50), l=(99, 0, 0, 0), ol=99, rs=3),
+        op(r=(97, 70, 50, 50), l=(99, 0, 0, 0), ol=80, coarse=4, rs=3, kvs=4),
+        op(r=(95, 50, 30, 50), l=(99, 0, 0, 0), ol=84, coarse=4, rs=3),
+        op(r=(97, 80, 50, 50), l=(99, 0, 0, 0), ol=60, coarse=10, rs=3)], alg=5))
+    # clav: a bright, nasal stack with a quick decay (alg 3)
+    v.append(trimmed('CLAV 1', [
+        op(r=(95, 45, 30, 70), l=(99, 40, 0, 0), ol=99),
+        op(r=(97, 55, 30, 70), l=(99, 30, 0, 0), ol=86, coarse=3, kvs=4),
+        op(r=(97, 60, 30, 70), l=(99, 20, 0, 0), ol=78, coarse=1, kvs=3),
+        op(r=(95, 40, 30, 70), l=(99, 40, 0, 0), ol=92, coarse=2),
+        op(r=(97, 50, 30, 70), l=(99, 30, 0, 0), ol=80, coarse=5),
+        op(r=(97, 70, 30, 70), l=(99, 0, 0, 0), ol=60, coarse=1)], alg=3, fb=5))
+    # sine bass: one carrier with a touch of its octave (alg 1)
+    v.append(trimmed('SINE BASS', [
+        op(r=(92, 40, 35, 60), l=(99, 88, 80, 0), ol=99, coarse=0),
+        op(r=(95, 60, 40, 60), l=(99, 50, 30, 0), ol=70, coarse=1, kvs=3)], alg=1, tr=12))
     while len(v) < 32:
         v.append(init)
     return b''.join(v)

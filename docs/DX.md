@@ -20,9 +20,9 @@ machines. The four machine knobs:
 | knob | label | does |
 |---|---|---|
 | **Color** | **ALGO** | the algorithm. At 0 (**VCE**) the voice's own; turning up picks **A1** to **A32**, about four steps each. The routing changes at once. |
-| **Shape** | **ENV** | every envelope at once: at 64 as the voice has it, turning down makes them faster (plucky), up slower (pad), up to four times either way at the ends. |
+| **Shape** | **ENV** | every envelope at once: at 64 as the voice has it. Turning down makes them faster (plucky, up to about 4x), up slower (a pad: an instant attack becomes about 0.8 s at 127; no attack gets slower than about 3 s unless the voice's own already is). |
 | **Sweep** | **FBHM** | below the middle, the feedback, **FB0** to **FB7**. At 64 (**VCE**) the voice's own. Above the middle, the modulators' frequencies go up together, by up to two octaves (**+0** to **+24** semitones): new, often clangy, overtones. |
-| **Contour** | **VOIC** | the voice, 1 to 32 of the cartridge. The page shows its name. |
+| **Contour** | **VOIC** | the voice, 1 to 32 of the cartridge. The parameter page shows its number; turning Contour shows its name. |
 
 All four p-lock, slide, take LFOs and are saved, like any machine knob. So
 the algorithm, the envelope speed and the voice can change from step to step.
@@ -42,8 +42,14 @@ cartridge made for this firmware, so no Yamaha voice is included:
 | 5 | BRASS SWEL | brass: the modulators swell after the carriers |
 | 6 | DRAWBARS 1 | an organ: six carriers on drawbar ratios |
 | 7 | FM PLUCK 1 | a short pluck |
-| 8 | SOFT PAD 1 | a slow, slightly detuned pad |
-| 9-32 | INIT VOICE | |
+| 8 | SOFT PAD 1 | a slightly detuned pad, swelling in over ~0.3 s |
+| 9 | MARIMBA 1 | a short 4:1 strike over a sine |
+| 10 | CLAV 1 | a bright, nasal clav |
+| 11 | SINE BASS | a sine bass with a touch of its octave |
+| 12-32 | INIT VOICE | |
+
+The built-in voices are levelled to play about equally loud (within 1.5 dB,
+measured), and their attacks are a few milliseconds, not instant.
 
 **Your own cartridges.**
 
@@ -55,6 +61,14 @@ cartridge made for this firmware, so no Yamaha voice is included:
    `<first voice's name> <4 hex digits>.syx`: a 32-voice cartridge, or a
    single voice (which becomes voice 1 of a cartridge, INIT VOICE after it).
    Send them one at a time, a second or two apart (the page does).
+
+   **Through Elektron Transfer** (experimental): Transfer only sends audio,
+   so the sender page's **Save for Transfer** wraps each cartridge in a
+   48 kHz mono WAV whose samples are the cartridge's bytes. Upload it with
+   Transfer in SMP mode and load it on a DX track as below: the loader finds
+   the cartridge inside the sample file. (Don't play it on a Sampler track:
+   it is noise.) Whether Transfer keeps the bytes exactly needs a try on the
+   Cycles.
 2. **Load one onto a track.** Select a DX track, press **FUNCTION** +
    **PRESET**, open `DX7` and choose a cartridge: "Cartridge loaded". Contour
    now picks its 32 voices. Files from anywhere on the drive work too: a
@@ -66,8 +80,11 @@ cartridge made for this firmware, so no Yamaha voice is included:
    patterns on the built-in cartridge.
 
 **Notes and the gate.** Each trig is a new note on the same voice: the
-envelopes start their attack from wherever they are (no click), and the
-operators restart their phase if the voice has key sync on. The envelopes
+envelopes start their attack from wherever they are, and the operators
+restart their phase if the voice has key sync on - unless they still sound,
+where the jump would click. No operator's level jumps: it moves at most a
+quarter of full scale a block (0 to full in about 2.7 ms), so instant
+attacks and releases don't click. The envelopes
 hold at their sustain level (L3) while the note is held, and go to R4/L4
 when it is released (the trig's length).
 
@@ -140,9 +157,11 @@ msfa.
 - **Each operator** (OP6 first, as the voice stores them):
   - its **envelope** steps once (msfa's `Env::getsample`: rising faster the
     lower it is, from 1716 at least; falling linearly; stage 3 waits for the
-    key to lift). Shape offsets every rate by (64 - Shape) / 4.
-  - its **gain** is 2^((level - 3840) / 256), and ramps from last block's
-    across the 32 samples.
+    key to lift). Shape offsets every rate: (64 - Shape) / 3 below the
+    middle (up to +21), (64 - Shape) x 40 / 63 above it (down to -40, but
+    not below rate 16, a 2.75 s attack, unless the voice's own rate is).
+  - its **gain** is 2^((level - 3840) / 256), moves at most a quarter of
+    full scale from last block's, and ramps across the 32 samples.
   - it **renders** 32 samples of sin(phase + input), x gain, into its bus or
     the output, as its algorithm's byte says: read nothing, bus one or bus
     two; write or add to bus one, bus two or the output. A full modulator
@@ -193,8 +212,10 @@ and the feedback.
 **The labels and values.** `apply_names` set 7 puts up ALGO / ENV / FBHM /
 VOIC. Color's value prints the algorithm (`dx_algfmt`), Sweep's the feedback
 or the shift (`dx_swfmt`, Sweep's formatter swapped in and back), Contour's
-the selected track's voice name (`dx_vfmt`, in place of PLAITS' formatter
-while DX's labels are up).
+the voice's number (`dx_vfmt`, in place of PLAITS' formatter while DX's
+labels are up), and its knob screen (`dx_draw`, as PLAITS' `mi_draw`) clears
+the stock pips and draws the selected track's voice name, centred on x 96
+in the big font if it fits 56 pixels, else in the small one.
 
 **Machine plumbing,** widened from 12 to 13 machines as for PLAITS:
 `MACH_MAX = 12`, the ParameterPageView list (13 longs), the descriptor

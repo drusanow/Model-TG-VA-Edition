@@ -99,6 +99,16 @@
     <p id="status"></p>
   </div>
 
+  <div class="card">
+    <h2>Or: through Elektron Transfer (experimental)</h2>
+    <p>Transfer only sends audio. <strong>Save for Transfer</strong> wraps each cartridge in a
+      48 kHz mono WAV whose samples are the cartridge's bytes. Upload it with Transfer in SMP mode
+      (Device Config &gt; Transfer: SMP), then load it on a DX track with FUNCTION + PRESET as
+      above: the DX machine finds the cartridge inside. Don't play these files on a Sampler track:
+      they are loud noise.</p>
+    <p><button class="btn" id="wav" disabled>Save for Transfer</button></p>
+  </div>
+
   <footer>Only the DX7 dumps in each file are sent (F0 43 … F7), one every two seconds so the
     Cycles has saved the last one. Nothing is sent anywhere but your MIDI port.</footer>
 </main>
@@ -158,6 +168,38 @@ async function addFiles(files) {
     $("list").appendChild(li);
   }
   $("send").disabled = !dumps.length || !access;
+  $("wav").disabled = !dumps.length;
+}
+
+// A dump as a 48 kHz mono 16-bit WAV: each sample is two of its bytes, high
+// first, so the Cycles - which keeps samples big-endian behind a 64-byte
+// header - stores exactly the dump's bytes.
+function wavOf(d) {
+  const n = d.length + (d.length & 1);
+  const b = new Uint8Array(44 + n);
+  const v = new DataView(b.buffer);
+  const tag = (o, t) => { for (let i = 0; i < 4; i++) b[o + i] = t.charCodeAt(i); };
+  tag(0, "RIFF"); v.setUint32(4, 36 + n, true); tag(8, "WAVE");
+  tag(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 48000, true); v.setUint32(28, 96000, true); v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true); tag(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i += 2) {
+    b[44 + i] = i + 1 < d.length ? d[i + 1] : 0;   // little-endian: low byte first
+    b[44 + i + 1] = d[i];
+  }
+  return b;
+}
+
+function saveWavs() {
+  for (const { data } of dumps) {
+    const name = (firstName(data).replace(/[^A-Za-z0-9 .-]/g, "_") || "CART") + " DX7.wav";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([wavOf(data)], { type: "audio/wav" }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  status(`Saved ${dumps.length} WAV file(s) for Transfer.`);
 }
 
 function fillPorts() {
@@ -199,6 +241,7 @@ drop.addEventListener("drop", (ev) => {
   addFiles(ev.dataTransfer.files);
 });
 $("send").addEventListener("click", send);
+$("wav").addEventListener("click", saveWavs);
 
 if (!navigator.requestMIDIAccess) {
   $("port").innerHTML = "<option>This browser has no Web MIDI: use Chrome or Edge</option>";
