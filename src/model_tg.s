@@ -20638,6 +20638,8 @@ pf_dx:
     movel   %d2,%d0
     movel   %d3,%d1
     jsr     dx_nstore             | the pattern keeps it
+    movel   %d2,%d0               | and it plays as the cartridge has it:
+    jsr     dx_reset              | macros in the middle, algorithm VCE
     lea.l   msg_dx_ok,%a0
     braw    pf_msg
 pf_need:

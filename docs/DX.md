@@ -40,9 +40,16 @@ The defaults are the three macros in the middle and voice 1 (Tooropulse).
 **The algorithm.** Hold **SETTINGS** and turn **Shape**: the parameter page
 shows **ALGO** on Shape's place, from **VCE** (the voice's own) through
 **A1** to **A32**, and the routing changes at once. Let go of SETTINGS and
-Shape is Env Time again. The algorithm is kept with the pattern (and
-stays when Contour picks another voice); a track that becomes DX starts
-at VCE.
+Shape is Env Time again. The algorithm is kept with the pattern; a track
+that becomes DX starts at VCE.
+
+**A preset plays as it is.** Picking a voice with Contour, or loading a
+cartridge from the browser, puts Bright, Env Time and Feedback back in the
+middle and the algorithm on **VCE**, so you hear the voice exactly as its
+cartridge has it, then shape it from there. (A pattern you load keeps its
+own settings, and p-locks or LFOs on Contour reset nothing.) **VCE** is
+always the voice's own algorithm: turning ALGO back to VCE gives the
+preset's routing back.
 
 **The built-in bank.** Until you load a cartridge of your own, Contour picks
 among 63 built-in voices (the parameter page shows the number, the knob
@@ -271,6 +278,16 @@ Menu; `dx_play` uses it in place of the voice's byte. Its value prints
 through `dx_algfmt` (the UI record of id 0x0a), and `mc_commit_hook`
 clears sound+72 when a track becomes DX.
 
+**Back to the preset.** `dx_reset(track)` writes 64 to Color, Shape and
+Sweep (sound +42/+44/+46) and 0 to the algorithm word (+72), and the same
+to the words the audio side reads (`dx_tdp`, recorded by `dx_params`; the
+next trig copies the sound there anyway). `pf_dx` calls it after a
+cartridge loads from the browser (not `dx_probe`'s reload of a pattern's
+own). `dx_vwatch`, from `dx_probe`, keeps each DX track's 66 parameter
+bytes (sound+20.., `dx_snap`) and calls it when Contour is the only one
+that changed since the last look: the knob was turned. A p-lock, slide or
+LFO never writes the sound, and a pattern loaded changes more than that.
+
 **The labels and values.** `apply_names` set 7 puts up BRIG / TIME / FDBK /
 VOIC (Bright, Env Time, Feedback, Voice). Color's, Shape's and Sweep's values
 print the macro's offset, 0 in the middle (`dx_offmt`; Sweep's formatter is
@@ -328,6 +345,11 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   other machines, not after release. The word (k=26) gives VCE for 0..3 and
   A1..A32 above; turning it under SETTINGS marks a chord; the override
   plays (an OP4 carrier in A32 only); a track becoming DX clears it.
+- **Back to the preset:** Contour alone changed in the sound resets the
+  macros and VCE in the sound and the audio's words; the first look, the
+  macros turned, Contour with another word (a pattern), or a track that
+  was not DX at the last look reset nothing; a cartridge loaded from the
+  browser resets them.
 - **Notes:** a new trig starts from silence, the last note's gain ramping
   down first; on a DX track `amp_hook` fades in over 96 samples with
   Attack 0, on the other machines not.

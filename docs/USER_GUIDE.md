@@ -423,6 +423,9 @@ middle (**0**, the voice exactly), nothing is added on top:
 **Algorithm:** hold **SETTINGS** and turn **Shape** (it reads **ALGO**):
 **VCE** is the voice's own, then **A1** to **A32**. Kept with the pattern.
 
+Picking a voice (Contour) or loading a cartridge puts the macros back in the
+middle and the algorithm on VCE: the preset plays exactly as saved.
+
 **Turn Decay up** on a DX track: the track's Amp Decay comes after the
 voice's envelopes, so a low Decay cuts a pad short (or silences it, if its
 attack is slow). The voice's envelopes hold while the note is held (from a

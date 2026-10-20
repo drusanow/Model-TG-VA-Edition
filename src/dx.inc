@@ -83,6 +83,8 @@ dx_params:
 4:  movel   %d0,%a0@(12)
     lea.l   dx_gate,%a0
     movel   %a5@,%a0@(0,%d2:l:4)
+    lea.l   dx_tdp,%a0            | where this track's words are (dx_reset)
+    movel   %a2,%a0@(0,%d2:l:4)
     | the algorithm (param 0x0a, SETTINGS + Shape: trackData+52): (w >> 8) x
     | 33 / 128, 0 the voice's, 1..32. Turned while SETTINGS is down, it is a
     | chord: SETTINGS' release then opens no Config Menu.
@@ -1707,7 +1709,10 @@ dpr_l:
     moveq   #0,%d1
     moveb   %a0@(38),%d1
     cmpil   #DX_MACH,%d1
-    bnes    dpr_n
+    bnes    dpr_nd
+    movel   %a0,%sp@-
+    bsr     dx_vwatch             | a new voice picked: the preset as it is
+    movea.l %sp@+,%a0
     bsr     dx_tok
     movel   %d0,%d2
     lea.l   dx_hash,%a0
@@ -1730,6 +1735,10 @@ dpr_bi:
     clrl    %a0@(56)
     moveq   #1,%d0
     movel   %d0,%a0@(60)
+    bras    dpr_n
+dpr_nd:
+    lea.l   dx_snv,%a0            | not DX: no snapshot to compare with
+    clrb    %a0@(0,%d6:l)
 dpr_n:
     addql   #1,%d6
     moveq   #6,%d0
@@ -1739,6 +1748,84 @@ dpr_n:
     lea.l   %sp@(12),%sp
 dpr_out:
     rts
+
+| a0 = DX track d6's sound: a voice picked by hand starts as its preset. The
+| sound's 66 parameter bytes (sound+20.., k = 0..32) are compared with the
+| last look's (dx_snap): when Contour (k=14) is the only one that changed,
+| the knob was turned - p-locks, slides and LFOs never write the sound, and
+| a pattern loaded changes more than Contour - so dx_reset puts the macros
+| in the middle and the algorithm on VCE. Then the snapshot is taken again.
+| Clobbers d0/d1, a0/a1.
+dx_vwatch:
+    movel   %d2,%sp@-
+    lea.l   dx_snap,%a1
+    movel   %d6,%d0
+    mulu.w  #66,%d0
+    adda.l  %d0,%a1
+    lea.l   dx_snv,%a0
+    tstb    %a0@(0,%d6:l)
+    movea.l %sp@(8),%a0           | (the sound, as the caller pushed it)
+    beqs    4f
+    movew   %a0@(48),%d0          | Contour changed...
+    cmpw    %a1@(28),%d0
+    beqs    4f
+    moveq   #65,%d2               | ...and nothing else?
+1:  cmpil   #28,%d2
+    beqs    2f
+    cmpil   #29,%d2
+    beqs    2f
+    moveb   %a0@(20,%d2:l),%d0
+    cmpb    %a1@(0,%d2:l),%d0
+    bnes    4f
+2:  subql   #1,%d2
+    bpls    1b
+    movel   %d6,%d0
+    bsr     dx_reset
+    movea.l %sp@(8),%a0
+    lea.l   dx_snap,%a1
+    movel   %d6,%d0
+    mulu.w  #66,%d0
+    adda.l  %d0,%a1
+4:  moveq   #65,%d2               | the snapshot
+5:  moveb   %a0@(20,%d2:l),%d0
+    moveb   %d0,%a1@(0,%d2:l)
+    subql   #1,%d2
+    bpls    5b
+    lea.l   dx_snv,%a0
+    moveq   #1,%d0
+    moveb   %d0,%a0@(0,%d6:l)
+    movel   %sp@+,%d2
+    rts
+
+| d0 = a DX track: its macros in the middle (Color, Shape, Sweep: 64) and its
+| algorithm on VCE (the voice's own), in its sound and in the words the
+| audio side reads (dx_tdp; the next trig copies the sound there anyway).
+| UI task. Clobbers d0/d1, a0/a1.
+    .globl  dx_reset
+dx_reset:
+    movel   %d0,%sp@-
+    jsr     sound_obj
+    movel   %sp@+,%d1
+    tstl    %d0
+    beqs    1f
+    movea.l %d0,%a0
+    movel   #64<<8,%d0
+    movew   %d0,%a0@(42)          | k = 11..13
+    movew   %d0,%a0@(44)
+    movew   %d0,%a0@(46)
+    clrl    %a0@(72)              | k = 26: VCE
+1:  cmpil   #6,%d1
+    bccs    2f
+    lea.l   dx_tdp,%a1
+    movel   %a1@(0,%d1:l:4),%d0
+    beqs    2f
+    movea.l %d0,%a1
+    movel   #64<<8,%d0
+    movew   %d0,%a1@(22)
+    movew   %d0,%a1@(24)
+    movew   %d0,%a1@(26)
+    clrw    %a1@(52)
+2:  rts
 
 | ---- cartridges arriving as SysEx: saved on the drive -----------------------
 | The MIDI task hands every complete SysEx message, from USB and from MIDI IN,
@@ -2236,6 +2323,10 @@ dx_amsq:   .long 0, 4342338, 7171437, 16777216 | AM sensitivity (msfa's ams_tab)
 dx_p:      .space 6*16            | the four dials, Q15
 dx_vel:    .byte 100,100,100,100,100,100 | each track's note velocity (dx_params)
 dx_algo:   .byte 0,0,0,0,0,0     | each track's algorithm, 1..32 (0: the voice's)
+dx_snv:    .byte 0,0,0,0,0,0     | dx_snap holds the track's sound (dx_vwatch)
+dx_snap:   .space 6*66           | each DX track's 66 parameter bytes, last look
+    .align 2
+dx_tdp:    .space 6*4            | each track's trackData (dx_params)
     .align 2
 dx_hash:   .space 6*4             | the cartridge each track holds (its file's
                                   | hash; 0 the built-in one)

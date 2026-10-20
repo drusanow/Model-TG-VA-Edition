@@ -845,6 +845,38 @@ class TCartridges(unittest.TestCase):
             e.run('dx_probe')
         self.assertEqual(d.reads, n)
 
+    def test_picking_a_voice_plays_the_preset(self):
+        """Contour turned by hand (the sound's Contour the only word that
+        changed): macros back to the middle, algorithm to VCE, in the sound
+        and in the audio's words. Anything else changing with it (a pattern
+        loaded) leaves them."""
+        e = emu(); s = e.sym
+        Drive(e)
+        TDW = SCRATCH + 0x9800
+        S1 = SOUNDS + 0x100
+        e.w8(S1 + 38, DX)                                # track 1 is a DX
+        e.w32(s['dx_tdp'] + 4, TDW)
+        def setm(w=(10 << 8, 20 << 8, 30 << 8), alg=0x1000):
+            for k, v in enumerate(w):
+                e.w16(S1 + 42 + 2 * k, v); e.w16(TDW + 22 + 2 * k, v)
+            e.w16(S1 + 72, alg); e.w16(TDW + 52, alg)
+        def probe():
+            for _ in range(16):
+                e.run('dx_probe')
+        macros = lambda: ([e.r16(S1 + 42 + 2 * k) for k in range(3)] + [e.r16(S1 + 72)],
+                          [e.r16(TDW + 22 + 2 * k) for k in range(3)] + [e.r16(TDW + 52)])
+        setm(); probe()                                   # the first look: kept
+        self.assertEqual(macros()[0], [10 << 8, 20 << 8, 30 << 8, 0x1000])
+        e.w16(S1 + 48, 9 << 10); probe()                 # Contour alone: the preset
+        self.assertEqual(macros(), ([64 << 8] * 3 + [0], [64 << 8] * 3 + [0]))
+        setm(); probe()                                   # macros turned: kept
+        self.assertEqual(macros()[0], [10 << 8, 20 << 8, 30 << 8, 0x1000])
+        e.w16(S1 + 48, 3 << 10); e.w16(S1 + 20, 77); probe()   # with another word:
+        self.assertEqual(macros()[0], [10 << 8, 20 << 8, 30 << 8, 0x1000])   # a pattern
+        e.w8(S1 + 38, 6); probe()                         # not DX: forgotten...
+        e.w8(S1 + 38, DX); e.w16(S1 + 48, 5 << 10); probe()     # ...so no reset on return
+        self.assertEqual(macros()[0], [10 << 8, 20 << 8, 30 << 8, 0x1000])
+
     def test_preset_browser_loads_onto_a_dx_track(self):
         e = emu(); s = e.sym
         d = Drive(e)
@@ -853,8 +885,12 @@ class TCartridges(unittest.TestCase):
         e.w8(SOUNDS + 0x200 + 38, DX)                    # track 2 is a DX
         e.w32(s['sel_hash'], self.H)
         rd = lambda: bytes(e.uc.mem_read(s['msg_buf'], 32)).split(b'\0')[0].decode()
+        for off, w in ((42, 10 << 8), (44, 20 << 8), (46, 30 << 8), (72, 0x12340000)):
+            e.w32(SOUNDS + 0x200 + off, w) if off == 72 else e.w16(SOUNDS + 0x200 + off, w)
         e.run('preset_fail_hook', regs={D[0]: 1}, stack=[0, 0, 2])
         self.assertEqual(rd(), 'Cartridge\nloaded')
+        self.assertEqual([e.r16(SOUNDS + 0x200 + o) for o in (42, 44, 46)], [64 << 8] * 3)
+        self.assertEqual(e.r32(SOUNDS + 0x200 + 72), 0)          # as the cartridge has it
         self.assertEqual(self.cart(e, 2), b''.join(vs))
         self.assertEqual(bytes(e.uc.mem_read(SOUNDS + 0x200 + 4, 11)), b'DX7ABCD1234')
         e.w32(s['sel_hash'], 0x11111111)                 # a file that is no cartridge
