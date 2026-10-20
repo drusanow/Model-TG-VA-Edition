@@ -24,6 +24,7 @@
 | DX_MACH (12) and the sample-region areas (DX_CARTS, DX_TST) are set in
 | model_tg.s.
 DX_TS   = 512                     | bytes of state per track (DX_TST)
+DX_VELW = 0x40fe4cdc              | the OS's note velocity per track, << 8
 DX_OP   = 192                     | ... where the six operators start, 48 each
 DX_OPS  = 48
 | track state:
@@ -47,7 +48,8 @@ DX_TRQ  = 492
 
 | ---- the four dials (from va_pre: d2 = track, a2 = trackData, a5 = trig) --
 | As mi_params, into dx_p, plus the gate: dx_gate[t] = the render loop's
-| trigger flag this block (non-zero while the note is held). Clobbers d0/a0.
+| trigger flag this block (non-zero while the note is held), and the note's
+| velocity, dx_vel[t]. Clobbers d0/a0.
     .globl  dx_params
 dx_params:
     movel   %d2,%d0
@@ -72,6 +74,16 @@ dx_params:
 4:  movel   %d0,%a0@(12)
     lea.l   dx_gate,%a0
     movel   %a5@,%a0@(0,%d2:l:4)
+    | the note's velocity: the audio side's per-track word (velocity << 8),
+    | written from the note-on event (0x40059136) before this block renders;
+    | dx_fill takes it at the note
+    lea.l   DX_VELW,%a0
+    mvsw    %a0@(0,%d2:l:2),%d0
+    bpls    5f
+    moveq   #0,%d0
+5:  lsrl    #8,%d0
+    lea.l   dx_vel,%a0
+    moveb   %d0,%a0@(0,%d2:l)
     rts
 
 | ---- helpers ------------------------------------------------------------------

@@ -75,7 +75,11 @@ when it is released (the trig's length).
 
 - **One voice per track.** Chords need more tracks, as on the other
   machines.
-- **No velocity:** the voices' key velocity sensitivity is ignored for now.
+- **Velocity** reaches each operator by its own sensitivity (KVS 0..7), as
+  on a DX7: hit harder and a sensitive modulator brightens the sound, a
+  sensitive carrier gets louder. On top of that the Cycles still scales the
+  whole track's volume by velocity, by the track's own velocity setting, as
+  for every machine; set that to none for a DX7's response alone.
 - **Algorithms 4 and 6:** their feedback goes from OP4 or OP5 back to OP6
   on a DX7. Here, as in msfa, OP6 feeds back on itself instead.
 - **The pitch envelope** is a simpler curve than the DX7's (+-4 octaves,
@@ -109,7 +113,9 @@ track's state when Contour picks it (`+64`). On a new note (`dx_noteon`),
 `Dx7Note::init` does:
 
 - **Levels** are in 1/256 octave. The output level is (scaleoutlevel(OL) +
-  keyboard level scaling) x 32, and each envelope level ((scaleoutlevel(L)
+  keyboard level scaling) x 32, plus the velocity by the operator's
+  sensitivity (msfa's ScaleVelocity: ((KVS (veld[vel / 2] - 239) + 7) >>
+  3) x 16), and each envelope level ((scaleoutlevel(L)
   / 2) x 64) + that - 4256, at least 16. OL 99 with L 99 is 3840, full
   scale. One OL step is 0.75 dB.
 - **Rates:** (R x 41) / 64 + rate scaling, at most 63.
@@ -118,6 +124,13 @@ track's state when Contour picks it (`+64`). On a new note (`dx_noteon`),
 - **Frequencies:** a ratio (coarse, 0 = 0.5, times 1 + fine / 100, Q16), or
   a fixed frequency (10^(coarse + fine / 100) Hz, as a note). Detune moves
   the ratio about 0.9 cent a step.
+
+**The velocity** is the OS's own per-track note velocity (`0x40fe4cdc`,
+velocity << 8), which the audio side writes from the note-on event before
+the block renders; `dx_params` copies it every block and `dx_fill` takes it
+at the note. Gains have an octave of headroom (Q14, up to 2.0), so a
+sensitive operator at OL 99 goes above full scale at high velocity, as in
+msfa.
 
 **Each block** (32 samples at 48 kHz):
 
@@ -220,6 +233,10 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   - L2 70 under L1 99 is 21 dB down, and holds.
   - The level holds while the gate is held, and falls after it is released.
   - A new note mid-attack starts from where it was.
+- **Velocity:** a carrier with KVS 7 follows msfa within 0.3 dB from
+  velocity 40 to 127 (+4.5 dB at 127 over 100, near silence at 1); KVS 0
+  stays; a sensitive modulator brightens with velocity; the velocity is
+  taken at the note, and `dx_params` reads it from the OS's word.
 - **LFO:** PMD 99 / PMS 7 swings the pitch; AMD 99 / AMS 3 swings the level
   over 12 dB; PMD 0 leaves it steady.
 - **Voices:** the built-in cartridge is the generator's, Contour picks the
@@ -263,7 +280,10 @@ Needs hardware:
    loads ("Cartridge loaded"), and Contour shows its voice names. Save the
    project, load another, come back: the cartridge is still there. Another
    pattern can have another. Elektron Transfer still connects and works.
-7. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
+7. **Velocity:** E.PIANO MT and FM PLUCK 1 with soft and hard trigs (or
+   velocity p-locks, or a MIDI keyboard): harder is brighter, not only
+   louder.
+8. **CPU page:** six DX tracks playing E.PIANO MT chords across tracks, with
    no dropouts.
 
 ## Credits and licence

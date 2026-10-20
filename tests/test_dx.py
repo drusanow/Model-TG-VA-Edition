@@ -733,8 +733,15 @@ class TPlumbing(unittest.TestCase):
         self.assertEqual([e.r32(e.sym['dx_p'] + 48 + 4 * i) for i in range(4)], list(words))
         self.assertEqual(e.r8(e.sym['dr_trig'] + 3), 1)
         self.assertNotEqual(e.r32(e.sym['dx_gate'] + 12), 0)    # the gate, held
+        self.assertEqual(e.r8(e.sym['dx_vel'] + 3), 0)           # the velocity word: 0 here
+        e.w16(0x40fe4cdc + 6, 93 << 8)                          # the note's velocity, 93
+        V.run_pre(e, 3, DX, trig=True, words=words)
+        self.assertEqual(e.r8(e.sym['dx_vel'] + 3), 93)
+        e.w16(0x40fe4cdc + 6, 0xffff)                           # negative: 0
+        V.run_pre(e, 3, DX, trig=True, words=words)
+        self.assertEqual(e.r8(e.sym['dx_vel'] + 3), 0)
         self.assertEqual((e.visits['dx_params'], e.visits['mi_params'], e.visits['dr_params'],
-                          e.visits['va_params']), (1, 0, 0, 0))
+                          e.visits['va_params']), (3, 0, 0, 0))          # three runs above
 
     def test_render_calls_dx_fill(self):
         import test_va as V
