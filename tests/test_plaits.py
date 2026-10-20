@@ -539,7 +539,7 @@ class TPlumbing(unittest.TestCase):
     def test_machine_page_picture_follows_the_engine(self):
         e = emu(); s = e.sym
         TB = SCRATCH + 0x70000                                  # table B, rebuilt: 12 entries
-        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 336)
+        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 364)
         e.w32(e.arr('trk_mach', 2), MI)
         e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))   # the selected track: 2
         names = [n.lower() for n in NAMES]

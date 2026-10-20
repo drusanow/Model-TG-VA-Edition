@@ -96,6 +96,22 @@ l34_clear:
     lea.l   16(%a0),%a0
     cmpal   #lfo34_kits_end,%a0
     bcss    l34_clear
+    | DX's cartridges and state (dx.inc), in the sample region: zero, with
+    | no voice loaded on any track (-1)
+    lea.l   dx_base,%a0
+dx_clear:
+    moveml  %d4-%d7,%a0@
+    lea.l   16(%a0),%a0
+    cmpal   #dx_end,%a0
+    bcss    dx_clear
+    lea.l   dx_tst,%a0
+    moveq   #5,%d5
+    moveq   #-1,%d4
+dx_unld:
+    movel   %d4,%a0@
+    lea.l   512(%a0),%a0
+    subql   #1,%d5
+    bpls    dx_unld
     moveml  %sp@,%d4-%d7
     lea.l   %sp@(16),%sp
 
@@ -127,7 +143,7 @@ sampler_lazy_init_trampoline:
     movea.l 0x40fe32d0,%a1     | a1 = table A vector "end"
     movel   %a1,%d0
     subl    %a0,%d0             | d0 = end - begin (byte count of live elements)
-    cmpil   #336,%d0            | already rebuilt to 12 elements (12 * 0x1c)?
+    cmpil   #364,%d0            | already rebuilt to 13 elements (13 * 0x1c)?
     beqs    already_done
     bsr     build_sampler_icons
 already_done:
@@ -136,14 +152,14 @@ already_done:
     jmp     0x400a24ca
 
 build_sampler_icons:
-    | Twelve 0x1c-byte entries now: the six stock machines, the Sampler (6),
-    | the VA (7), the drums (8..10) and PLAITS (11). The machine page
-    | (0x400a24ca) indexes both tables by the machine after its 0..11 bound
+    | Thirteen 0x1c-byte entries now: the six stock machines, the Sampler
+    | (6), the VA (7), the drums (8..10), PLAITS (11) and DX (12). The machine
+    | page (0x400a24ca) indexes both tables by the machine after its 0..12 bound
     | (0x400a25e0, widened by
     | build.py); the
     | other reader (0x4001b696) still clamps to 5.
     | ---------- Table A (0x40fe32cc): 48x33 icons ----------
-    movel   #336,-(%a7)            | 12 * 0x1c
+    movel   #364,-(%a7)            | 13 * 0x1c
     jsr     0x40080064             | d0 = new heap buffer
     addql   #4,%a7
     moveal  %d0,%a2                | a2 = new buffer base (table A)
@@ -210,15 +226,24 @@ copyA_loop:
     movel   #0x4016ac78,(%a1)+
     clrl    (%a1)
 
+    lea.l   336(%a2),%a1           | icon #12 slot (DX)
+    movel   #0x401117c8,(%a1)+
+    movel   #48,(%a1)+
+    movel   #33,(%a1)+
+    movel   #2,(%a1)+
+    movel   #dx_icon_a_pixels,(%a1)+
+    movel   #0x4016ac78,(%a1)+
+    clrl    (%a1)
+
     movel   %a2,%d2                | d2 = new buffer base, kept for arithmetic
     lea.l   0x40fe32cc,%a0
     movel   %d2,(%a0)+             | vector.begin = new buffer
-    lea.l   336(%a2),%a1           | new buffer + 12*0x1c
+    lea.l   364(%a2),%a1           | new buffer + 13*0x1c
     movel   %a1,(%a0)+             | vector.end
     movel   %a1,(%a0)               | vector.capacity_end
 
     | ---------- Table B (0x40fe384c): 34x34 icons ----------
-    movel   #336,-(%a7)
+    movel   #364,-(%a7)
     jsr     0x40080064
     addql   #4,%a7
     moveal  %d0,%a2                | a2 = new buffer base (table B)
@@ -285,10 +310,19 @@ copyB_loop:
     movel   #0x4017c20c,(%a1)+
     clrl    (%a1)
 
+    lea.l   336(%a2),%a1           | icon #12 slot (DX)
+    movel   #0x401117c8,(%a1)+
+    movel   #34,(%a1)+
+    movel   #34,(%a1)+
+    movel   #2,(%a1)+
+    movel   #dx_icon_b_pixels,(%a1)+
+    movel   #0x4017c20c,(%a1)+
+    clrl    (%a1)
+
     movel   %a2,%d2
     lea.l   0x40fe384c,%a0
     movel   %d2,(%a0)+
-    lea.l   336(%a2),%a1
+    lea.l   364(%a2),%a1
     movel   %a1,(%a0)+
     movel   %a1,(%a0)
 
@@ -308,6 +342,7 @@ sampler_name_table:
     .long   snare_name_string      | VA SNARE (9)
     .long   hihat_name_string      | VA HIHAT (10)
     .long   plaits_name_string     | PLAITS (11)
+    .long   dx_name_string         | DX (12)
 
 sampler_name_string:
     .ascii  "Sample"
@@ -359,6 +394,14 @@ hihat_name_string:
     .asciz  "VA HIHAT"
 plaits_name_string:
     .asciz  "PLAITS"
+dx_name_string:
+    .asciz  "DX"
+    .align 2
+dx_icon_a_pixels:                  | tools/gen_dx_icons.py
+    .incbin "va_icons/dx_icon_A_48x33.bin"
+    .align 2
+dx_icon_b_pixels:
+    .incbin "va_icons/dx_icon_B_34x34.bin"
     .align 2
 plaits_icon_a_pixels:              | tools/gen_mi_icons.py
     .incbin "va_icons/plaits_icon_A_48x33.bin"
@@ -385,9 +428,9 @@ plaits_icon_b_pixels:
 
 table_lookup_a_fixed:              | replaces FUN_4004df5c (called with machineIndex+1)
     movel   %sp@(4),%d0
-    cmpil   #7,%d0                  | 7..12: the Sampler, the VA, the drums and
-    bcss    a_not_seven             | PLAITS - the same alias, used only until
-    cmpil   #12,%d0                 | descr_hook's own descriptor is built
+    cmpil   #7,%d0                  | 7..13: the Sampler, the VA, the drums,
+    bcss    a_not_seven             | PLAITS and DX - the same alias, used only
+    cmpil   #13,%d0                 | until descr_hook's own descriptor is built
     bhis    a_not_seven
 a_alias:
     moveq   #1,%d0                  | alias -> slot 1 (Kick), same slot machineIndex 0 uses
@@ -404,9 +447,9 @@ a_domul:
 
 table_lookup_b_fixed:              | replaces FUN_4004df76 (called with raw machineIndex)
     movel   %sp@(4),%d0
-    cmpil   #6,%d0                  | 6..11: the Sampler, the VA, the drums and
-    bcss    b_not_six               | PLAITS
-    cmpil   #11,%d0
+    cmpil   #6,%d0                  | 6..12: the Sampler, the VA, the drums,
+    bcss    b_not_six               | PLAITS and DX
+    cmpil   #12,%d0
     bhis    b_not_six
 b_alias:
     moveq   #0,%d0                  | alias -> raw index 0 (Kick)

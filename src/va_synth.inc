@@ -44,8 +44,13 @@ va_pre:
     cmpil   #VA_MACH,%d1          | 8..10: the drums' dials (drums.inc),
     beqs    vp_va                 | 11: PLAITS' (plaits.inc)
     cmpil   #MI_MACH,%d1
-    bnes    vp_dr
+    bnes    vp_dx
     jsr     mi_params
+    bras    vp_tr
+vp_dx:
+    cmpil   #DX_MACH,%d1          | 12: DX's, and its gate (dx.inc)
+    bnes    vp_dr
+    jsr     dx_params
     bras    vp_tr
 vp_dr:
     jsr     dr_params

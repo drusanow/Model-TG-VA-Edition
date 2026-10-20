@@ -2,7 +2,7 @@
 
 **Unofficial firmware additions for the Elektron Model:Cycles (OS 1.13):
 a full Sampler machine, a two-oscillator VA synth machine, three analogue-
-style drum machines, a Plaits-style macro machine with ten engines, four
+style drum machines, a Plaits-style macro machine with ten engines, a DX7-style FM machine, four
 LFOs a track, a trig generator, resampling, beat-repeat with master FX, and
 more.**
 
@@ -47,6 +47,12 @@ keeps working.
   noise, a struck modal resonator, particles and a plucked string - on Plaits' four controls: Contour picks the engine,
   Color / Shape / Sweep are HARMONICS / TIMBRE / MORPH, labelled per engine.
   Integer remakes of Plaits' algorithms (MIT, credited in docs/PLAITS.md).
+- **DX** (Plaits Edition), the thirteenth machine: a 6-operator FM voice per
+  track after the DX7, as Dexed's engine (msfa, Apache 2.0) models it - the
+  32 algorithms, envelopes, keyboard scaling, feedback, LFO - playing DX7
+  voices. Color picks the algorithm, Shape speeds up or slows down every
+  envelope, Sweep sets the feedback or shifts the modulators, Contour picks
+  the voice ([docs/DX.md](docs/DX.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale

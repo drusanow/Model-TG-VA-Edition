@@ -2316,7 +2316,7 @@ mw_out:
 | d0 = an engine (0..9), or -1 for PLAITS' own picture. Table B's twelve
 | entries (0x40fe384c, built by build_sampler_icons) hold PLAITS' at entry 11
 | (+308); its pixel pointer (+16) is set to the engine's. Nothing is written
-| until the table has been rebuilt to twelve entries. Clobbers d0/d1/a0/a1.
+| until the table has been rebuilt to thirteen entries. Clobbers d0/d1/a0/a1.
 mi_icon:
     lea.l   plaits_icon_b_pixels,%a1
     tstl    %d0
@@ -2326,7 +2326,7 @@ mi_icon:
 1:  movea.l 0x40fe384c,%a0
     movel   0x40fe3850,%d1
     subl    %a0,%d1
-    cmpil   #336,%d1
+    cmpil   #364,%d1
     bnes    2f
     movel   %a1,%a0@(308+16)
 2:  rts
@@ -2345,17 +2345,39 @@ MI_ENG_FMT = 0x40a7345c
 | with set 6 up that is mi_draw, on Pitch's storage and manager words as
 | fine_draw is, and every other set puts the four words back.
 MI_ENG_DRW = 0x40a73460
+DX_SWF     = 0x40a733f8           | Sweep's (id 0x49) formatter: DX names it
 mi_fmtswap:
+    | Contour's formatter: PLAITS' engine (set 6), DX's voice (set 7), else
+    | the stock one (kept in mi_fmt0 while one of ours is in)
     lea.l   MI_ENG_FMT,%a0
-    movel   %a0@,%d0
+    suba.l  %a1,%a1               | the one wanted
     cmpil   #6,%d1
     bnes    1f
+    lea.l   mi_eng_fmt,%a1
+1:  cmpil   #7,%d1
+    bnes    2f
+    lea.l   dx_vfmt,%a1
+2:  movel   %a0@,%d0
+    cmpl    %a1,%d0
+    beqs    5f                    | already
     cmpil   #mi_eng_fmt,%d0
-    beqs    2f
-    movel   %d0,mi_fmt0           | the stock formatter, kept
-    movel   #mi_eng_fmt,%a0@
-    lea.l   MI_ENG_DRW,%a0        | ...and the stock function object
-    lea.l   mi_drw0,%a1
+    beqs    3f
+    cmpil   #dx_vfmt,%d0
+    bnes    4f
+3:  movel   mi_fmt0,%d0           | ours, not the one wanted: stock first
+    movel   %d0,%a0@
+4:  cmpa.l  #0,%a1
+    beqs    5f
+    movel   %d0,mi_fmt0           | the stock one, kept
+    movel   %a1,%a0@
+5:  | ...and its knob screen: mi_draw for PLAITS only
+    lea.l   MI_ENG_DRW,%a0
+    movel   %a0@(12),%d0
+    cmpil   #6,%d1
+    bnes    6f
+    cmpil   #mi_draw,%d0
+    beqs    7f
+    lea.l   mi_drw0,%a1           | the stock function object, kept
     movel   %a0@,%a1@+
     movel   %a0@(4),%a1@+
     movel   %a0@(8),%a1@+
@@ -2368,17 +2390,28 @@ mi_fmtswap:
     movel   %d0,%a0@(4)
     movel   0x40a727e8,%d0        | and manager, last
     movel   %d0,%a0@(8)
-    rts
-1:  cmpil   #mi_eng_fmt,%d0
-    bnes    2f
-    movel   mi_fmt0,%a0@
-    lea.l   MI_ENG_DRW,%a0
+    bras    7f
+6:  cmpil   #mi_draw,%d0
+    bnes    7f
     lea.l   mi_drw0,%a1
     movel   %a1@(8),%a0@(8)       | the manager first: off before the rest
     movel   %a1@,%a0@
     movel   %a1@(4),%a0@(4)
     movel   %a1@(12),%a0@(12)
-2:  rts
+7:  | ...and DX's Sweep (id 0x49) names feedback and ratio shifts
+    lea.l   DX_SWF,%a0
+    movel   %a0@,%d0
+    cmpil   #7,%d1
+    bnes    8f
+    cmpil   #dx_swfmt,%d0
+    beqs    9f
+    movel   %d0,dx_swf0
+    movel   #dx_swfmt,%a0@
+    rts
+8:  cmpil   #dx_swfmt,%d0
+    bnes    9f
+    movel   dx_swf0,%a0@
+9:  rts
 
 | ---- mi_draw: the knob screen while Contour picks the engine ---------------
 | Invoked as fine_draw is: (functor, value, ctx, 0x60, y, flag), after the

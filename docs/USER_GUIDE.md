@@ -22,6 +22,8 @@ The twelve parameter knobs are numbered 1 to 12.
 - [Stereo](#stereo)
 - [Retrig and master FX](#retrig-and-master-fx)
 - [The VA machine](#the-va-machine)
+- [PLAITS](#plaits)
+- [DX](#dx)
 - [Additions for every machine](#additions-for-every-machine)
 - [Slide trigs](#slide-trigs)
 - [Scale Lock](#scale-lock)
@@ -388,6 +390,26 @@ as on the VA. Every knob - Contour too - p-locks, slides, takes LFOs and is
 saved. Patterns from before SWRM and MODL keep their engines; a p-lock or
 LFO on Contour near an engine's edge may now reach its neighbour. Details:
 [PLAITS.md](PLAITS.md).
+
+## DX
+
+*Plaits Edition only.* The thirteenth machine: one 6-operator FM voice per
+track, after the DX7 (as Dexed's engine models it). It plays DX7 voices; this
+build has a built-in cartridge of its own voices (INIT VOICE, E.PIANO MT,
+SYN BASS 1, GLASS BELL, BRASS SWEL, DRAWBARS 1, FM PLUCK 1, SOFT PAD 1).
+Loading your own cartridges is coming.
+
+| knob | label | does |
+|---|---|---|
+| **Color** | **ALGO** | the algorithm: **VCE** (the voice's own) at 0, then **A1** to **A32** |
+| **Shape** | **ENV** | all envelopes faster (down) or slower (up); 64 as the voice has them |
+| **Sweep** | **FBHM** | below the middle feedback **FB0** to **FB7**, **VCE** at 64, above it the modulators up to **+24** semitones |
+| **Contour** | **VOIC** | the voice, 1 to 32; the page shows its name |
+
+The voice's envelopes hold while the note is held (the trig's length) and
+release after. Pitch, Decay, Attack, Filter and Resonance work as on the other
+machines; every knob p-locks, slides, takes LFOs and is saved. Details:
+[DX.md](DX.md).
 
 ## Additions for every machine
 

@@ -33,7 +33,8 @@ image.
   - Calls between the blob and the overlay must be `jsr`/`jmp` (absolute):
     a `bsr`/`bra` across fails the link. Labels the other side uses need
     `.globl` if they are in another source file.
-  - PLAITS (`plaits.inc`) is the first thing moved there.
+  - PLAITS (`plaits.inc`) is the first thing moved there, then DX
+    (`dx.inc`, [DX.md](DX.md)).
   - `build.py --space-test` pads the overlay with incompressible bytes to
     4 KB short of the limit: a firmware as large as one can get, to check
     on a Cycles that the updater and the bootstrap take it.

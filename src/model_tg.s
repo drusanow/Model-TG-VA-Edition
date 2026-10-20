@@ -227,7 +227,8 @@
     DR_SNARE = 9
     DR_HAT   = 10
     MI_MACH  = 11                 | PLAITS (plaits.inc)
-    MACH_LAST = 11                | the last machine index
+    DX_MACH  = 12                 | DX (dx.inc)
+    MACH_LAST = 12                | the last machine index
     .include "sampler_strings.inc"
     .include "name_swap.inc"
     .include "note_ratio.inc"
@@ -265,10 +266,10 @@ va_descr_atk:                     | the VA's, modifier held: Attack, Filter
 
 
 | machine+1 list for ParameterPageView, now including the Sampler (7), the
-| VA (8), the drums (9..11) and PLAITS (12). build.py widens the three sizes
-| at 0x4001bbd0.. to 12 longs.
+| VA (8), the drums (9..11), PLAITS (12) and DX (13). build.py widens the
+| three sizes at 0x4001bbd0.. to 13 longs.
 page_machine_list:
-    .long 1,2,3,4,5,6,7,8,9,10,11,12
+    .long 1,2,3,4,5,6,7,8,9,10,11,12,13
 
     .align 2
 | Geometric midpoints between adjacent semitones around 45710 (1.0x),
@@ -2661,6 +2662,15 @@ sv_dr:
     lea.l   %sp@(12),%sp
     braw    sv_nofilt
 sv_dr2:
+    cmpil   #DX_MACH,%d0          | DX (dx.inc)
+    bnes    sv_dr3
+    movel   %d0,%sp@-
+    movel   %d1,%sp@-
+    movel   %d4,%sp@-
+    jsr     dx_fill
+    lea.l   %sp@(12),%sp
+    braw    sv_nofilt
+sv_dr3:
     movel   %d0,%sp@-             | the drum (drums.inc)
     movel   %d1,%sp@-             | step
     movel   %d4,%sp@-             | track
@@ -4109,11 +4119,11 @@ descr_hook:
     moveq   #1,%d1
     bras    ns_go
 ns_va:
-    movel   %d0,%d1               | 8..12: the VA's, the drums' and PLAITS'
-    subql   #6,%d1                | labels, 2..6
+    movel   %d0,%d1               | 8..13: the VA's, the drums', PLAITS' and
+    subql   #6,%d1                | DX's labels, 2..7
     cmpil   #2,%d1
     bcss    ns_none
-    cmpil   #6,%d1
+    cmpil   #7,%d1
     blss    ns_go
 ns_none:
     moveq   #0,%d1
@@ -9482,9 +9492,13 @@ an_dk:
     cmpil   #5,%d1
     beqw    an_loop
     cmpil   #6,%d1                | 6: PLAITS, for the selected engine
-    bnew    an_smp
+    bnew    an_dx
     jsr     mi_fillswap
     braw    an_loop
+an_dx:
+    lea.l   dx_swap,%a1           | 7: DX
+    cmpil   #7,%d1
+    beqw    an_loop
 an_smp:
     lea.l   ui_gran,%a1           | our labels: the selected track's mode picks
     movel   %a1@,%d0              | the set - 1 granular, 2 stretch
@@ -9541,7 +9555,10 @@ an_done:
     | stock formatter (0x40a70708), which is what is put back for Kick Color
     | and Perc Shape.
     movel   #0x400456c8,%d0
-    cmpil   #1,%d1                | the Sampler only: the VA's dials are plain
+    cmpil   #7,%d1                | DX: Color names the algorithm
+    bnes    1f
+    movel   #dx_algfmt,%d0
+1:  cmpil   #1,%d1                | the Sampler only: the VA's dials are plain
     bnes    an_fmt                | 0..127, drawn as the stock ones are
     movel   #0x4004a440,%d0
 an_fmt:
@@ -9788,11 +9805,11 @@ descr_b_hook:
     moveq   #1,%d1
     bras    dbh_names
 dbh_va:
-    movel   %d0,%d1               | 7..11: the VA's, the drums' and PLAITS'
-    subql   #5,%d1                | labels, 2..6
+    movel   %d0,%d1               | 7..12: the VA's, the drums', PLAITS' and
+    subql   #5,%d1                | DX's labels, 2..7
     cmpil   #2,%d1
     bcss    dbh_none
-    cmpil   #6,%d1
+    cmpil   #7,%d1
     blss    dbh_names
 dbh_none:
     moveq   #0,%d1
@@ -9896,7 +9913,15 @@ dbh_pass:
     OVL_MAX     = 0x40000         | the overlay: code and tables run from here
     OVL_BASE    = L34_KITS - OVL_MAX | (build.py links `.section .ovl` here;
                                   | boot_extra_hook copies it up from the image)
-    PCM_TOP     = OVL_BASE        | samples and takes stay below this
+    DX_BASE     = OVL_BASE - 0x8000 | DX (dx.inc): six cartridges of 4 KiB,
+    DX_CARTS    = DX_BASE         | then the six tracks' state (DX_TS each);
+    DX_TST      = DX_BASE + 0x6000 | cleared at boot (boot_extra_hook)
+    DX_END      = DX_BASE + 0x8000
+    PCM_TOP     = DX_BASE         | samples and takes stay below this
+    .globl  dx_base, dx_tst, dx_end
+    dx_base     = DX_BASE
+    dx_tst      = DX_TST
+    dx_end      = DX_END
     .globl  ovl_vma, ovl_max
     ovl_vma     = OVL_BASE
     ovl_max     = OVL_MAX
@@ -20892,11 +20917,19 @@ msg_buf:    .space 64
     .align 2
     .include "drums.inc"
 
-| ---- PLAITS (machine 11): in the overlay (build.py), run from the sample region
+| ---- PLAITS (machine 11) and DX (12): in the overlay (build.py), run from the
+| sample region; DX's per-sample buffers stay here, in copyback cache
     .section .ovl,"ax"
     .align 4
     .include "plaits.inc"
+    .align 4
+    .include "dx.inc"
     .text
+    .align 4
+    .globl  dx_gate, dx_bus1, dx_bus2
+dx_gate:    .space 6*4            | the render loop's trigger flag (dx_params)
+dx_bus1:    .space 32*4           | the operators' two buses, one block
+dx_bus2:    .space 32*4
 
 | ---- LFO 2: a second LFO on every track -------------------------------------
     .align 2

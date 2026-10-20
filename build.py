@@ -168,6 +168,7 @@ _txt+="\n"+open(f"{proto}/va_synth.inc").read()
 _txt+="\n"+open(f"{proto}/drums.inc").read()
 _txt+="\n"+open(f"{proto}/lfo2.inc").read()
 _txt+="\n"+open(f"{proto}/plaits.inc").read()
+_txt+="\n"+open(f"{proto}/dx.inc").read()
 _txt+="\n"+open(f"{proto}/gen.inc").read()
 _neg={int(m) for m in _re.findall(r'lea\.l\s+%sp@\(-(\d+)\),%sp', _txt)}
 _pos={int(m) for m in _re.findall(r'lea\.l\s+%sp@\((\d+)\),%sp', _txt)}
@@ -190,8 +191,8 @@ print(f"  stack frames balanced ({sorted(_neg)})")
 # The VA's va_fill writes the same window, the tenth; the drums' dr_fill the
 # eleventh; PLAITS' mi_fill the twelfth.
 _bufs=_re.findall(r'lea\.l\s+sampler_buf(\+32)?,%a[0-7]', _txt)
-if _bufs.count('') or len(_bufs)!=12:
-    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected twelve '+32')")
+if _bufs.count('') or len(_bufs)!=13:
+    raise SystemExit(f"sampler_buf window mismatch: {_bufs!r} (expected thirteen '+32')")
 print(f"  sampler_buf: fill, filter, granular, pluck, wavetable, lo-fi, tape, vinyl and VA all at +32")
 # Everything that renders a voice must reach the amp stage through amp_hook, or
 # it silently loses its attack. The six stock call sites are retargeted in the
@@ -261,7 +262,7 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'kick_swap','snare_swap','hat_swap','dr_defaults','dr_hat_r','dr_ktab','dr_ftab',
               'kick_icon_a_pixels','kick_icon_b_pixels','snare_icon_a_pixels',
               'snare_icon_b_pixels','hihat_icon_a_pixels','hihat_icon_b_pixels',
-              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat',
+              'plaits_icon_a_pixels','plaits_icon_b_pixels','rtg_names','mi_etab','mi_swap','mi_labs','mi_engn','mi_icons','mi_icobj','mi_drw0','mi_ic_wshp','mi_ic_fm','mi_ic_gran','mi_ic_pd','mi_ic_chip','mi_ic_nois','mi_ic_part','mi_ic_strg','mi_ic_swrm','mi_ic_modl','md_rat','dx_alg','dx_e2','dx_sin','dx_sol','dx_exps','dx_pms','dx_cart','dx_swap','dx_amsw','dx_p','dx_swf0','dx_sbuf','dx_gate','dx_bus1','dx_bus2',
               'mi_sin','mi_semi','mi_ws','mi_fold','mi_fmq','mi_e2','mi_chord','mi_chn',
               'sfx_desc','sfx_items','sfx_n_d','sfx_n_r','sfx_spl','sfx_v','sfx_dt','sfx_dcl',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
@@ -283,7 +284,7 @@ print(f"  every 16-bit branch lands on a label")
 # mach_nbuf (19 bytes, no .balign after it) left gm_val_*/gm_rot_* odd, and
 # the options menu threw an exception at its first row. So any label at an
 # odd address must be a string: printable, NUL-terminated.
-_BYTE_DATA={'qry_yes','qry_none','key_state'}   # .byte data, not code
+_BYTE_DATA={'qry_yes','qry_none','key_state','dx_sol','dx_exps','dx_pms','dx_amsw'}   # .byte data, not code
 _odd=[]
 for _l in _nm.splitlines():
     _p=_l.split()
@@ -421,8 +422,8 @@ assert bytes(d[_o:_o+4])==struct.pack('>I',_osum)
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
-MACH_MAX=11                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
-                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS
+MACH_MAX=12                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
+                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS, 12 DX
 _M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),
