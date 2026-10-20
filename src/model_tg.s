@@ -9557,7 +9557,7 @@ an_done:
     movel   #0x400456c8,%d0
     cmpil   #7,%d1                | DX: Color names the algorithm
     bnes    1f
-    movel   #dx_algfmt,%d0
+    movel   #dx_offmt,%d0
 1:  cmpil   #1,%d1                | the Sampler only: the VA's dials are plain
     bnes    an_fmt                | 0..127, drawn as the stock ones are
     movel   #0x4004a440,%d0

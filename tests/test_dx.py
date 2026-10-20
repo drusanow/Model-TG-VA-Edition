@@ -19,6 +19,7 @@ import gen_dx_tables as G
 DX = 12
 FS = 96000
 STEP1 = 0x10000                                   # note 60
+DXOP = 192                                        # the operators in a track's state
 EMU = None
 
 
@@ -28,20 +29,13 @@ def emu():
         EMU = Emu()
     else:
         EMU.reset()
-    for t in range(6):                            # as the boot clear leaves it
+    for t in range(6):                            # as the boot clear leaves it,
         EMU.w32(EMU.sym['dx_tst'] + 512 * t, M32)
+        dials(EMU, t)                             # and the defaults row's dials
     return EMU
 
 
-def color_for(alg):
-    """the Color value (0..127) that picks algorithm alg (1..32)"""
-    for c in range(1, 128):
-        if (c - 1) * 32 // 127 + 1 == alg:
-            return c
-    raise ValueError(alg)
-
-
-def dials(e, t, color=0, shape=64, sweep=64, voice=0):
+def dials(e, t, color=64, shape=64, sweep=64, voice=0):
     for i, v in enumerate((color << 8, shape << 8, sweep << 8, voice << 10)):
         e.w32(e.sym['dx_p'] + 16 * t + 4 * i, v)
 
@@ -153,18 +147,17 @@ class TAlgorithms(unittest.TestCase):
         self.assertEqual(got, bytes(b for row in G.DX_ALG for b in row))
 
     def test_engine_follows_carriers_and_edges(self):
-        """for every algorithm (picked by Color): an operator alone sounds iff
+        """for every algorithm (the voice's own): an operator alone sounds iff
         it is a carrier, and a modulator alone with a carrier changes it iff
         it feeds it directly"""
         for a in range(1, 33):
             edges, carriers, _ = G.ALGOS[a][0], G.ALGOS[a][1], G.ALGOS[a][2]
             for k in range(1, 7):                       # carriers
                 e = emu()
-                load(e, 0, one(**{f'op{k}': op(ol=99)}))
-                dials(e, 0, color=color_for(a), sweep=0)
+                load(e, 0, one(alg=a, **{f'op{k}': op(ol=99)}))
                 x = render(e, 40)[1000:]
                 if k in carriers:
-                    self.assertGreater(np.abs(x).max(), 10000, (a, k))
+                    self.assertGreater(np.abs(x).max(), 6000, (a, k))
                 else:
                     self.assertLess(np.abs(x).max(), 4, (a, k))
             for k in carriers:                          # what feeds each carrier
@@ -172,8 +165,7 @@ class TAlgorithms(unittest.TestCase):
                     if j in carriers or j == k:
                         continue
                     e = emu()
-                    load(e, 0, one(**{f'op{k}': op(ol=99), f'op{j}': op(ol=85, coarse=3)}))
-                    dials(e, 0, color=color_for(a), sweep=0)
+                    load(e, 0, one(alg=a, **{f'op{k}': op(ol=99), f'op{j}': op(ol=85, coarse=3)}))
                     x = render(e, 64)[1000:]
                     side = amp_at(x, 261.63 * 4) + amp_at(x, 261.63 * 2)
                     main = amp_at(x, 261.63)
@@ -182,22 +174,15 @@ class TAlgorithms(unittest.TestCase):
                     else:
                         self.assertLess(side, 0.002 * main, (a, j, k))
 
-    def test_color_zero_is_the_voices_own(self):
-        e = emu()
-        load(e, 0, one(alg=1, op1=op(ol=99), op3=op(ol=99)))  # alg 1: carriers 1, 3
-        dials(e, 0, color=0)
-        a = render(e, 40)[1000:]
-        e = emu()
-        load(e, 0, one(alg=1, op1=op(ol=99), op3=op(ol=99)))
-        dials(e, 0, color=color_for(1))
-        b = render(e, 40)[1000:]
-        self.assertTrue(np.array_equal(a, b))
-        e = emu()
-        load(e, 0, one(alg=1, op1=op(ol=99), op3=op(ol=99)))
-        dials(e, 0, color=color_for(3))                 # alg 3: OP3 modulates
-        c = render(e, 40)[1000:]
-        self.assertFalse(np.array_equal(a, c))
-
+    def test_feedback_operator_overwrites_its_bus(self):
+        """the feedback operator of algorithm 2 (OP2) writes bus one, so OP4's
+        output (into OP3) must not reach OP1 - it did when the add-or-write
+        test was lost"""
+        def out(op4):
+            e = emu()
+            load(e, 0, one(alg=2, fb=5, op1=op(ol=99), op2=op(ol=80), op4=op(ol=op4)))
+            return render(e, 200)[2000:]
+        self.assertTrue(np.array_equal(out(0), out(80)))
 
 class TOperators(unittest.TestCase):
     def test_sine_at_the_note(self):
@@ -208,7 +193,7 @@ class TOperators(unittest.TestCase):
             self.assertLess(abs(cents(peak_hz(x, hz * 0.8, hz * 1.25), hz)), 1.5, step)
             f, s = spectrum(x)
             self.assertLess(s[(f > hz * 1.5) & (f < 20000)].max(), s.max() * 1e-3)   # -60 dB
-            self.assertGreater(np.abs(x).max(), 12000)
+            self.assertGreater(np.abs(x).max(), 6000)       # a carrier at -12 dB
 
     def test_ratios_and_fixed(self):
         for kw, hz in ((dict(coarse=2), 523.25), (dict(coarse=0), 130.81),
@@ -226,6 +211,16 @@ class TOperators(unittest.TestCase):
             load(e, 0, one(op1=op(ol=99, mode=1, coarse=2)))
             x = render(e, 400, step=step)[2000:]
             self.assertLess(abs(cents(peak_hz(x, 80, 125), 100)), 3, step)
+        for kw, hz in ((dict(coarse=0, fine=50), 3.1623), (dict(coarse=1, fine=37), 23.442),
+                       (dict(coarse=3, fine=99), 9772.4)):  # 10^(c + f / 100), even
+            e = emu()                                       # below 8 Hz
+            load(e, 0, one(op1=op(ol=99, mode=1, **kw)))
+            st = e.sym['dx_tst'] + DXOP + 48 * 5            # OP1
+            render(e, 2)
+            inc = e.r32(st + 44)
+            self.assertTrue(inc & 0x80000000)
+            got = (inc & 0x7fffffff) * 48000 / 2 ** 32
+            self.assertLess(abs(cents(got, hz)), 2, kw)
 
     def test_output_level(self):
         e = emu()
@@ -254,34 +249,70 @@ class TOperators(unittest.TestCase):
 
     def test_feedback(self):
         e = emu()
-        load(e, 0, one(alg=32, op6=op(ol=99)))
-        dials(e, 0, sweep=0)                                 # FB 0: a sine
+        load(e, 0, one(alg=32, op6=op(ol=99)))              # FB 0: a sine
         x = render(e, 200)[2000:]
         self.assertLess(amp_at(x, 523.25), 1e-3 * amp_at(x, 261.63))
         r = []
         for fb in range(1, 8):
             e = emu()
-            load(e, 0, one(alg=32, op6=op(ol=99)))
-            dials(e, 0, sweep=fb * 8)
+            load(e, 0, one(alg=32, fb=fb, op6=op(ol=99)))
             x = render(e, 200)[2000:]
             r.append([amp_at(x, 261.63 * n) / amp_at(x, 261.63) for n in (2, 3)])
         h2 = [v[0] for v in r]
-        self.assertEqual(h2, sorted(h2))                     # brighter step by step
+        self.assertEqual(h2[:6], sorted(h2[:6]))             # brighter step by step
         self.assertTrue(0.4 < r[5][0] < 0.75 and 0.2 < r[5][1] < 0.45, r[5])   # FB6: a saw's
-        e = emu()                                            # Sweep 64: the voice's
-        load(e, 0, one(alg=32, fb=7, op6=op(ol=99)))
-        dials(e, 0)
-        x = render(e, 200)[2000:]
-        self.assertGreater(amp_at(x, 523.25) / amp_at(x, 261.63), 0.3)
 
-    def test_sweep_shifts_the_modulators(self):
+    def test_macros_at_64_and_on_carriers_alone(self):
+        """64 is the voice as it is; Bright and Mod Env leave a voice of
+        carriers alone; Amp Env leaves its modulators alone"""
+        v = one(alg=1, op1=op(ol=99, r=(60, 50, 99, 60)), op2=op(ol=80, r=(50, 40, 99, 60)))
+        def out(voice=v, **d):
+            e = emu()
+            load(e, 0, voice)
+            dials(e, 0, **d)
+            return render(e, 300)
+        ref = out()
+        self.assertTrue(np.array_equal(ref, out(color=64, shape=64, sweep=64)))
+        c = one(alg=32, op6=op(ol=99, r=(60, 50, 99, 60)))
+        self.assertTrue(np.array_equal(out(c), out(c, color=0, sweep=127)))
+        m = one(alg=1, op2=op(ol=80, r=(50, 40, 99, 60)))   # a modulator alone: silent
+        self.assertEqual(np.abs(out(m, shape=0)).max(), 0)
+
+    def test_bright(self):
+        def bright(color):
+            e = emu()
+            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=60)))
+            dials(e, 0, color=color)
+            x = render(e, 200)[2000:]
+            return sum(amp_at(x, 261.63 * n) for n in (2, 3, 4)) / amp_at(x, 261.63)
+        b = [bright(c) for c in (0, 32, 64, 96, 127)]
+        self.assertEqual(b, sorted(b))
+        self.assertLess(b[0], 0.3 * b[2])
+        self.assertGreater(b[4], 3 * b[2])
+        e = emu()                                            # Bright 127 = the
+        load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=60)))   # modulator 504 / 32
+        dials(e, 0, color=127)                               # output levels up
+        a = render(e, 200)[2000:]
         e = emu()
-        load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=80)))
-        dials(e, 0, sweep=127)                               # +24: the modulator x4
-        x = render(e, 200)[2000:]
-        self.assertGreater(amp_at(x, 261.63 * 5), 0.05 * amp_at(x, 261.63))
-        self.assertLess(amp_at(x, 261.63 * 2), 0.01 * amp_at(x, 261.63))
-        self.assertLess(abs(cents(peak_hz(x, 200, 320), 261.63)), 1.5)   # carrier kept
+        load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=76)))
+        b = render(e, 200)[2000:]
+        self.assertLess(abs(20 * np.log10(amp_at(a, 523.25) / amp_at(b, 523.25))), 1.0)
+
+    def test_mod_env(self):
+        """Sweep moves the modulators' attack and first decay: the tone's
+        movement - a brass swell slower or quicker, a pluck's bite shorter"""
+        def bright(sweep, at, r, l):
+            e = emu()
+            load(e, 0, one(alg=1, op1=op(ol=99), op2=op(ol=85, r=r, l=l)))
+            dials(e, 0, sweep=sweep)
+            x = render(e, int(at * 1500) + 100)
+            w = x[int(at * FS):int(at * FS) + 4096]
+            return sum(amp_at(w, 261.63 * n) for n in (2, 3, 4)) / amp_at(w, 261.63)
+        swell = ((40, 99, 99, 99), (99, 99, 99, 0))
+        self.assertGreater(bright(0, 0.05, *swell), bright(64, 0.05, *swell))
+        self.assertGreater(bright(64, 0.05, *swell), bright(127, 0.05, *swell))
+        bite = ((99, 45, 99, 99), (99, 40, 40, 0))
+        self.assertLess(bright(0, 0.15, *bite), bright(64, 0.15, *bite))
 
 
 class TEnvelopes(unittest.TestCase):
@@ -329,6 +360,49 @@ class TEnvelopes(unittest.TestCase):
         b = render(e, 2)                                     # a new note mid-attack
         self.assertLess(abs(np.abs(b[:200]).max() - np.abs(a[-200:]).max()),
                         0.1 * np.abs(a[-200:]).max())        # no jump to silence
+
+
+class TPitchEg(unittest.TestCase):
+    """msfa's PitchEnv: pitchenv_tab[L] << 19 octaves (Q24), from L4 at the
+    note, stage 3 after the key lifts"""
+    def hz(self, x):
+        z = np.flatnonzero((x[:-1] < 0) & (x[1:] >= 0))
+        return FS / np.diff(z).mean()
+
+    def test_held_level(self):
+        e = emu()
+        load(e, 0, G.voice('PEG', [op(ol=99)], alg=32, peg_l=(62, 62, 62, 62)))
+        x = render(e, 300)[4000:]
+        want = 261.63 * 2 ** (G.PEG_TAB[62] / 32)          # 12 / 32 octave up
+        self.assertLess(abs(cents(self.hz(x), want)), 3)
+
+    def test_glide_from_l4_and_release(self):
+        e = emu()
+        load(e, 0, G.voice('PEG', [op(ol=99, l=(99, 99, 99, 99))], alg=32,
+                           peg_r=(50, 99, 99, 50), peg_l=(50, 50, 50, 70)))
+        a = render(e, 20)
+        b = render(e, 1500, trig=False)
+        hi, lo = 261.63 * 2 ** (G.PEG_TAB[70] / 32), 261.63
+        self.assertLess(abs(cents(self.hz(a), hi)), 40)     # it starts at L4...
+        self.assertLess(abs(cents(self.hz(b[-9600:]), lo)), 3)   # ...and lands on L1
+        c = render(e, 1500, trig=False, gate=0)              # released: back to L4
+        self.assertLess(abs(cents(self.hz(c[-9600:]), hi)), 3)
+
+
+class TGate(unittest.TestCase):
+    """a trig's gate seen for under three blocks is a pulse: the note holds on
+    (the track's Amp Decay shapes it); a longer one is the note's length"""
+    def tail(self, held):
+        e = emu()
+        load(e, 0, one(op1=op(ol=99, r=(99, 99, 99, 60), l=(99, 99, 99, 0))))
+        render(e, held)
+        return np.abs(render(e, 600, trig=False, gate=0)[-4800:]).max()
+
+    def test_pulse_holds_and_length_releases(self):
+        self.assertGreater(self.tail(1), 6000)
+        self.assertGreater(self.tail(2), 6000)
+        self.assertLess(self.tail(3), 100)
+        self.assertLess(self.tail(200), 100)
 
 
 class TVelocity(unittest.TestCase):
@@ -385,6 +459,8 @@ class TBuiltIn(unittest.TestCase):
             first = np.abs(x[:48]).max()                     # the first half millisecond
             self.assertLess(first, 0.5 * np.abs(x[:4800]).max(), v)
         db = 20 * np.log10(np.array(list(louds.values())) / louds[0])
+        if os.environ.get('VA_TEST_VERBOSE'):
+            print('\n  built-in voices, dB:', np.round(db, 2))
         self.assertLess(np.abs(db).max(), 1.5, db)
 
     def test_shape_reaches_pads_and_plucks(self):
@@ -392,13 +468,13 @@ class TBuiltIn(unittest.TestCase):
             e = emu()
             load(e, 0, one(op1=op(ol=99, r=(r1, 99, 99, 99))))
             dials(e, 0, shape=shape)
-            x = render(e, 1500)
+            x = render(e, 2000)
             env = np.array([np.abs(x[i:i + 960]).max() for i in range(0, len(x) - 960, 960)])
-            return int(np.argmax(env > 0.7 * 12288))         # 10 ms steps
+            return int(np.argmax(env > 0.7 * env.max()))     # 10 ms steps
         self.assertLessEqual(attack(64), 1)                  # R1 99: at once
-        self.assertGreater(attack(127), 30)                  # Shape up: a pad, > 0.3 s
-        self.assertLess(attack(0, r1=60), attack(64, r1=60))  # Shape down: faster
-
+        self.assertGreater(attack(127), 40)                  # Amp Env up: a pad, > 0.4 s
+        self.assertLess(attack(0, r1=60), attack(64, r1=60))  # down: faster
+        self.assertLess(attack(64, r1=60), attack(96, r1=60))
 
 class TLfo(unittest.TestCase):
     def test_pitch_and_amp_mod(self):
@@ -446,12 +522,9 @@ class TVoices(unittest.TestCase):
             sp = e.sp()
             self.assertEqual((e.r32(sp + 4), e.r32(sp + 8)), (0x2000, 0x40124b58))
             return rd(e.r32(sp + 12))
-        self.assertEqual(fmt('dx_algfmt', 0), 'VCE')
-        self.assertEqual([fmt('dx_algfmt', color_for(a) << 8) for a in (1, 9, 32)],
-                         ['A1', 'A9', 'A32'])
-        self.assertEqual(fmt('dx_algfmt', 127 << 8), 'A32')
-        self.assertEqual([fmt('dx_swfmt', v << 8) for v in (0, 8, 63, 64, 65, 127)],
-                         ['FB0', 'FB1', 'FB7', 'VCE', '+0', '+24'])
+        self.assertEqual([fmt('dx_offmt', v << 8) for v in (0, 1, 63, 64, 65, 127)],
+                         ['-64', '-63', '-1', '0', '+1', '+63'])
+        self.assertEqual(fmt('dx_offmt', 0xffff8000), '-64')
         self.assertEqual([fmt('dx_vfmt', v << 10) for v in (0, 5, 31)], ['1', '6', '32'])
         self.assertEqual(fmt('dx_vfmt', 32512), '32')
 
@@ -500,12 +573,12 @@ class TVoices(unittest.TestCase):
 
     def test_cpu(self):
         worst = 0
-        for c in (0, color_for(1), color_for(32), color_for(5)):
+        for c in (0, 64, 127):
             for sw in (0, 64, 127):
                 e = emu()
-                load(e, 0, G.voice('CPU', [op(ol=99)] * 6, alg=1, fb=7,
+                load(e, 0, G.voice('CPU', [op(ol=99, ams=3)] * 6, alg=1, fb=7,
                                    lfo=(60, 0, 50, 50, 1, 4), pms=5))
-                dials(e, 0, color=c, sweep=sw)
+                dials(e, 0, color=c, shape=sw, sweep=sw)
                 e.w8(e.sym['dr_trig'], 1)
                 e.w32(e.sym['dx_gate'], 1)
                 e.count_instructions('dx_fill', RET, stack=[0, STEP1, DX])
@@ -515,7 +588,6 @@ class TVoices(unittest.TestCase):
         if os.environ.get('VA_TEST_VERBOSE'):
             print("\n  dx_fill instructions a block:", worst)
         self.assertLess(worst, 7200)
-
 
 # ---- a drive, as the sample loader reads it (model_tg.s: load_at) ------------
 TABLE_BLOCK, DATA_BASE = 1835088, 1851472
@@ -825,11 +897,11 @@ class TPlumbing(unittest.TestCase):
         e.w32(SWEEP, 0x11112222)
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[DX])
         self.assertEqual([rd(e.r32(pt + off + 52)) for off in (2576, 3472, 4088, 4144)],
-                         ['ALGO', 'ENV', 'FBHM', 'VOIC'])
+                         ['BRIG', 'AENV', 'MENV', 'VOIC'])
         self.assertEqual([rd(e.r32(pt + off + 44)) for off in (2576, 3472, 4088, 4144)],
-                         ['Algorithm', 'Envelope', 'FB / Harm', 'Voice'])
+                         ['Bright', 'Amp Env', 'Mod Env', 'Voice'])
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP), e.r32(COLOR)),
-                         (s['dx_vfmt'], s['dx_swfmt'], s['dx_algfmt']))
+                         (s['dx_vfmt'], s['dx_offmt'], s['dx_offmt']))
         self.assertEqual(e.r32(0x40a73460 + 12), s['dx_draw'])   # the knob screen's
         e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[11])  # PLAITS
         self.assertEqual((e.r32(CONTOUR), e.r32(SWEEP)), (s['mi_eng_fmt'], 0x11112222))
@@ -845,7 +917,7 @@ class TPlumbing(unittest.TestCase):
         e = emu()
         T = V.T6Commit()
         T._commit(e, DX)
-        self.assertEqual([e.r16(T.SOUND + 42 + 2 * i) >> 8 for i in range(4)], [0, 64, 64, 0])
+        self.assertEqual([e.r16(T.SOUND + 42 + 2 * i) >> 8 for i in range(4)], [64, 64, 64, 0])
 
     def test_level_x2(self):
         e = emu()

@@ -50,9 +50,11 @@ keeps working.
 - **DX** (Plaits Edition), the thirteenth machine: a 6-operator FM voice per
   track after the DX7, as Dexed's engine (msfa, Apache 2.0) models it - the
   32 algorithms, envelopes, keyboard scaling, feedback, LFO - playing DX7
-  voices. Color picks the algorithm, Shape speeds up or slows down every
-  envelope, Sweep sets the feedback or shifts the modulators, Contour picks
-  the voice ([docs/DX.md](docs/DX.md)).
+  voices, checked against msfa voice by voice. The voice plays as its
+  cartridge has it; three macros move it without breaking it: Color is
+  Bright (the modulators' levels), Shape Amp Env (the carriers' attack and
+  release), Sweep Mod Env (the modulators' attack and decay), and Contour
+  picks the voice ([docs/DX.md](docs/DX.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale

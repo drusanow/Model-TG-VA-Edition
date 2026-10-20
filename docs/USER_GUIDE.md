@@ -409,17 +409,23 @@ your own cartridges:
    "Cartridge loaded". Contour picks its voices.
 3. The pattern keeps it, and loads it again with the project.
 
+The voice always plays as its cartridge has it (its own algorithm, ratios,
+feedback and envelopes). The three macros move it from the middle (**0**,
+the voice exactly) without breaking it:
+
 | knob | label | does |
 |---|---|---|
-| **Color** | **ALGO** | the algorithm: **VCE** (the voice's own) at 0, then **A1** to **A32** |
-| **Shape** | **ENV** | all envelopes faster (down) or slower (up); 64 as the voice has them |
-| **Sweep** | **FBHM** | below the middle feedback **FB0** to **FB7**, **VCE** at 64, above it the modulators up to **+24** semitones |
+| **Color** | **BRIG** | Bright: the modulators up or down, up to 12 dB: darker or brighter, same loudness |
+| **Shape** | **AENV** | Amp Env: the carriers' attack and release, snappier (down) or slower (up: a swell of about a second) |
+| **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, how the tone moves: a quicker bite (down) or a slower swell (up) |
 | **Contour** | **VOIC** | the voice, 1 to 32; the page shows its name |
 
-The voice's envelopes hold while the note is held (the trig's length) and
-release after. Pitch, Decay, Attack, Filter and Resonance work as on the other
-machines; every knob p-locks, slides, takes LFOs and is saved. Details:
-[DX.md](DX.md).
+**Turn Decay up** on a DX track: the track's Amp Decay comes after the
+voice's envelopes, so a low Decay cuts a pad short (or silences it, if its
+attack is slow). The voice's envelopes hold while the note is held (from a
+MIDI keyboard, or the trig's length) and release after. Pitch, Decay,
+Attack, Filter and Resonance work as on the other machines; every knob
+p-locks, slides, takes LFOs and is saved. Details: [DX.md](DX.md).
 
 ## Additions for every machine
 

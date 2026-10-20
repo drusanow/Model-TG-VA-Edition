@@ -2414,12 +2414,12 @@ mi_fmtswap:
     movel   %a0@,%d0
     cmpil   #7,%d1
     bnes    8f
-    cmpil   #dx_swfmt,%d0
+    cmpil   #dx_offmt,%d0
     beqs    9f
     movel   %d0,dx_swf0
-    movel   #dx_swfmt,%a0@
+    movel   #dx_offmt,%a0@
     rts
-8:  cmpil   #dx_swfmt,%d0
+8:  cmpil   #dx_offmt,%d0
     bnes    9f
     movel   dx_swf0,%a0@
 9:  rts

@@ -15,20 +15,27 @@ Not yet tested on hardware: back up first.**
 
 Choose **DX** on any track, like any other machine. Pitch and the trig's note
 tune it, and Decay, Attack, Filter and Resonance work as on the other
-machines. The four machine knobs:
+machines. **Turn Decay up** for DX: the track's Amp Decay comes after the
+voice's own envelopes and cuts the note short, so a low Decay turns a pad
+into a click, or into silence if its attack is slow.
+
+The voice always plays as its cartridge has it: its algorithm, ratios,
+feedback and envelopes are the voice's own, as on a DX7 (or Dexed). The
+three macros only move it, from the middle, in directions that keep it the
+same sound:
 
 | knob | label | does |
 |---|---|---|
-| **Color** | **ALGO** | the algorithm. At 0 (**VCE**) the voice's own; turning up picks **A1** to **A32**, about four steps each. The routing changes at once. |
-| **Shape** | **ENV** | every envelope at once: at 64 as the voice has it. Turning down makes them faster (plucky, up to about 4x), up slower (a pad: an instant attack becomes about 0.8 s at 127; no attack gets slower than about 3 s unless the voice's own already is). |
-| **Sweep** | **FBHM** | below the middle, the feedback, **FB0** to **FB7**. At 64 (**VCE**) the voice's own. Above the middle, the modulators' frequencies go up together, by up to two octaves (**+0** to **+24** semitones): new, often clangy, overtones. |
+| **Color** | **BRIG** | Bright: the modulators' output levels, up to 12 dB down or up. Down is rounder and darker, up brighter and more biting. The carriers, and so the loudness, stay. |
+| **Shape** | **AENV** | Amp Env: the carriers' attack and release. Down is snappier (up to 32x faster), up slower: an instant attack swells over about a second at 127, and releases ring longer. |
+| **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, the way the tone moves. Down is a quicker bite and a shorter "pluck", up a slower swell (brass, pads). |
 | **Contour** | **VOIC** | the voice, 1 to 32 of the cartridge. The parameter page shows its number; turning Contour shows its name. |
 
-All four p-lock, slide, take LFOs and are saved, like any machine knob. So
-the algorithm, the envelope speed and the voice can change from step to step.
+Each macro shows **0** in the middle (the voice exactly as it is), and
+**-64** to **+63** around it. All four p-lock, slide, take LFOs and are
+saved, like any machine knob.
 
-The defaults are the voice's own algorithm, envelopes and feedback, and
-voice 1.
+The defaults are the three macros in the middle and voice 1.
 
 **The built-in cartridge.** Until you load one of your own, DX plays a
 cartridge made for this firmware, so no Yamaha voice is included:
@@ -50,6 +57,13 @@ cartridge made for this firmware, so no Yamaha voice is included:
 
 The built-in voices are levelled to play about equally loud (within 1.5 dB,
 measured), and their attacks are a few milliseconds, not instant.
+
+**How close it is to a DX7.** Every voice of a third-party 32-voice
+cartridge was rendered here and through msfa (Dexed's engine, built
+unchanged on the host) at four notes and velocities: 122 of the 128 renders
+match within 1 dB in level over time and 3 dB in spectrum, and the rest
+within 5 dB in one spectrum window (voices with feedback at 7, where the
+sound is near noise).
 
 **Your own cartridges.**
 
@@ -84,9 +98,12 @@ envelopes start their attack from wherever they are, and the operators
 restart their phase if the voice has key sync on - unless they still sound,
 where the jump would click. No operator's level jumps: it moves at most a
 quarter of full scale a block (0 to full in about 2.7 ms), so instant
-attacks and releases don't click. The envelopes
-hold at their sustain level (L3) while the note is held, and go to R4/L4
-when it is released (the trig's length).
+attacks and releases don't click. The envelopes hold at their sustain level
+(L3) while the note is held, and go to R4/L4 when it is released (the
+trig's length, from a MIDI keyboard or a sequencer). A gate shorter than
+three blocks (2 ms) is taken for a trig's pulse rather than a note length:
+the note then holds on, and the track's Decay shapes it, until the next
+trig.
 
 ## Limits
 
@@ -99,9 +116,8 @@ when it is released (the trig's length).
   for every machine; set that to none for a DX7's response alone.
 - **Algorithms 4 and 6:** their feedback goes from OP4 or OP5 back to OP6
   on a DX7. Here, as in msfa, OP6 feeds back on itself instead.
-- **The pitch envelope** is a simpler curve than the DX7's (+-4 octaves,
-  straight segments), and **the LFO's amplitude modulation** depth is an
-  approximation (at most 24 dB). Most voices use neither much.
+- **The pitch envelope and the LFO's amplitude modulation** are msfa's
+  models, which are close to a DX7's but not measured from one.
 - **48 kHz:** the voice is computed at 48 kHz, the rate the stock decimator
   brings every machine to (the DX7 ran at 49 kHz).
 - **Envelope timing** follows msfa's rate formula, scaled to this machine's
@@ -139,8 +155,11 @@ track's state when Contour picks it (`+64`). On a new note (`dx_noteon`),
 - **Keyboard scaling** is msfa's: the break point, the two depths and the
   four curves (linear, exponential), in groups of three notes.
 - **Frequencies:** a ratio (coarse, 0 = 0.5, times 1 + fine / 100, Q16), or
-  a fixed frequency (10^(coarse + fine / 100) Hz, as a note). Detune moves
-  the ratio about 0.9 cent a step.
+  a fixed frequency: msfa's log2 of 10^(coarse + fine / 100) Hz (Q24), plus
+  the increment's log2 for 48 kHz, turned back into an increment through a
+  2^x table (`dx_x2`, interpolated): exact from 1 Hz to 9.8 kHz. Detune is
+  msfa's, larger on low notes: the ratio times 1 + (D - 7) `dx_dtn[note]`
+  (about 1 cent a step in the middle).
 
 **The velocity** is the OS's own per-track note velocity (`0x40fe4cdc`,
 velocity << 8), which the audio side writes from the note-on event before
@@ -151,15 +170,28 @@ msfa.
 
 **Each block** (32 samples at 48 kHz):
 
-- The **LFO** steps (msfa's speeds, delay and six waves) and gives a pitch
-  and an amplitude modulation. The **pitch envelope** steps. With the
-  transpose they make this block's increment.
+- The **LFO** steps (msfa's measured speeds, `dx_lfor`, its delay and six
+  waves) and gives a pitch and an amplitude modulation (msfa's: the depth
+  times the delay times the inverted wave, Q24).
+- The **pitch envelope** steps (msfa's `PitchEnv`: levels `pitchenv_tab[L]`
+  << 19 octaves, Q24, from L4 at the note; steps `pitchenv_rate[R]` x 525 a
+  block; stage 3 after the key lifts). With the transpose and the LFO it
+  makes this block's increment.
 - **Each operator** (OP6 first, as the voice stores them):
   - its **envelope** steps once (msfa's `Env::getsample`: rising faster the
     lower it is, from 1716 at least; falling linearly; stage 3 waits for the
-    key to lift). Shape offsets every rate: (64 - Shape) / 3 below the
-    middle (up to +21), (64 - Shape) x 40 / 63 above it (down to -40, but
-    not below rate 16, a 2.75 s attack, unless the voice's own rate is).
+    key to lift). A stage whose target is the level already (or an attack
+    to level 0) first holds for a time set by its rate, as the DX7 does
+    (msfa's ACCURATE_ENVELOPE statics, `dx_stat`). The macros offset the
+    rates of the stages they move: Amp Env a carrier's attack and release,
+    Mod Env a modulator's attack and first decay, by (64 - k) x 20 / 64
+    below the middle (up to +20 steps) and (64 - k) x 40 / 63 above it
+    (down to -40, but not below rate 16, a 2.7 s attack, unless the
+    voice's own rate is).
+  - its **level** gets Bright's offset if it is a modulator ((Color - 64)
+    x 8, in 1/256 octave: 16 output-level steps either way), and loses
+    msfa's amplitude modulation: level x amf[(AM depth x AMS) >> 42]
+    (`dx_amf`, `dx_amsq`).
   - its **gain** is 2^((level - 3840) / 256), moves at most a quarter of
     full scale from last block's, and ramps across the 32 samples.
   - it **renders** 32 samples of sin(phase + input), x gain, into its bus or
@@ -170,7 +202,8 @@ msfa.
     8), added to its own phase.
   - An operator whose gain is under 2/32768 at both ends of the block is
     skipped (its phase still turns, and a bus it would start is cleared).
-- The **output** is the carriers' sum x 3/8, written twice to 96 kHz.
+- The **output** is the carriers' sum x 1/4 (one full carrier at -12 dB, so
+  several add up before they clip), written twice to 96 kHz.
 
 **The sine** is an 8192-entry table read with the phase's top 13 bits,
 sampled at the half steps so the truncation rounds (spurs below -70 dB). The
@@ -209,9 +242,10 @@ and the feedback.
   again when its token changes, or goes back to the built-in one; a file it
   cannot read is not tried again until the token changes.
 
-**The labels and values.** `apply_names` set 7 puts up ALGO / ENV / FBHM /
-VOIC. Color's value prints the algorithm (`dx_algfmt`), Sweep's the feedback
-or the shift (`dx_swfmt`, Sweep's formatter swapped in and back), Contour's
+**The labels and values.** `apply_names` set 7 puts up BRIG / AENV / MENV /
+VOIC (Bright, Amp Env, Mod Env, Voice). Color's, Shape's and Sweep's values
+print the macro's offset, 0 in the middle (`dx_offmt`; Sweep's formatter is
+swapped in and back), Contour's
 the voice's number (`dx_vfmt`, in place of PLAITS' formatter while DX's
 labels are up), and its knob screen (`dx_draw`, as PLAITS' `mi_draw`) clears
 the stock pips and draws the selected track's voice name, centred on x 96
@@ -224,8 +258,9 @@ defaults row, the name table and the icon tables (thirteen entries, 364
 bytes), the machine page's second line of markers (five).
 
 **CPU** (`tests/test_dx.py`, `VA_TEST_VERBOSE=1`): the worst block, six
-operators sounding with feedback, the LFO and Sweep's shift, is **~5,300
-instructions**, against PLAITS' heaviest engine at ~6,800.
+operators sounding with feedback, the LFO and amplitude modulation on every
+operator, is **~5,600 instructions**, against PLAITS' heaviest engine at
+~6,800.
 
 ## Verification
 
@@ -234,23 +269,40 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
 - **Algorithms:**
   - The table read by msfa's rules is the DX7's 32 diagrams: carriers,
     direct modulation edges and the feedback operator.
-  - The engine follows it for all 32 (picked by Color): each operator alone
-    sounds only if it is a carrier; each modulator alone with a carrier
-    changes it only if it feeds it directly.
-  - Color 0 is the voice's own algorithm.
+  - The engine follows it for all 32: each operator alone sounds only if it
+    is a carrier; each modulator alone with a carrier changes it only if it
+    feeds it directly.
+  - A feedback operator writing a bus overwrites it (algorithm 2: OP4's
+    output does not reach OP1).
+- **Against msfa:** a third-party cartridge's 32 voices, rendered here and
+  through msfa built on the host, at notes 36, 60, 72 and 84: as in
+  "How close it is to a DX7" above. (The comparison is a script outside
+  the suite: the cartridge is not ours to ship.)
 - **Operators:**
   - INIT VOICE is a sine at the note within 1.5 cents (65, 262 and 1047 Hz),
     nothing else above -60 dB.
   - Ratios 2, 0.5 and 1.5 are in tune; detune 14 is a few cents sharp; a
-    fixed 100 Hz stays 100 Hz at any note.
+    fixed 100 Hz stays 100 Hz at any note; fixed 3.16 Hz, 23.4 Hz and
+    9.77 kHz are within 2 cents.
   - OL 99 against OL 91: 6.0 dB (0.75 dB a step).
   - **One modulator into one carrier gives Bessel's sidebands** within 8% at
     OL 99, 91 and 75 (indices 4 pi, 2 pi, pi / 2).
   - Feedback brightens step by step; FB6 has a sawtooth's 2nd and 3rd
-    harmonics. Sweep 64 keeps the voice's.
-  - Sweep at the top moves the modulator up two octaves, the carrier stays.
+    harmonics.
+- **Macros:** all three at 64 are the voice exactly; Bright and Mod Env
+  leave a voice of carriers alone. Bright brightens step by step, and at
+  127 is the modulator 16 levels up (within 1 dB); Mod Env down makes a
+  slow modulator attack brighter early and a modulator decay shorter, up
+  the opposite; Amp Env up turns an instant attack into a pad (over 0.4 s),
+  down makes an attack faster.
+- **Pitch envelope:** a held level is msfa's pitch (L 62: 12/32 octave up,
+  within 3 cents); it starts at L4, lands on L1, and goes back to L4 after
+  the release.
+- **Gate:** one- and two-block gates hold the note; three or more release
+  it.
 - **Envelopes:**
-  - A faster R1 rises sooner; Shape 0 is over 4x faster than 64, 127 slower.
+  - A faster R1 rises sooner; Amp Env 0 is over 4x faster than 64, 127
+    slower.
   - L2 70 under L1 99 is 21 dB down, and holds.
   - The level holds while the gate is held, and falls after it is released.
   - A new note mid-attack starts from where it was.
@@ -262,8 +314,9 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   over 12 dB; PMD 0 leaves it steady.
 - **Voices:** the built-in cartridge is the generator's, Contour picks the
   voice (copied into the track), and different voices sound different.
-- **Values:** Color prints VCE, A1..A32; Sweep FB0..FB7, VCE, +0..+24;
-  Contour the voice's name, from the built-in or the track's own cartridge.
+- **Values:** the macros print -64..-1, 0, +1..+63; Contour the voice's
+  number, and its knob screen the voice's name, from the built-in or the
+  track's own cartridge.
 - **Cartridges,** on a stand-in drive: a bulk dump with junk around it,
   a single voice (packed to exactly the generator's 128 bytes, INIT VOICE
   after it), a bare bank, 7-bit masking; a file that is no DX7 cartridge,
@@ -285,17 +338,19 @@ Needs hardware:
 
 1. **Machine page:** DX is the thirteenth machine, the fifth marker on the
    second line, with its card and picture.
-2. **Parameter page:** ALGO / ENV / FBHM / VOIC; Color shows VCE / A1..A32,
-   Sweep FB0..FB7 / VCE / +n, Contour the voice name. No label runs out of
-   its box. PLAITS' Contour and Chord's still show theirs.
+2. **Parameter page:** BRIG / AENV / MENV / VOIC; the macros show 0 in the
+   middle and -64..+63, Contour the voice number and its name. No label
+   runs out of its box. PLAITS' Contour and Chord's still show theirs.
 3. **The built-in voices** play and sound as described; Pitch and notes
    tune them.
-4. **Note length:** a long trig holds a voice's sustain (try SOFT PAD 1 or
-   DRAWBARS 1), a short one releases it. (If notes never release, or always
-   release at once, tell us: the gate is the one thing here the emulator
-   cannot show.)
-5. **Color** turned while playing changes the routing at once; **Shape**
-   makes FM PLUCK 1 snappier or a pad; **Sweep** adds feedback or clang.
+4. **Note length:** with Decay up, a pad (SOFT PAD 1) swells in and holds
+   until the next trig; with Decay down it is cut short. From a MIDI
+   keyboard, a held key holds the sustain and letting go releases it. (The
+   gate is the one thing here the emulator cannot show: tell us what you
+   hear.)
+5. **Macros:** Bright darkens or brightens E.PIANO MT without changing its
+   loudness; Amp Env makes FM PLUCK 1 snappier or a pad; Mod Env makes
+   BRASS SWEL swell slower or bite quicker. None of them breaks a voice.
 6. **Cartridges:** send a cartridge with the DX Cartridge Sender (or a
    librarian), then FUNCTION + PRESET on a DX track: it is in `/DX7/`, it
    loads ("Cartridge loaded"), and Contour shows its voice names. Save the
@@ -310,15 +365,20 @@ Needs hardware:
 ## Credits and licence
 
 DX follows the DX7 engine of **msfa** ("Music Synthesizer for Android",
-Raph Levien), which **Dexed** (Pascal Gauthier, GPL-3.0) is built on. Dexed's
-code is not used. msfa's algorithms are followed, rewritten in ColdFire
-assembly, and some of its numbers are used as tables: the algorithm
-routing, scaleoutlevel's low end, the exponential keyboard scaling curve and
-the pitch modulation sensitivities (`tools/gen_dx_tables.py`).
+Raph Levien), as kept in **Dexed** (Pascal Gauthier). Dexed itself is
+GPL-3.0 and none of its code is used; its copy of msfa is under the Apache
+License 2.0. msfa's algorithms are followed, rewritten in ColdFire assembly,
+and some of its numbers are used as tables (`tools/gen_dx_tables.py`): the
+algorithm routing, scaleoutlevel's low end, the exponential keyboard
+scaling curve, the pitch modulation sensitivities, the velocity curve, the
+LFO's measured speeds, the pitch envelope's rates and levels, the amplitude
+modulation sensitivities and curve, the detune's formula and the
+envelope's measured static times.
 
 msfa is released under the Apache License 2.0:
 
-> Copyright 2012 Google Inc.
+> Copyright 2012-2013 Google Inc.; Copyright 2016-2025 Pascal Gauthier
+> (Dexed's changes to `env.cc` and `dx7note.cc`).
 >
 > Licensed under the Apache License, Version 2.0 (the "License"); you may not
 > use this file except in compliance with the License. You may obtain a copy

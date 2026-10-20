@@ -8,10 +8,11 @@
 | .syx through the preset browser) or the built-in one (dx_cart, all its
 | voices made in tools/gen_dx_tables.py).
 |
-|   Color   ALGO  the algorithm: 0 the voice's own, then 1..32
-|   Shape   ENV   every envelope faster (down to 0) or slower (up to 127)
-|   Sweep   FBHM  0..63 the feedback 0..7, 64 the voice's, above that the
-|                 modulators' ratios up to +24 semitones
+|   Color   BRIG  the modulators' output levels, +-12 dB: darker / brighter
+|   Shape   AENV  the carriers' attack and release: faster down, slower up
+|   Sweep   MENV  the modulators' attack and first decay: the tone's movement
+|   (each at 64 the voice exactly as it is; the algorithm, ratios and
+|   feedback are always the voice's own)
 |   Contour VOIC  the voice, 1..32 of the cartridge
 |
 | Built as PLAITS is: sampler_pre sends it to va_pre (dx_params: the dials
@@ -33,19 +34,22 @@ DX_OPS  = 48
 |   +12/+16 feedback's last two outputs
 |   +20 key down                       +24 the note (MIDI number, transposed)
 |   +28 LFO phase  +32 its delay phase  +36 its sample-and-hold value
-|   +40 pitch EG level (Q16 of Q8 semitones)  +44 its stage  +48 its target
+|   +40 pitch EG level (Q24 octaves)  +44 its stage  +48 its target
 |   +52 has played                     +56 its own cartridge loaded (dx_cv)
 |   +60 voice changed (dx_load)        +64 the voice, 128 bytes (VMEM)
 |   +192 six operators, OP6 first:
 |        +0 phase  +4 increment  +8 gain (Q14 << 16: 2.0 the most)
 |        +12 level (1/256 oct << 16)
-|        +16 target  +20 spare  +24 stage (4 = done)  +28 rising
+|        +16 target  +20 its hold (samples)  +24 stage (4 = done)  +28 rising
 |        +32 four target levels (words)  +40 four rates (bytes, qrate)
 |        +44 ratio (Q16), or bit 31 + a fixed increment (48 kHz)
 |   +480 LFO increment  +484/+488 its delay's two increments
-|   +492 transpose, Q12
+|   +492 transpose, Q12               +496 pitch EG rising
+|   +500 blocks the gate has been held since the note (dx_fill)
 DX_LFOI = 480
 DX_TRQ  = 492
+DX_PEGU = 496
+DX_GCNT = 500
 
 | ---- the four dials (from va_pre: d2 = track, a2 = trackData, a5 = trig) --
 | As mi_params, into dx_p, plus the gate: dx_gate[t] = the render loop's
@@ -291,32 +295,49 @@ ds_op:
     mulul   %d2,%d1
     moveq   #100,%d2
     divul   %d2,%d1
-    movel   %d1,%d0               | detune: about 0.9 cent a step
+    movel   %a5@(24),%d0          | detune (msfa's): x (1 + (D - 7) dx_dtn[note])
+    lea.l   dx_dtn,%a1
+    mvzw    %a1@(0,%d0:l:2),%d0
     subql   #7,%d3
-    muls.w  #34,%d3
     mulsl   %d3,%d0
-    asrl    #8,%d0
-    asrl    #8,%d0
-    addl    %d0,%d1
-    movel   %d1,%a2@(44)
+    addil   #65536,%d0
+    movel   %d0,%d2
+    movel   %d1,%d0
+    movel   %d2,%d1
+    bsr     dx_mul16
+    movel   %d0,%a2@(44)
     bras    9f
-7:  lsrl    #1,%d1                | fixed: 10^(coarse & 3 + fine / 100) Hz,
-    andil   #3,%d1                | as a note: 39.863 x - 36.376, Q8
-    mulu.w  #10205,%d1
-    mulu.w  #102,%d2
+7:  lsrl    #1,%d1                | fixed (msfa's): log2 Hz, Q24, is
+    andil   #3,%d1                | (4458616 (100 (coarse & 3) + fine)) >> 3
+    mulu.w  #100,%d1              | + 13457 (D - 7) when D > 7
     addl    %d2,%d1
-    subil   #9312,%d1
+    movel   #4458616,%d0
+    mulul   %d0,%d1
+    lsrl    #3,%d1
     subql   #7,%d3
     bles    10f
-    mulu.w  #5,%d3
-    lsrl    #1,%d3
+    mulu.w  #13457,%d3
     addl    %d3,%d1
-10: movel   %d1,%d0
-    DX_MAX  %d0, 127*256
-    movel   %a0,%sp@-
-    bsr     mi_n2inc
-    movea.l %sp@+,%a0
-    addl    %d0,%d0               | 48 kHz
+10: addil   #275972674,%d1        | + log2(2^32 / 48000): the increment's log2
+    movel   %d1,%d3
+    moveq   #24,%d0
+    lsrl    %d0,%d3               | its octave (16..29)
+    andil   #0xffffff,%d1
+    movel   %d1,%d2
+    clrw    %d2
+    swap    %d2                   | 2^fraction from dx_x2, interpolated
+    andil   #0xffff,%d1
+    lea.l   dx_x2,%a1
+    lea.l   %a1@(0,%d2:l:4),%a1
+    movel   %a1@,%d0
+    movel   %a1@(4),%d2
+    subl    %d0,%d2
+    mulul   %d1,%d2
+    clrw    %d2
+    swap    %d2
+    addl    %d2,%d0
+    subil   #16,%d3
+    lsll    %d3,%d0
     bset    #31,%d0
     movel   %d0,%a2@(44)
 9:  lea.l   %a0@(17),%a0
@@ -324,24 +345,10 @@ ds_op:
     subql   #1,%d6
     bplw    ds_op
     | the LFO: msfa's rate and delay, in this block's units (16794)
-    mvzb    %a5@(64+112),%d0      | speed
+    mvzb    %a5@(64+112),%d0      | speed: msfa's measured rates (dx_lfor)
     DX_MAX  %d0, 99
-    tstl    %d0
-    bnes    11f
-    moveq   #1,%d0
-    bras    12f
-11: mulu.w  #165,%d0
-    lsrl    #6,%d0
-12: moveq   #11,%d1
-    cmpil   #160,%d0
-    bcss    13f
-    movel   %d0,%d1
-    subil   #160,%d1
-    lsrl    #4,%d1
-    addil   #11,%d1
-13: mulu.w  %d1,%d0
-    movel   #16794,%d1
-    mulul   %d1,%d0
+    lea.l   dx_lfor,%a1
+    movel   %a1@(0,%d0:l:4),%d0
     movel   %d0,%a5@(DX_LFOI)
     mvzb    %a5@(64+113),%d0      | delay
     DX_MAX  %d0, 99
@@ -381,22 +388,76 @@ ds_op:
     rts
 
 | ---- envelopes ----------------------------------------------------------------
-| a2 = an operator, d1 = its new stage (msfa's Env::advance). Clobbers d0.
+| a2 = an operator, d1 = its new stage (msfa's Env::advance). Clobbers d0/d1.
+| A stage whose target is the level already (or an attack to level 0) holds
+| first, as the DX7 does: msfa's ACCURATE_ENVELOPE "static" count, from
+| dx_stat by the stage's rate + rate scaling (a twentieth for the attack),
+| in samples, at +20.
 dx_adv:
     movel   %d1,%a2@(24)
+    clrl    %a2@(20)
     cmpil   #4,%d1
-    bccs    1f
+    bccw    dxa_out
+    lea.l   %sp@(-16),%sp
+    moveml  %d2-%d3/%a0-%a1,%sp@
+    movel   %d1,%d2               | the stage
     addl    %d1,%d1
     mvzw    %a2@(32,%d1:l),%d0
     swap    %d0
     clrw    %d0
     movel   %d0,%a2@(16)
+    moveq   #0,%d3                | static: 1 equal, 2 an attack to 0
     moveq   #0,%d1
     cmpl    %a2@(12),%d0
-    bles    2f
+    bnes    1f
+    moveq   #1,%d3
+    bras    2f
+1:  bles    2f
     moveq   #1,%d1
 2:  movel   %d1,%a2@(28)
-1:  rts
+    movel   %a2,%d0               | the operator's VMEM bytes: a5 + 64 +
+    subl    %a5,%d0               | 17 x (its index, (a2 - a5 - 192) / 48)
+    subil   #DX_OP,%d0
+    mulu.w  #1366,%d0
+    clrw    %d0
+    swap    %d0
+    mulu.w  #17,%d0
+    lea.l   %a5@(64,%d0:l),%a0
+    tstl    %d2
+    bnes    3f
+    tstb    %a0@(4)               | L1 = 0
+    bnes    3f
+    moveq   #2,%d3
+3:  tstl    %d3
+    beqs    8f
+    movel   %a5@(24),%d0          | the rate + its scaling, at most 99
+    mulu.w  #21846,%d0
+    clrw    %d0
+    swap    %d0
+    subql   #7,%d0
+    bpls    4f
+    moveq   #0,%d0
+4:  DX_MAX  %d0, 31
+    mvzb    %a0@(12),%d1
+    andil   #7,%d1
+    mulu.w  %d1,%d0
+    lsrl    #3,%d0
+    mvzb    %a0@(0,%d2:l),%d1
+    addl    %d1,%d0
+    DX_MAX  %d0, 99
+    lea.l   dx_stat,%a1
+    movel   %a1@(0,%d0:l:4),%d1
+    cmpil   #2,%d3
+    bnes    5f
+    cmpil   #77,%d0
+    bccs    5f
+    moveq   #20,%d0
+    divul   %d0,%d1
+5:  movel   %d1,%a2@(20)
+8:  moveml  %sp@,%d2-%d3/%a0-%a1
+    lea.l   %sp@(16),%sp
+dxa_out:
+    rts
 
 | a5 = the track: a new note (msfa's keydown(true) / Dx7Note::init).
 dx_noteon:
@@ -457,8 +518,6 @@ dx_noteon:
 7:  clrl    %a5@(32)
     mvzb    %a5@(64+109),%d0      | the pitch EG starts at L4
     bsr     dx_peg_lv
-    swap    %d0
-    clrw    %d0
     movel   %d0,%a5@(40)
     moveq   #0,%d1
     bsr     dx_peg_adv
@@ -484,14 +543,18 @@ dx_noteoff:
     movel   %sp@+,%d2
     rts
 
-| the pitch EG (simplified from the DX7's): a level 0..99 is (L - 50) x 251,
-| Q8 semitones (+-48); d0 = L -> d0. Clobbers nothing else.
+| the pitch EG (msfa's PitchEnv): a level 0..99 is pitchenv_tab[L] << 19,
+| Q24 octaves (+-4); d0 = L -> d0. Clobbers a0.
 dx_peg_lv:
     DX_MAX  %d0, 99
-    subil   #50,%d0
-    muls.w  #251,%d0
+    lea.l   dx_pegl,%a0
+    moveb   %a0@(0,%d0:l),%d0
+    extbl   %d0
+    swap    %d0
+    clrw    %d0
+    lsll    #3,%d0
     rts
-| d1 = the pitch EG's new stage. Clobbers d0/d1.
+| d1 = the pitch EG's new stage (PitchEnv::advance). Clobbers d0/d1, a0.
 dx_peg_adv:
     movel   %d1,%a5@(44)
     cmpil   #4,%d1
@@ -499,10 +562,29 @@ dx_peg_adv:
     lea.l   %a5@(64+106),%a0
     mvzb    %a0@(0,%d1:l),%d0
     bsr     dx_peg_lv
-    swap    %d0
-    clrw    %d0
     movel   %d0,%a5@(48)
+    moveq   #0,%d1
+    cmpl    %a5@(40),%d0
+    bles    2f
+    moveq   #1,%d1
+2:  movel   %d1,%a5@(DX_PEGU)
 1:  rts
+
+| d0 = a macro knob (Q15) -> d0 = a rate offset: 0 at 64, up to +20 rate
+| steps (faster, x32) at 0 and -40 (slower, x1000) at 127 - 4 steps double a
+| time, and dx_env never slows a stage below rate 16 (about 2.7 s) unless the
+| voice's own is. Keeps the rest.
+dx_roff:
+    asrl    #8,%d0
+    subil   #64,%d0
+    negl    %d0                   | 64 - k
+    bmis    1f
+    mulsw   #20,%d0               | (64 - k) x 20 / 64
+    asrl    #6,%d0
+    rts
+1:  mulsw   #162,%d0              | (64 - k) x 40 / 63
+    asrl    #8,%d0
+    rts
 
 | ---- dx_fill(track, stepQ16, machine): one block into sampler_buf+32 -------
 | Frame: 64 bytes of locals, d2-d7/a2-a6 at sp@(64), the arguments at
@@ -586,11 +668,16 @@ dx_fill:
     DX_MAX  %d0, 127
     movel   %d0,%a5@(4)
     bsr     dx_noteon
+    clrl    %a5@(DX_GCNT)
+6:  tstl    %a5@(20)              | the note released when its gate falls -
+    beqs    7f                    | if it was held: a gate seen for under
+    tstl    %sp@(36)              | three blocks is a trig's pulse, not a
+    beqs    9f                    | length, and the note holds on (Amp Decay
+    addql   #1,%a5@(DX_GCNT)      | shapes it) until the next
     bras    7f
-6:  tstl    %a5@(20)
-    beqs    7f
-    tstl    %sp@(36)
-    bnes    7f
+9:  moveq   #3,%d0
+    cmpl    %a5@(DX_GCNT),%d0
+    bgts    7f
     bsr     dx_noteoff
 7:  tstl    %a5@(52)
     bnew    dx_play
@@ -601,67 +688,38 @@ dx_fill:
     bpls    8b
     braw    dx_out
 dx_play:
-    | ---- Color: the algorithm (0 the voice's, then 32 steps) ----
+    | ---- the voice's own algorithm and feedback ----
     mvzb    %a5@(64+110),%d0
     andil   #31,%d0
-    movel   %a4@,%d1
-    lsrl    #8,%d1                | 0..127
-    beqs    1f
-    subql   #1,%d1
-    lsll    #5,%d1
-    moveq   #127,%d0
-    divul   %d0,%d1
-    movel   %d1,%d0
-    DX_MAX  %d0, 31
-1:  mulu.w  #6,%d0
+    mulu.w  #6,%d0
     lea.l   dx_alg,%a0
     adda.l  %d0,%a0
     movel   %a0,%sp@(24)
-    | ---- Sweep: feedback below the middle, the modulators' ratios above ----
     mvzb    %a5@(64+111),%d2
-    andil   #7,%d2                | the voice's feedback
-    movel   #0x10000,%d0
-    movel   %d0,%sp@(8)
-    movel   %a4@(8),%d1
-    lsrl    #8,%d1
-    cmpil   #64,%d1
-    beqs    2f
-    bhis    3f
-    movel   %d1,%d2               | 0..63: feedback 0..7
-    lsrl    #3,%d2
-    bras    2f
-3:  subil   #64,%d1               | 65..127: x 2^((s - 64) 24 / 63 / 12)
-    mulu.w  #6242,%d1
-    lsrl    #6,%d1                | Q8 semitones, up to +24
-    movel   %d1,%d0
-    bsr     mi_exp2
-    lsll    #2,%d0                | Q16
-    movel   %d0,%sp@(8)
-2:  movel   %d2,%sp@(28)
+    andil   #7,%d2
+    movel   %d2,%sp@(28)
     moveq   #0,%d1
     tstl    %d2
     beqs    4f
     moveq   #9,%d1                | (y0 + y1) << (9 + fb)
     addl    %d2,%d1
 4:  movel   %d1,%sp@(40)
-    | ---- Shape: every rate offset, up to +21 (faster, s 0) and -40 (slower,
-    | s 127; 4 rate steps double or halve a time): (64 - s) / 3 below the
-    | middle, (64 - s) x 40 / 63 above it ----
-    movel   %a4@(4),%d0
+    | ---- the macros, each 64 = the voice as it is ----
+    | Color, Bright: the modulators' levels, (c - 64) x 8 (1/256 octave): +-16
+    | output-level steps, +-12 dB
+    movel   %a4@,%d0
     lsrl    #8,%d0
-    moveq   #64,%d1
-    subl    %d0,%d1
-    bmis    1f
-    mulu.w  #21846,%d1
-    clrw    %d1
-    swap    %d1                   | / 3
-    bras    2f
-1:  negl    %d1
-    mulu.w  #40,%d1
-    moveq   #63,%d0
-    divul   %d0,%d1
-    negl    %d1
-2:  movel   %d1,%sp@(12)
+    subil   #64,%d0
+    lsll    #3,%d0
+    movel   %d0,%sp@(8)
+    | Shape, Amp Env: the carriers' attack and release rates; Sweep, Mod Env:
+    | the modulators' attack and first decay (dx_roff: faster down, slower up)
+    movel   %a4@(4),%d0
+    bsr     dx_roff
+    movel   %d0,%sp@(12)
+    movel   %a4@(8),%d0
+    bsr     dx_roff
+    movel   %d0,%sp@(44)
     | ---- the LFO ----
     bsr     dx_lfo                | -> d0 pitch (Q8 semitones), d1 amp (Q24)
     movel   %d1,%sp@(16)
@@ -701,38 +759,57 @@ dx_opl:
     bclr    #31,%d1               | fixed
     movel   %d1,%d2
     bras    3f
-1:  movel   %d7,%d0               | a modulator: Sweep's ratio factor
-    andil   #3,%d0
-    beqs    2f
-    movel   %sp@(8),%d0
-    cmpil   #0x10000,%d0
-    beqs    2f
-    movel   %d1,%a0               | (ratio x factor)
-    movel   %d0,%d1
-    movel   %a0,%d0
-    bsr     dx_mul16
-    movel   %d0,%d1
-2:  movel   %sp@(4),%d0
+1:  movel   %sp@(4),%d0
     bsr     dx_mul16
     movel   %d0,%d2
 3:  movel   %d2,%a6@(4)
-    | the envelope, one step
-    movea.l %a6,%a2
+    | the envelope, one step, its rates offset by the macro for its role:
+    | a carrier's attack and release (Shape), a modulator's attack and
+    | first decay (Sweep) - sp@(48) / (52) / (56) for stages 0 / 1 / 3
+    clrl    %sp@(48)
+    clrl    %sp@(52)
+    clrl    %sp@(56)
+    movel   %d7,%d0
+    andil   #3,%d0
+    bnes    2f
+    movel   %sp@(12),%d0          | a carrier
+    movel   %d0,%sp@(48)
+    movel   %d0,%sp@(56)
+    bras    3f
+2:  movel   %sp@(44),%d0          | a modulator
+    movel   %d0,%sp@(48)
+    movel   %d0,%sp@(52)
+3:  movea.l %a6,%a2
     bsr     dx_env                | -> d0 = the level (1/256 octave)
-    movel   %sp@(20),%d2          | amplitude modulation sensitivity:
-    mulu.w  #17,%d2               | this operator's byte 13
-    mvzb    %a5@(64+13,%d2:l),%d1
+    movel   %d7,%d1               | a modulator: Color's brightness
     andil   #3,%d1
     beqs    4f
-    lea.l   dx_amsw,%a0
-    mvzb    %a0@(0,%d1:l),%d1
-    movel   %sp@(16),%d2
-    moveq   #14,%d5
-    lsrl    %d5,%d2               | 0..1024
-    mulu.w  %d1,%d2
+    addl    %sp@(8),%d0
+    bpls    4f
+    moveq   #0,%d0
+4:  | amplitude modulation, msfa's: level -= level x amf[(amd x ams) >> 42]
+    movel   %sp@(20),%d2          | (this operator's byte 13: its AMS)
+    mulu.w  #17,%d2
+    mvzb    %a5@(64+13,%d2:l),%d1
+    andil   #3,%d1
+    beqs    5f
+    lea.l   dx_amsq,%a0
+    movel   %a0@(0,%d1:l:4),%d1   | Q24
+    lsrl    #8,%d1
+    movel   %sp@(16),%d2          | amd, Q24
     lsrl    #8,%d2
+    mulul   %d1,%d2
+    moveq   #26,%d1               | (amd >> 8)(sens >> 8) >> 26 = (amd x
+    lsrl    %d1,%d2               | sens) >> 24 >> 18: 0..64
+    DX_MAX  %d2, 64
+    lea.l   dx_amf,%a0
+    mvzw    %a0@(0,%d2:l:2),%d1
+    movel   %d0,%d2
+    mulul   %d1,%d2
+    clrw    %d2
+    swap    %d2
     subl    %d2,%d0
-4:  movel   #4096,%d1             | the gain: 2^((L - 3840) / 256), Q14 - an
+5:  movel   #4096,%d1             | the gain: 2^((L - 3840) / 256), Q14 - an
     subl    %d0,%d1               | octave over full scale for velocity
     bgts    5f
     movel   #32767,%d0
@@ -904,9 +981,11 @@ dx_i0:
     | -- feedback on itself (msfa's compute_fb): phase + (y0 + y1) << (9 + fb)
 dx_fb:
     movea.l %a5@(12),%a1          | y0
-    btst    #2,%d7                | (whether it adds, before d7 takes y1)
+    btst    #2,%d7                | whether it adds (branched on before d7
+    bnes    1f                    | takes y1: the move sets the flags)
     movel   %a5@(16),%d7          | y1
-    beqs    dx_f0
+    bras    dx_f0
+1:  movel   %a5@(16),%d7
 dx_f1:
     movel   %a1,%d0
     addl    %d7,%d0
@@ -962,15 +1041,13 @@ dx_nx:
     moveq   #6,%d0
     cmpl    %sp@(20),%d0
     bnew    dx_opl
-    | ---- the sum (x 3/8, Q15) to 96 kHz, from the end ----
+    | ---- the sum (x 1/4, Q15: a full carrier at -12 dB, so several add up
+    | before they clip, as in Dexed) to 96 kHz, from the end ----
     lea.l   %a3@(128),%a1
     lea.l   %a3@(256),%a0
     moveq   #31,%d2
 1:  movel   %a1@-,%d0
-    movel   %d0,%d1
-    addl    %d0,%d0
-    addl    %d1,%d0
-    asrl    #3,%d0
+    asrl    #2,%d0
     MI_CLAMP %d0, 32767
     lsll    #8,%d0
     lsll    #7,%d0
@@ -983,20 +1060,37 @@ dx_out:
     lea.l   %sp@(108),%sp
     rts
 
+dxe_soff: .long 56, 60, 0, 64       | stage -> the caller's offset, from here
 | a2 = an operator: one block of its envelope (msfa's Env::getsample), its
 | rate offset by Shape (the caller's sp@(12), here sp@(20)) -> d0 = the
 | level, in 1/256 octave. Keeps d2-d7. Clobbers d1, a0.
 dx_env:
     movel   %d2,%sp@-
+    movel   %a2@(20),%d0          | holding (dx_adv): 32 samples a block
+    beqs    12f
+    subil   #32,%d0
+    movel   %d0,%a2@(20)
+    bgtw    dxe_out
+    clrl    %a2@(20)
+    movel   %a2@(24),%d1
+    addql   #1,%d1
+    bsr     dx_adv
+    tstl    %a2@(20)
+    bnew    dxe_out
+12:
     movel   %a2@(24),%d1          | the stage
     cmpil   #3,%d1
     bcss    1f
     bhiw    dxe_out                    | done
     tstl    %a5@(20)
     bnew    dxe_out                    | stage 3 waits for the key to lift
-1:  mvzb    %a2@(40,%d1:l),%d0    | its rate, offset by Shape - which slows
-    movel   %d0,%d2               | it to 16 (a 2.75 s attack) at most,
-    addl    %sp@(20),%d0          | below the voice's own
+1:  mvzb    %a2@(40,%d1:l),%d0    | its rate, offset by the macro for this
+    movel   %d0,%d2               | stage (the caller's sp@(48 / 52 / -,
+    lea.l   dxe_soff,%a0          | 56), here 8 on) - which slows it to 16
+    movel   %a0@(0,%d1:l:4),%d1   | (a 2.75 s attack) at most, below the
+    beqs    11f                   | voice's own
+    addl    %sp@(0,%d1:l),%d0
+11:
     cmpil   #16,%d0
     bges    2f
     cmpl    %d2,%d0
@@ -1153,7 +1247,9 @@ l_got:
     addl    %d1,%d0
     moveq   #14,%d1
     asrl    %d1,%d0               | x 3072 / 2^24: Q8 semitones
-    | amplitude: ((AMD 165 >> 6) delay >> 8) lfo >> 24
+    | amplitude: ((AMD 165 >> 6) delay >> 8) (2^24 - lfo) >> 24, as msfa
+    negl    %d4
+    addil   #0x1000000,%d4
     mvzb    %a5@(64+115),%d1
     DX_MAX  %d1, 99
     mulu.w  #165,%d1
@@ -1168,8 +1264,9 @@ l_got:
     lea.l   %sp@(12),%sp
     rts
 
-| the pitch EG, one block: d0 += its level (Q8 semitones). a5 = the track.
-| Keeps d2-d7. Clobbers d1, a0.
+| the pitch EG, one block (PitchEnv::getsample, its step pitchenv_rate[R] x
+| 525: 2^24 x 32 / (21.3 x 48000)): d0 += its level, as Q8 semitones
+| (Q24 octaves x 3 >> 14). a5 = the track. Keeps d2-d7. Clobbers d1, a0.
 dx_peg:
     movel   %d2,%sp@-
     movel   %d0,%sp@-
@@ -1178,27 +1275,24 @@ dx_peg:
     bcss    1f
     bhis    4f
     tstl    %a5@(20)
-    bnes    4f
-1:  lea.l   %a5@(64+102),%a0      | its rate: (8 + (R & 7)) << (R / 8 + 2)
+    bnes    4f                    | stage 3 waits for the key to lift
+1:  lea.l   %a5@(64+102),%a0
     mvzb    %a0@(0,%d1:l),%d0
     DX_MAX  %d0, 99
-    movel   %d0,%d2
-    andil   #7,%d2
-    addql   #8,%d2
-    lsrl    #3,%d0
-    addql   #2,%d0
-    lsll    %d0,%d2
+    lea.l   dx_pegr,%a0
+    mvzb    %a0@(0,%d0:l),%d2
+    mulu.w  #525,%d2
     movel   %a5@(40),%d0
     movel   %a5@(48),%d1
-    cmpl    %d1,%d0
-    blts    2f
-    subl    %d2,%d0               | down to it
-    cmpl    %d1,%d0
-    bgts    3f
-    bras    5f
-2:  addl    %d2,%d0               | up to it
+    tstl    %a5@(DX_PEGU)
+    beqs    2f
+    addl    %d2,%d0               | up to it
     cmpl    %d1,%d0
     blts    3f
+    bras    5f
+2:  subl    %d2,%d0               | down to it
+    cmpl    %d1,%d0
+    bgts    3f
 5:  movel   %d1,%a5@(40)
     movel   %a5@(44),%d1
     addql   #1,%d1
@@ -1206,8 +1300,11 @@ dx_peg:
     bras    4f
 3:  movel   %d0,%a5@(40)
 4:  movel   %a5@(40),%d0
-    swap    %d0
-    extl    %d0
+    movel   %d0,%d1
+    addl    %d0,%d0
+    addl    %d1,%d0
+    asrl    #7,%d0
+    asrl    #7,%d0
     addl    %sp@+,%d0
     movel   %sp@+,%d2
     rts
@@ -1882,60 +1979,24 @@ dx_sfmt:
     movel   %d1,%sp@(12)
     jmp     0x40000e6e            | sprintf
 
-| Color: "VCE" (the voice's own algorithm), then "A1" .. "A32"
-    .globl  dx_algfmt
-dx_algfmt:
+| Color, Shape, Sweep: the macros, 64 the voice as it is: "0", "+1" .. "+63",
+| "-1" .. "-64"
+    .globl  dx_offmt
+dx_offmt:
     lea.l   dx_sbuf,%a1
     movel   %sp@(8),%d0
     bpls    1f
     moveq   #0,%d0
 1:  lsrl    #8,%d0
-    bnes    2f
-    moveb   #86,%a1@+             | VCE
-    moveb   #67,%a1@+
-    moveb   #69,%a1@+
-    bras    3f
-2:  subql   #1,%d0
-    lsll    #5,%d0
-    moveq   #127,%d1
-    divul   %d1,%d0
-    addql   #1,%d0
-    moveq   #32,%d1
-    cmpl    %d1,%d0
-    blss    4f
-    movel   %d1,%d0
-4:  moveb   #65,%a1@+             | A
-    bsr     dx_num
-3:  clrb    %a1@
-    braw    dx_sfmt
-
-| Sweep: "FB0" .. "FB7", "VCE" in the middle, "+1" .. "+24" (semitones)
-dx_swfmt:
-    lea.l   dx_sbuf,%a1
-    movel   %sp@(8),%d0
-    bpls    1f
-    moveq   #0,%d0
-1:  lsrl    #8,%d0
-    cmpil   #64,%d0
+    subil   #64,%d0
     beqs    2f
-    bhis    3f
-    moveb   #70,%a1@+             | FB
-    moveb   #66,%a1@+
-    lsrl    #3,%d0
-    bsr     dx_num
-    bras    4f
-2:  moveb   #86,%a1@+             | VCE
-    moveb   #67,%a1@+
-    moveb   #69,%a1@+
-    bras    4f
-3:  subil   #64,%d0
-    mulu.w  #6242,%d0
-    lsrl    #6,%d0                | Q8 semitones
-    addil   #128,%d0
-    lsrl    #8,%d0
-    moveb   #43,%a1@+             | +
-    bsr     dx_num
-4:  clrb    %a1@
+    bpls    3f
+    moveb   #45,%a1@+             | -
+    negl    %d0
+    bras    2f
+3:  moveb   #43,%a1@+             | +
+2:  bsr     dx_num
+    clrb    %a1@
     braw    dx_sfmt
 
 | Contour: the voice's number, 1..32 (the name is the knob screen's, dx_draw)
@@ -2088,12 +2149,12 @@ dxd_width:
     rts
 
 s_dxc:  .asciz "DX"
-s_dxa:  .asciz "Algorithm"
-s_dxas: .asciz "ALGO"
-s_dxe:  .asciz "Envelope"
-s_dxes: .asciz "ENV"
-s_dxf:  .asciz "FB / Harm"
-s_dxfs: .asciz "FBHM"
+s_dxa:  .asciz "Bright"
+s_dxas: .asciz "BRIG"
+s_dxe:  .asciz "Amp Env"
+s_dxes: .asciz "AENV"
+s_dxf:  .asciz "Mod Env"
+s_dxfs: .asciz "MENV"
 s_dxv:  .asciz "Voice"
 s_dxvs: .asciz "VOIC"
     .align 2
@@ -2102,7 +2163,7 @@ dx_sbuf: .space 16
 dx_nbuf: .space 16
 
     .align 2
-dx_amsw:   .byte 0, 66, 109, 255  | amplitude modulation sensitivity, Q8
+dx_amsq:   .long 0, 4342338, 7171437, 16777216 | AM sensitivity (msfa's ams_tab), Q24
     .align 2
     .include "dx_tables.inc"
     .align 2

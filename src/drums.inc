@@ -731,6 +731,6 @@ dr_defaults:
     .word 64<<8, 32<<8, 88<<8, 48<<8   | SNARE: NOIS 64 PENV 32 TONE 88 SAT 48
     .word 80<<8, 64<<8, 16<<8, 48<<8   | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 48
     .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
-    .word 0, 64<<8, 64<<8, 0           | DX: ALGO voice, ENV 64, FBHM voice, VOIC 1
+    .word 64<<8, 64<<8, 64<<8, 0       | DX: BRIG, AENV, MENV at the voice's, VOIC 1
     .include "drum_tables.inc"
     .align 2
