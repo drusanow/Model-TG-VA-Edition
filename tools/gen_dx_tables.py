@@ -28,9 +28,11 @@ Levien, Apache 2.0) models it.
            at 44.1 kHz, x 44100 / 48000 as msfa's sr_multiplier)
   dx_amf   msfa's amplitude modulation curve, Q16 of the level taken off:
            exp(12.2 + 0.07 k) x 16 / 2^28 for k = 0..64 (k = depth / 2^18)
-  dx_cart  the built-in cartridge: 32 voices in the DX7's packed 128-byte
-           format (VMEM), all of them made here - INIT VOICE and a handful of
-           simple original sounds. No Yamaha voice is included.
+  dx_cart  the built-in bank: BANK voices in the DX7's packed 128-byte format
+           (VMEM): the free cartridges in carts/ (BANK_CARTS: Legowelt's
+           "Magic DX7" 32, Richard's DX9 20), then this project's own voices
+           at dx_own - INIT VOICE and a handful of simple original sounds,
+           made here. No Yamaha voice is included.
 
 The numbers of dx_sol, dx_exps, dx_pms and dx_veld are msfa's (Apache License 2.0;
 see docs/DX.md for the notice). Rerun after changing anything here; CI
@@ -39,6 +41,22 @@ checks that the file is up to date.
 import os
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+# the built-in bank's cartridges (carts/README.md: 4096-byte voice banks, the
+# data of a 32-voice bulk dump): file, voices taken
+BANK_CARTS = [('Legowelt_magic_DX7.vmem', 32), ('Richard_DX9.vmem', 20)]
+OWN = 11                                     # INIT VOICE and the ten after it
+BANK = sum(n for _, n in BANK_CARTS) + OWN   # = DX_BANKV in src/dx.inc
+
+
+def cart_voices(name):
+    b = open(os.path.join(REPO, 'carts', name), 'rb').read()
+    assert len(b) == 4096 and max(b) < 128, name
+    return b
+
+
+def bank():
+    out = b''.join(cart_voices(f)[:128 * n] for f, n in BANK_CARTS)
+    return out + voices()[:128 * OWN]
 OUT = os.path.join(REPO, 'src', 'dx_tables.inc')
 
 # msfa's algorithm table (fm_core.cc), OP6 .. OP1
@@ -349,8 +367,10 @@ def main():
         lines.append('    .byte ' + ', '.join(str(x) for x in VELD[i:i + 16]))
     lines.append('    .align 2')
     lines.append('dx_cart:')
-    c = voices()
+    c = bank()
     for i in range(0, len(c), 16):
+        if i == len(c) - 128 * OWN:
+            lines.append('dx_own:')
         lines.append('    .byte ' + ', '.join(str(x) for x in c[i:i + 16]))
     lines.append('    .align 2')
     open(OUT, 'w').write('\n'.join(lines) + '\n')

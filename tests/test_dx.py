@@ -35,8 +35,23 @@ def emu():
     return EMU
 
 
-def dials(e, t, color=64, shape=64, sweep=64, voice=0):
-    for i, v in enumerate((color << 8, shape << 8, sweep << 8, voice << 10)):
+OWNV = G.BANK - G.OWN                             # INIT VOICE, in the built-in bank
+
+
+def contour(voice, n=G.BANK):
+    """Contour's value that picks voice (from 0) of n (dx_vidx)"""
+    return min(k for k in range(128) if k * n >> 7 == voice) << 8
+
+
+def dials(e, t, color=64, shape=64, sweep=64, voice=None, own=None):
+    """the four dials; voice of the built-in bank, or of the track's own
+    cartridge (own; by default if it has one loaded, voice 1 of it, else
+    INIT VOICE of the bank)"""
+    if own is None:
+        own = e.r32(e.sym['dx_tst'] + 512 * t + 56) != 0
+    if voice is None:
+        voice = 0 if own else OWNV
+    for i, v in enumerate((color << 8, shape << 8, sweep << 8, contour(voice, 32 if own else G.BANK))):
         e.w32(e.sym['dx_p'] + 16 * t + 4 * i, v)
 
 
@@ -48,6 +63,7 @@ def load(e, t, *voices):
     st = e.sym['dx_tst'] + 512 * t
     e.w32(st + 56, 1)
     e.w32(st + 60, 1)
+    dials(e, t)
 
 
 def render(e, blocks, t=0, step=STEP1, trig=True, gate=1):
@@ -452,7 +468,7 @@ class TBuiltIn(unittest.TestCase):
         louds = {}
         for v in range(11):
             e = emu()
-            dials(e, 0, voice=v)
+            dials(e, 0, voice=OWNV + v)
             e.w8(e.sym['dx_vel'], 100)
             x = render(e, 1500)
             louds[v] = max(rms(x[i:i + 9600]) for i in range(0, len(x) - 9600, 4800))
@@ -500,12 +516,18 @@ class TLfo(unittest.TestCase):
 class TVoices(unittest.TestCase):
     def test_built_in_cartridge_and_voice_select(self):
         e = emu()
-        cart = bytes(e.uc.mem_read(e.sym['dx_cart'], 4096))
-        self.assertEqual(cart, G.voices())
-        names = [cart[128 * i + 118:128 * i + 128].decode().rstrip() for i in range(32)]
-        self.assertEqual(names[0], 'INIT VOICE')
+        cart = bytes(e.uc.mem_read(e.sym['dx_cart'], 128 * G.BANK))
+        self.assertEqual(cart, G.bank())
+        self.assertEqual(e.sym['dx_own'], e.sym['dx_cart'] + 128 * OWNV)
+        names = [cart[128 * i + 118:128 * i + 128].decode().rstrip() for i in range(G.BANK)]
+        self.assertEqual((names[0], names[31], names[32], names[51], names[OWNV], names[-1]),
+                         ('Tooropulse', 'Swissynth', 'DX9. 1', 'DX9.20', 'INIT VOICE', 'SINE BASS'))
+        self.assertEqual(cart[:4096], open(os.path.join(G.REPO, 'carts', 'Legowelt_magic_DX7.vmem'),
+                                             'rb').read())
+        self.assertEqual([k * G.BANK >> 7 for k in (0, 127)], [0, G.BANK - 1])   # all reached
+        self.assertEqual(len({k * G.BANK >> 7 for k in range(128)}), G.BANK)
         outs = []
-        for v in (0, 1, 5):
+        for v in (0, 1, OWNV + 5):
             e = emu()
             dials(e, 0, voice=v)
             outs.append(render(e, 40))
@@ -525,8 +547,11 @@ class TVoices(unittest.TestCase):
         self.assertEqual([fmt('dx_offmt', v << 8) for v in (0, 1, 63, 64, 65, 127)],
                          ['-64', '-63', '-1', '0', '+1', '+63'])
         self.assertEqual(fmt('dx_offmt', 0xffff8000), '-64')
-        self.assertEqual([fmt('dx_vfmt', v << 10) for v in (0, 5, 31)], ['1', '6', '32'])
-        self.assertEqual(fmt('dx_vfmt', 32512), '32')
+        e.uc.mem_write(0x40012412, bytes.fromhex('70014e75'))   # the selected track: 1
+        self.assertEqual([fmt('dx_vfmt', v << 8) for v in (0, 64, 127)], ['1', '32', '63'])
+        self.assertEqual(fmt('dx_vfmt', contour(OWNV)), str(OWNV + 1))
+        load(e, 1, G.voice('MY VOICE', [op(ol=99)]))             # its own cartridge: 32
+        self.assertEqual([fmt('dx_vfmt', v << 8) for v in (0, 64, 127)], ['1', '17', '32'])
 
     def test_knob_screen_names_the_voice(self):
         e = emu(); s = e.sym
@@ -542,16 +567,16 @@ class TVoices(unittest.TestCase):
             calls.clear()
             e.w32(SCRATCH + 0x9000, width)                       # the width, from memory:
             e.uc.mem_write(0x40072102, bytes.fromhex('2039%08x4e75' % (SCRATCH + 0x9000)))
-            e.run('dx_draw', stack=[0x1000, v << 10, 0x5555, 0x60, 0x22, 0])
+            e.run('dx_draw', stack=[0x1000, v, 0x5555, 0x60, 0x22, 0])
             return calls
-        c = draw(40, 5)                                          # fits the big font
+        c = draw(40, contour(OWNV + 5))                          # fits the big font
         fills = [x for x in c if x[0] == 'fill']
         self.assertEqual(fills[0][1:], (0x5555, 66, 22, 122, 28, 0))   # the stock pips off
         text = [x for x in c if x[0] == 'text'][0]
         self.assertEqual(rd(text[9] & M32), 'DRAWBARS 1')
         self.assertEqual(text[3:5], (96 - 20, 0x22))
         self.assertEqual([x[1] & M32 for x in c if x[0] == 'font'][-1], 0x40ea14dc)   # big
-        c = draw(70, 5)                                          # too wide: small, at 66
+        c = draw(70, contour(OWNV + 5))                          # too wide: small, at 66
         text = [x for x in c if x[0] == 'text'][0]
         self.assertEqual([x[1] & M32 for x in c if x[0] == 'font'][-1], 0x40ea14cc)
         self.assertEqual(text[3], 66)
@@ -680,7 +705,7 @@ class TCartridges(unittest.TestCase):
         self.assertEqual(r, 0)
         self.assertEqual(self.cart(e, 2), b''.join(vs))
         self.assertEqual((self.st(e, 2, 56), self.st(e, 2, 60)), (1, 1))
-        dials(e, 2, voice=7)                            # it plays: voice 8 is V7
+        dials(e, 2, voice=7, own=True)                  # it plays: voice 8 is V7
         render(e, 2, t=2)
         self.assertEqual(bytes(e.uc.mem_read(e.sym['dx_tst'] + 512 * 2 + 64 + 118, 10)),
                          b'V7'.ljust(10))

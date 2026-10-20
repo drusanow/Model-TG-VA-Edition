@@ -394,11 +394,11 @@ LFO on Contour near an engine's edge may now reach its neighbour. Details:
 ## DX
 
 *Plaits Edition only.* The thirteenth machine: one 6-operator FM voice per
-track, after the DX7 (as Dexed's engine models it). It plays DX7 voices; this
-build has a built-in cartridge of its own voices (INIT VOICE, E.PIANO MT,
-SYN BASS 1, GLASS BELL, BRASS SWEL, DRAWBARS 1, FM PLUCK 1, SOFT PAD 1,
-MARIMBA 1, CLAV 1, SINE BASS), and
-your own cartridges:
+track, after the DX7 (as Dexed's engine models it). It plays DX7 voices: a
+built-in bank of 63 (1-32 Legowelt's "Magic DX7" cartridge, 33-52 a DX9
+cartridge, 53-63 this firmware's own: INIT VOICE, E.PIANO MT, SYN BASS 1,
+GLASS BELL, BRASS SWEL, DRAWBARS 1, FM PLUCK 1, SOFT PAD 1, MARIMBA 1,
+CLAV 1, SINE BASS), and your own cartridges:
 
 1. Send DX7 `.syx` files to the Cycles over USB or MIDI IN (the
    [DX Cartridge Sender](../flasher/dx.html) page, a SysEx librarian, or
@@ -418,7 +418,7 @@ the voice exactly) without breaking it:
 | **Color** | **BRIG** | Bright: the modulators up or down, up to 12 dB: darker or brighter, same loudness |
 | **Shape** | **AENV** | Amp Env: the carriers' attack and release, snappier (down) or slower (up: a swell of about a second) |
 | **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, how the tone moves: a quicker bite (down) or a slower swell (up) |
-| **Contour** | **VOIC** | the voice, 1 to 32; the page shows its name |
+| **Contour** | **VOIC** | the voice, 1 to 63 of the bank (1 to 32 of your cartridge); the page shows its name |
 
 **Turn Decay up** on a DX track: the track's Amp Decay comes after the
 voice's envelopes, so a low Decay cuts a pad short (or silences it, if its

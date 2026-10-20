@@ -5,15 +5,16 @@
 | Raph Levien, Apache 2.0: its envelope, level and scaling rules are followed
 | here, rewritten in ColdFire assembly). It plays DX7 voices in the packed
 | 128-byte cartridge format (VMEM): the track's own cartridge (loaded from a
-| .syx through the preset browser) or the built-in one (dx_cart, all its
-| voices made in tools/gen_dx_tables.py).
+| .syx through the preset browser) or the built-in bank (dx_cart, 63 voices:
+| two free cartridges from carts/, then this project's own, dx_own; all put
+| together by tools/gen_dx_tables.py).
 |
 |   Color   BRIG  the modulators' output levels, +-12 dB: darker / brighter
 |   Shape   AENV  the carriers' attack and release: faster down, slower up
 |   Sweep   MENV  the modulators' attack and first decay: the tone's movement
 |   (each at 64 the voice exactly as it is; the algorithm, ratios and
 |   feedback are always the voice's own)
-|   Contour VOIC  the voice, 1..32 of the cartridge
+|   Contour VOIC  the voice, 1..63 of the bank (1..32 of a track's own cartridge)
 |
 | Built as PLAITS is: sampler_pre sends it to va_pre (dx_params: the dials
 | and the gate), sampler_render calls dx_fill into the same 64-sample, 96 kHz
@@ -29,6 +30,7 @@ DX_VELW = 0x40fe4cdc              | the OS's note velocity per track, << 8
 DX_GMAX = 0x10000000              | a gain's largest step a block (Q14 << 16)
 DX_OP   = 192                     | ... where the six operators start, 48 each
 DX_OPS  = 48
+DX_BANKV = 63                     | voices in the built-in bank (dx_cart, gen_dx_tables.py)
 | track state:
 |   +0 the voice loaded (-1 none)      +4 the note's velocity (0..127)
 |   +12/+16 feedback's last two outputs
@@ -630,11 +632,14 @@ dx_fill:
     movel   %a0@(0,%d6:l:4),%d0
     movel   %d0,%sp@(36)
     lea.l   sampler_buf+32,%a3
-    | ---- the voice: Contour x 32 / 32768 of this track's cartridge ----
+    | ---- the voice: Contour picks one of the built-in bank or of the
+    | track's own cartridge ----
     movel   %a4@(12),%d0
-    moveq   #10,%d1
-    lsrl    %d1,%d0
-    DX_MAX  %d0, 31
+    moveq   #32,%d1
+    tstl    %a5@(56)
+    bnes    1f
+    moveq   #DX_BANKV,%d1
+1:  bsr     dx_vidx
     cmpl    %a5@,%d0
     bnes    2f
     tstl    %a5@(60)
@@ -642,7 +647,7 @@ dx_fill:
 2:  movel   %d0,%a5@
     clrl    %a5@(60)
     lsll    #7,%d0
-    lea.l   dx_cart,%a0           | the built-in cartridge...
+    lea.l   dx_cart,%a0           | the built-in bank...
     tstl    %a5@(56)
     beqs    4f
     movel   %d6,%d1               | ...or the track's own
@@ -1419,7 +1424,7 @@ dcl_vced:
     bsr     dx_vced               | voice 1
     lea.l   %a1@(128),%a1         | INIT VOICE for the rest
     moveq   #30,%d1
-8:  lea.l   dx_cart,%a0
+8:  lea.l   dx_own,%a0            | (INIT VOICE)
     moveq   #31,%d0
 9:  movel   %a0@+,%a1@+
     subql   #1,%d0
@@ -1999,15 +2004,50 @@ dx_offmt:
     clrb    %a1@
     braw    dx_sfmt
 
-| Contour: the voice's number, 1..32 (the name is the knob screen's, dx_draw)
-dx_vfmt:
-    lea.l   dx_sbuf,%a1
-    movel   %sp@(8),%d0
+| d0 = Contour's value, d1 = the voices to pick from (the bank's, or 32) ->
+| d0 = the voice, (value >> 8) x d1 / 128. Clobbers d1.
+dx_vidx:
+    tstl    %d0
     bpls    1f
     moveq   #0,%d0
-1:  moveq   #10,%d1
-    lsrl    %d1,%d0
-    DX_MAX  %d0, 31
+1:  lsrl    #8,%d0
+    DX_MAX  %d0, 127
+    mulu.w  %d1,%d0
+    lsrl    #7,%d0
+    rts
+
+| the selected track's cartridge -> a0 = it (the built-in bank, or the
+| track's own), d1 = its voices. Clobbers d0, a1.
+dx_selc:
+    jsr     0x400cf866            | the selected track
+    movel   %d0,%sp@-
+    jsr     0x4000eb90
+    movel   %d0,%sp@-
+    jsr     0x40012412
+    addql   #8,%sp
+    lea.l   dx_cart,%a0
+    moveq   #DX_BANKV,%d1
+    cmpil   #6,%d0
+    bccs    1f
+    lsll    #8,%d0
+    addl    %d0,%d0               | x DX_TS (512)
+    lea.l   DX_TST,%a1
+    tstl    %a1@(56,%d0:l)
+    beqs    1f
+    lsll    #3,%d0                | x 4096 = 512 x 8
+    lea.l   DX_CARTS,%a0
+    adda.l  %d0,%a0
+    moveq   #32,%d1
+1:  rts
+
+| Contour: the voice's number, 1..63 of the bank or 1..32 of a track's own
+| cartridge (the name is the knob screen's, dx_draw)
+dx_vfmt:
+    movel   %sp@(8),%sp@-
+    bsr     dx_selc
+    movel   %sp@+,%d0
+    bsr     dx_vidx
+    lea.l   dx_sbuf,%a1
     addql   #1,%d0
     bsr     dx_num
     clrb    %a1@
@@ -2017,30 +2057,9 @@ dx_vfmt:
 | from its cartridge, trailing spaces off; d0 = its length. Clobbers d1/a0.
 dx_vname:
     movel   %d0,%sp@-
-    jsr     0x400cf866            | the selected track
-    movel   %d0,%sp@-
-    jsr     0x4000eb90
-    movel   %d0,%sp@-
-    jsr     0x40012412
-    addql   #8,%sp
-    lea.l   dx_cart,%a0
-    cmpil   #6,%d0
-    bccs    1f
-    movel   %d0,%d1
-    lsll    #8,%d1
-    addl    %d1,%d1               | x DX_TS (512)
-    lea.l   DX_TST,%a1
-    tstl    %a1@(56,%d1:l)
-    beqs    1f
-    lsll    #3,%d1                | x 4096 = 512 x 8
-    lea.l   DX_CARTS,%a0
-    adda.l  %d1,%a0
-1:  movel   %sp@+,%d0
-    bpls    2f
-    moveq   #0,%d0
-2:  moveq   #10,%d1
-    lsrl    %d1,%d0
-    DX_MAX  %d0, 31
+    bsr     dx_selc
+    movel   %sp@+,%d0
+    bsr     dx_vidx
     lsll    #7,%d0
     lea.l   %a0@(118,%d0:l),%a0   | its name, ten characters
     lea.l   dx_sbuf,%a1

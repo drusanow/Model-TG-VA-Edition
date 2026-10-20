@@ -29,31 +29,40 @@ same sound:
 | **Color** | **BRIG** | Bright: the modulators' output levels, up to 12 dB down or up. Down is rounder and darker, up brighter and more biting. The carriers, and so the loudness, stay. |
 | **Shape** | **AENV** | Amp Env: the carriers' attack and release. Down is snappier (up to 32x faster), up slower: an instant attack swells over about a second at 127, and releases ring longer. |
 | **Sweep** | **MENV** | Mod Env: the modulators' attack and first decay, the way the tone moves. Down is a quicker bite and a shorter "pluck", up a slower swell (brass, pads). |
-| **Contour** | **VOIC** | the voice, 1 to 32 of the cartridge. The parameter page shows its number; turning Contour shows its name. |
+| **Contour** | **VOIC** | the voice: 1 to 63 of the built-in bank, or 1 to 32 of a cartridge you loaded. The parameter page shows its number; turning Contour shows its name. |
 
 Each macro shows **0** in the middle (the voice exactly as it is), and
 **-64** to **+63** around it. All four p-lock, slide, take LFOs and are
 saved, like any machine knob.
 
-The defaults are the three macros in the middle and voice 1.
+The defaults are the three macros in the middle and voice 1 (Tooropulse).
 
-**The built-in cartridge.** Until you load one of your own, DX plays a
-cartridge made for this firmware, so no Yamaha voice is included:
+**The built-in bank.** Until you load a cartridge of your own, Contour picks
+among 63 built-in voices (the parameter page shows the number, the knob
+screen the name):
+
+| voices | from | |
+|---|---|---|
+| 1-32 | Legowelt's "Magic DX7" cartridge | Tooropulse, Overcast P, Delicho, ... Swissynth |
+| 33-52 | a DX9 cartridge | DX9. 1 to DX9.20 |
+| 53-63 | this firmware's own | below |
+
+Both cartridges are free patch sets ([carts/](../carts/README.md)). The
+firmware's own voices:
 
 | voice | name | what it is |
 |---|---|---|
-| 1 | INIT VOICE | a sine (the DX7's starting point) |
-| 2 | E.PIANO MT | an electric piano: three pairs, a tine on 14:1 |
-| 3 | SYN BASS 1 | a bass: a stack of modulators with feedback |
-| 4 | GLASS BELL | a bell: inharmonic ratios, long decays |
-| 5 | BRASS SWEL | brass: the modulators swell after the carriers |
-| 6 | DRAWBARS 1 | an organ: six carriers on drawbar ratios |
-| 7 | FM PLUCK 1 | a short pluck |
-| 8 | SOFT PAD 1 | a slightly detuned pad, swelling in over ~0.3 s |
-| 9 | MARIMBA 1 | a short 4:1 strike over a sine |
-| 10 | CLAV 1 | a bright, nasal clav |
-| 11 | SINE BASS | a sine bass with a touch of its octave |
-| 12-32 | INIT VOICE | |
+| 53 | INIT VOICE | a sine (the DX7's starting point) |
+| 54 | E.PIANO MT | an electric piano: three pairs, a tine on 14:1 |
+| 55 | SYN BASS 1 | a bass: a stack of modulators with feedback |
+| 56 | GLASS BELL | a bell: inharmonic ratios, long decays |
+| 57 | BRASS SWEL | brass: the modulators swell after the carriers |
+| 58 | DRAWBARS 1 | an organ: six carriers on drawbar ratios |
+| 59 | FM PLUCK 1 | a short pluck |
+| 60 | SOFT PAD 1 | a slightly detuned pad, swelling in over ~0.3 s |
+| 61 | MARIMBA 1 | a short 4:1 strike over a sine |
+| 62 | CLAV 1 | a bright, nasal clav |
+| 63 | SINE BASS | a sine bass with a touch of its octave |
 
 The built-in voices are levelled to play about equally loud (within 1.5 dB,
 measured), and their attacks are a few milliseconds, not instant.
@@ -312,8 +321,11 @@ Host-verified in `tests/test_dx.py` (Unicorn ColdFire V4e):
   taken at the note, and `dx_params` reads it from the OS's word.
 - **LFO:** PMD 99 / PMS 7 swings the pitch; AMD 99 / AMS 3 swings the level
   over 12 dB; PMD 0 leaves it steady.
-- **Voices:** the built-in cartridge is the generator's, Contour picks the
-  voice (copied into the track), and different voices sound different.
+- **Voices:** the built-in bank is the generator's (the two cartridges from
+  `carts/`, then its own voices), Contour reaches all 63 (or the 32 of a
+  loaded cartridge) and copies the voice into the track, and different
+  voices sound different. The DX9 voices match msfa as closely as the
+  Legowelt ones.
 - **Values:** the macros print -64..-1, 0, +1..+63; Contour the voice's
   number, and its knob screen the voice's name, from the built-in or the
   track's own cartridge.
@@ -390,6 +402,8 @@ msfa is released under the Apache License 2.0:
 > License for the specific language governing permissions and limitations
 > under the License.
 
-The built-in voices are this project's own. "DX7" and "Yamaha" are Yamaha
+The built-in bank's first 52 voices are Legowelt's "Magic DX7" cartridge
+and a DX9 cartridge, free patch sets ([carts/](../carts/README.md)); the
+rest are this project's own. "DX7" and "Yamaha" are Yamaha
 Corporation's. This firmware is not made, supported or endorsed by Yamaha,
 by the authors of msfa or Dexed, or by Elektron.
