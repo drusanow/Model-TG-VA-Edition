@@ -288,6 +288,16 @@ bytes (sound+20.., `dx_snap`) and calls it when Contour is the only one
 that changed since the last look: the knob was turned. A p-lock, slide or
 LFO never writes the sound, and a pattern loaded changes more than that.
 
+**The labels follow the selected track.** The names of the shared
+parameter ids are global, and `descr_hook` / `descr_b_hook` used to put up
+the set of whichever machine a lookup asked for. With a step held, the
+p-lock editor looks up another machine's (Kick's), so the page flickered
+between our labels and "Kick Color" ones while a lock was turned (the sound
+was never affected). `names_mach` now takes the selected track's machine
+for the labels whenever it is one of ours (6 and up); the descriptor each
+lookup returns is unchanged. This holds for every machine of this firmware
+(Sampler, VA, drums, PLAITS, DX).
+
 **The labels and values.** `apply_names` set 7 puts up BRIG / TIME / FDBK /
 VOIC (Bright, Env Time, Feedback, Voice). Color's, Shape's and Sweep's values
 print the macro's offset, 0 in the middle (`dx_offmt`; Sweep's formatter is

@@ -1098,6 +1098,27 @@ class TPlumbing(unittest.TestCase):
                          (0x400456c8, 0x11112222, 0x400456c8))
         self.assertEqual(e.r32(pt + 2576 + 44), 0x4012999c)    # stock labels again
 
+    def test_labels_follow_the_selected_track(self):
+        """with a DX track selected, a lookup for another machine (the p-lock
+        editor's, with a step held, asks for Kick's) keeps DX's labels up;
+        with a stock track selected the labels follow the lookup as before"""
+        e = emu(); s = e.sym
+        pt = 0x4010dce0
+        rd = lambda a: bytes(e.uc.mem_read(a, 16)).split(b'\0')[0].decode()
+        labels = lambda: [rd(e.r32(pt + off + 52)) for off in (2576, 3472, 4088, 4144)]
+        e.uc.mem_write(0x40012412, bytes.fromhex('70014e75'))   # the selected track: 1
+        e.w32(e.arr('trk_mach', 1), DX)
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[DX])
+        self.assertEqual(labels(), ['BRIG', 'TIME', 'FDBK', 'VOIC'])
+        for m in (0, 3):                                     # Kick's, Perc's lookups
+            e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[m])
+            self.assertEqual(labels(), ['BRIG', 'TIME', 'FDBK', 'VOIC'], m)
+            e.run_to_any('descr_hook', (s['table_lookup_b_fixed'], RET), stack=[m + 1])
+            self.assertEqual(labels(), ['BRIG', 'TIME', 'FDBK', 'VOIC'], m)
+        e.w32(e.arr('trk_mach', 1), 0)                       # a Kick track selected:
+        e.run_to_any('descr_b_hook', (s['table_lookup_b_fixed'], RET), stack=[0])
+        self.assertNotEqual(labels()[0], 'BRIG')             # the stock labels
+
     def test_commit_defaults(self):
         import test_va as V
         e = emu()

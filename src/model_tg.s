@@ -4114,6 +4114,9 @@ descr_hook:
     lea.l   %sp@(-16),%sp
     moveml  %d0-%d1/%a0-%a1,%sp@
     movel   %sp@(20),%d0
+    subql   #1,%d0                | (the index is the machine + 1)
+    bsr     names_mach
+    addql   #1,%d0
     | choose which label set the table should carry for this page
     moveq   #0,%d1
     cmpil   #7,%d0
@@ -9825,8 +9828,40 @@ fh_abs:
     movel   %d0,%sp@(16)
     bras    fh_go
 
+| d0 = the machine a lookup asks for -> d0 = the machine whose labels to put
+| up: the selected track's when it is one of ours (6 and up), else d0. The
+| labels of the shared parameter ids are global, and other lookups run
+| meanwhile - with a step held, the p-lock editor's (0x4002628e) - which
+| put Kick's names ("Kick Color" ...) over ours until the page's next own
+| lookup: the parameter page flickered between the two. Clobbers d1, a0/a1.
+names_mach:
+    movel   %d0,%sp@-
+    jsr     0x400cf866            | the selected track
+    movel   %d0,%sp@-
+    jsr     0x4000eb90
+    movel   %d0,%sp@-
+    jsr     0x40012412
+    addql   #8,%sp
+    cmpil   #MAX_TRK,%d0
+    bccs    1f
+    lea.l   trk_mach,%a0
+    movel   %a0@(0,%d0:l:4),%d0
+    cmpil   #6,%d0
+    blts    1f
+    cmpil   #MACH_LAST,%d0
+    bhis    1f
+    addql   #4,%sp                | ours: its labels
+    rts
+1:  movel   %sp@+,%d0
+    rts
+
 descr_b_hook:
     movel   %sp@(4),%d0
+    movel   %a0,%sp@-             | (the stock lookup keeps a1, and names_mach
+    movel   %a1,%sp@-             | calls the OS)
+    bsr     names_mach
+    movea.l %sp@+,%a1
+    movea.l %sp@+,%a0
     | Keep the global labels in step with the track being drawn. descr_hook only
     | runs when the parameter page is REBUILT, so a project that loads with a
     | Sampler track already selected kept the stock labels until the machine was
@@ -9850,9 +9885,8 @@ dbh_va:
 dbh_none:
     moveq   #0,%d1
 dbh_names:
-    movel   %d0,%sp@-             | apply_names clobbers d0
     bsr     apply_names
-    movel   %sp@+,%d0             | sp restored: dbh_pass re-reads the argument
+    movel   %sp@(4),%d0           | the lookup itself: the machine asked for
     cmpil   #6,%d0                | the VA and the drums share the Sampler's
     bcss    dbh_pass              | descriptor
     cmpil   #MACH_LAST,%d0
