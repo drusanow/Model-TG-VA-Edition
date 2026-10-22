@@ -42,8 +42,8 @@ shows **ALGO** on Shape's place, from **VCE** (the voice's own) through
 **A1** to **A32**, and the routing changes at once. While you turn it, the
 whole screen shows the algorithm's diagram, drawn as on the DX7's chart (the
 carriers on the bottom line, each modulator above what it modulates, the
-feedback loop), with its number underneath: **ALGORITHM 24**, or on VCE
-**VCE: ALGORITHM 5**, the voice's own (boxed when p-locked). Let go of
+feedback loop), with its number underneath: **24**, or on VCE **VCE 5**,
+the voice's own (boxed when p-locked). Let go of
 SETTINGS and Shape is Env Time again. The algorithm is kept with the pattern; a track
 that becomes DX starts at VCE.
 

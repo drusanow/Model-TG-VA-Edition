@@ -2174,8 +2174,8 @@ dx_algfmt:
 | ---- dx_algpop: the Algorithm popup, full screen ---------------------------
 | SETTINGS + Shape on a DX track turns Algorithm (param 0x0a): instead of the
 | stock value popup (a dial), the whole screen shows the algorithm's diagram,
-| as the DX7's chart draws it, and under it its number ("ALGORITHM 24"; on
-| VCE, the voice's own: "VCE: ALGORITHM 5", boxed when p-locked). Reached from
+| as the DX7's chart draws it, and under it its number ("24"; on VCE, the
+| voice's own: "VCE 5"; boxed when p-locked). Reached from
 | wf_popup, the parameter view's popup (slot 0x90), with its arguments
 | (this, ctx, id, value, locked, 1); like the waveform there, it clears the
 | screen, draws, and pre-inverts the left 64 x 64 box, which the view's render
@@ -2286,8 +2286,8 @@ dx_algpop:
     moveml  %sp@,%d2-%d7/%a2-%a5
     unlk    %fp
     rts
-dx_agf_n: .asciz "ALGORITHM %d"
-dx_agf_v: .asciz "VCE: ALGORITHM %d"
+dx_agf_n: .asciz "%d"
+dx_agf_v: .asciz "VCE %d"
     .align 2
 
 | Contour: the voice's number, 1..63 of the bank or 1..32 of a track's own

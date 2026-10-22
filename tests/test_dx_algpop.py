@@ -106,17 +106,17 @@ class TAlgPopup(unittest.TestCase):
             want = G.render(n)
             self.assertEqual(got[:53], want[:53], n)
             self.assertTrue(all(not any(r) for r in got[53:]), n)
-            self.assertEqual(self.texts, [(64, 1, 0x12, f'ALGORITHM {n}')], n)
+            self.assertEqual(self.texts, [(64, 1, 0x12, f'{n}')], n)
 
     def test_vce_shows_the_voice_own(self):
         self.e.w8(self.e.sym['dx_tst'] + 512 * self.track + 64 + 110, 21)   # algorithm 22
         self.popup(0)
         self.assertEqual(self.shown()[:53], G.render(22)[:53])
-        self.assertEqual(self.texts, [(64, 1, 0x12, 'VCE: ALGORITHM 22')])
+        self.assertEqual(self.texts, [(64, 1, 0x12, 'VCE 22')])
 
     def test_locked_is_boxed(self):
         self.popup(127 << 8, locked=1)
-        self.assertEqual(self.texts, [(64, 1, 0x1a, 'ALGORITHM 32')])
+        self.assertEqual(self.texts, [(64, 1, 0x1a, '32')])
 
     def test_others_get_the_stock_popup(self):
         self.mach = 4                                         # TONE: its own 0x0a, if any
