@@ -39,8 +39,12 @@ The defaults are the three macros in the middle and voice 1 (Tooropulse).
 
 **The algorithm.** Hold **SETTINGS** and turn **Shape**: the parameter page
 shows **ALGO** on Shape's place, from **VCE** (the voice's own) through
-**A1** to **A32**, and the routing changes at once. Let go of SETTINGS and
-Shape is Env Time again. The algorithm is kept with the pattern; a track
+**A1** to **A32**, and the routing changes at once. While you turn it, the
+whole screen shows the algorithm's diagram, drawn as on the DX7's chart (the
+carriers on the bottom line, each modulator above what it modulates, the
+feedback loop), with its number underneath: **ALGORITHM 24**, or on VCE
+**VCE: ALGORITHM 5**, the voice's own (boxed when p-locked). Let go of
+SETTINGS and Shape is Env Time again. The algorithm is kept with the pattern; a track
 that becomes DX starts at VCE.
 
 **A preset plays as it is.** Picking a voice with Contour, or loading a
@@ -140,7 +144,8 @@ trig.
   whole track's volume by velocity, by the track's own velocity setting, as
   for every machine; set that to none for a DX7's response alone.
 - **Algorithms 4 and 6:** their feedback goes from OP4 or OP5 back to OP6
-  on a DX7. Here, as in msfa, OP6 feeds back on itself instead.
+  on a DX7. Here, as in msfa, OP6 feeds back on itself instead (the
+  Algorithm screen draws the DX7's loop, as its chart does).
 - **The pitch envelope and the LFO's amplitude modulation** are msfa's
   models, which are close to a DX7's but not measured from one.
 - **48 kHz:** the voice is computed at 48 kHz, the rate the stock decimator

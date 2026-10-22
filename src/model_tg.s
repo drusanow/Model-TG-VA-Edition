@@ -18439,6 +18439,8 @@ WF_MID  = 37
 WF_HALF = 26
 wf_popup:
     movel   %sp@(12),%d0          | id
+    cmpil   #0x0a,%d0             | Algorithm: on a DX track, its diagram
+    beqw    wp_alg                | (dx_algpop)
     moveq   #0,%d1
     cmpil   #0x2e,%d0             | Start
     beqs    wp_id
@@ -18488,6 +18490,23 @@ wp_pos:
     beqw    wf_draw
 wp_stock:
     jmp     0x4001d818
+wp_alg:
+    jsr     0x400cf866            | the selected track
+    movel   %d0,%sp@-
+    jsr     0x4000eb90
+    movel   %d0,%sp@-
+    jsr     0x40012412
+    addql   #8,%sp
+    cmpil   #MAX_TRK,%d0
+    bccs    wp_stock
+    jsr     sound_obj
+    tstl    %d0
+    beqs    wp_stock
+    movea.l %d0,%a0
+    mvzb    %a0@(38),%d0
+    cmpil   #DX_MACH,%d0
+    bnes    wp_stock
+    jmp     dx_algpop
 
 wf_draw:
     linkw   %fp,#-8

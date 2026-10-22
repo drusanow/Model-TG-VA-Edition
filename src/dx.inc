@@ -2171,6 +2171,125 @@ dx_algfmt:
 3:  clrb    %a1@
     braw    dx_sfmt
 
+| ---- dx_algpop: the Algorithm popup, full screen ---------------------------
+| SETTINGS + Shape on a DX track turns Algorithm (param 0x0a): instead of the
+| stock value popup (a dial), the whole screen shows the algorithm's diagram,
+| as the DX7's chart draws it, and under it its number ("ALGORITHM 24"; on
+| VCE, the voice's own: "VCE: ALGORITHM 5", boxed when p-locked). Reached from
+| wf_popup, the parameter view's popup (slot 0x90), with its arguments
+| (this, ctx, id, value, locked, 1); like the waveform there, it clears the
+| screen, draws, and pre-inverts the left 64 x 64 box, which the view's render
+| inverts once more. The diagrams are rectangles (dx_algo_gfx.inc, written
+| by tools/gen_dx_algo_gfx.py), rows from the top: mirrored here, as the
+| screen counts y from the bottom.
+    .globl  dx_algpop
+dx_algpop:
+    linkw   %fp,#0
+    lea.l   %sp@(-40),%sp
+    moveml  %d2-%d7/%a2-%a5,%sp@
+    movea.l %fp@(12),%a4          | ctx
+    clrl    %sp@-                 | the screen cleared
+    pea     63
+    pea     127
+    clrl    %sp@-
+    clrl    %sp@-
+    movel   %a4,%sp@-
+    jsr     0x40070dea
+    lea.l   %sp@(24),%sp
+    movel   %fp@(20),%d0          | the value: 0 VCE, 1..32 (dx_algfmt's sum)
+    bpls    1f
+    moveq   #0,%d0
+1:  lsrl    #8,%d0
+    DX_MAX  %d0, 127
+    mulu.w  #33,%d0
+    lsrl    #7,%d0
+    movel   %d0,%d5               | 0: VCE
+    movel   %d0,%d6               | the algorithm shown, 1..32
+    bnes    2f
+    jsr     0x400cf866            | VCE: the selected track's voice's own
+    movel   %d0,%sp@-
+    jsr     0x4000eb90
+    movel   %d0,%sp@-
+    jsr     0x40012412
+    addql   #8,%sp
+    moveq   #1,%d6
+    cmpil   #6,%d0
+    bccs    2f
+    lsll    #8,%d0
+    addl    %d0,%d0               | x DX_TS (512)
+    lea.l   DX_TST+64+110,%a0
+    mvzb    %a0@(0,%d0:l),%d6     | the voice (packed): its algorithm, 0..31
+    moveq   #31,%d0
+    andl    %d0,%d6
+    addql   #1,%d6
+2:  lea.l   dx_agfx_ix,%a0
+    movel   %d6,%d0
+    subql   #1,%d0
+    addl    %d0,%d0
+    mvzw    %a0@(0,%d0:l),%d0
+    lea.l   dx_agfx,%a2
+    adda.l  %d0,%a2
+    moveq   #0,%d7
+    moveb   %a2@+,%d7             | how many rectangles
+3:  subql   #1,%d7
+    bmis    5f
+    moveq   #0,%d2
+    moveb   %a2@+,%d2             | x0 (bit 7: cleared)
+    moveq   #0,%d3
+    moveb   %a2@+,%d3             | y0, from the top
+    moveq   #0,%d4
+    moveb   %a2@+,%d4             | x1
+    moveq   #0,%d1
+    moveb   %a2@+,%d1             | y1, from the top
+    moveq   #1,%d0
+    bclr    #7,%d2
+    beqs    4f
+    moveq   #0,%d0
+4:  movel   %d0,%sp@-             | (ctx, x0, 63 - y1, x1, 63 - y0, set/clear)
+    moveq   #63,%d0
+    subl    %d3,%d0
+    movel   %d0,%sp@-
+    movel   %d4,%sp@-
+    moveq   #63,%d0
+    subl    %d1,%d0
+    movel   %d0,%sp@-
+    movel   %d2,%sp@-
+    movel   %a4,%sp@-
+    jsr     0x40070dea
+    lea.l   %sp@(24),%sp
+    bras    3b
+5:  movel   %d6,%sp@-             | the number, centred under it (rows 54..62)
+    pea     dx_agf_n
+    tstl    %d5
+    bnes    6f
+    addql   #4,%sp
+    pea     dx_agf_v
+6:  moveq   #0x12,%d0             | centred, cleared behind
+    tstb    %fp@(27)              | p-locked: boxed, as the stock popup marks it
+    beqs    7f
+    moveq   #0x1a,%d0
+7:  movel   %d0,%sp@-
+    pea     1
+    pea     64
+    pea     0x40ea14cc
+    movel   %a4,%sp@-
+    jsr     0x40071a04
+    lea.l   %sp@(28),%sp
+    pea     -1                    | pre-invert the left box, which the render
+    pea     63                    | inverts once more
+    pea     63
+    clrl    %sp@-
+    clrl    %sp@-
+    movel   %a4,%sp@-
+    jsr     0x40070dea
+    lea.l   %sp@(24),%sp
+    moveml  %sp@,%d2-%d7/%a2-%a5
+    unlk    %fp
+    rts
+dx_agf_n: .asciz "ALGORITHM %d"
+dx_agf_v: .asciz "VCE: ALGORITHM %d"
+    .align 2
+
 | Contour: the voice's number, 1..63 of the bank or 1..32 of a track's own
 | cartridge (the name is the knob screen's, dx_draw)
 dx_vfmt:
@@ -2319,6 +2438,7 @@ dx_nbuf: .space 16
 dx_amsq:   .long 0, 4342338, 7171437, 16777216 | AM sensitivity (msfa's ams_tab), Q24
     .align 2
     .include "dx_tables.inc"
+    .include "dx_algo_gfx.inc"
     .align 2
 dx_p:      .space 6*16            | the four dials, Q15
 dx_vel:    .byte 100,100,100,100,100,100 | each track's note velocity (dx_params)

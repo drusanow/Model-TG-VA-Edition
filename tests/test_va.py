@@ -485,6 +485,7 @@ class T7Static(unittest.TestCase):
                            ('gen_mi_tables.py', ['src/mi_tables.inc']),
                            ('gen_sfx_tables.py', ['src/sfx_tables.inc']),
                            ('gen_dx_tables.py', ['src/dx_tables.inc']),
+                           ('gen_dx_algo_gfx.py', ['src/dx_algo_gfx.inc']),
                            ('gen_dx_icons.py', ['src/va_icons/dx_icon_A_48x33.bin',
                                                 'src/va_icons/dx_icon_B_34x34.bin']),
                            ('gen_mi_icons.py', ['src/va_icons/plaits_icon_A_48x33.bin',
