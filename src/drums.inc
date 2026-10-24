@@ -563,7 +563,9 @@ dr_punch:
     cmpil   #MI_MACH-DR_KICK,%d0
     beqs    1f
     cmpil   #DX_MACH-DR_KICK,%d0
-    bnew    dp_out                | not a drum, nor PLAITS or DX
+    beqs    1f
+    cmpil   #LX_MACH-DR_KICK,%d0
+    bnew    dp_out                | not a drum, nor PLAITS, DX or LXR
 1:
     | PLAITS: a clean x2 - the 6 dB the Sampler path is short of the stock
     | machines' level - held at full scale
@@ -723,6 +725,7 @@ dr_hinc:   .space 6*4             | this block's six hat increments
 dr_seed:   .long 0x1f123bb5       | the noise's LCG
 dr_gq:     .long 0                | this block's drive gain (dr_setgq)
 dr_pgain:  .long 10923, 13653, 27307 | dr_punch: x4, x5, x10, x 2/3 (Q12)
+    .globl  dr_trig               | (src/lxr/lxr.c reads and clears its own)
 dr_trig:   .space 8               | a new note for the next block
 | Written over sound +42..+48 (k = 11..14) when a track becomes one of them,
 | by mc_commit_hook, as dial << 8.
@@ -732,5 +735,6 @@ dr_defaults:
     .word 80<<8, 64<<8, 16<<8, 48<<8   | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 48
     .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
     .word 64<<8, 64<<8, 64<<8, 0       | DX: BRIG, AENV, MENV at the voice's, VOIC 1
+    .word 40<<8, 48<<8, 32<<8, 0       | LXR: PAMT 40 PTIM 48 FMDR 32 ENG KICK
     .include "drum_tables.inc"
     .align 2

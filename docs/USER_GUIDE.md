@@ -433,6 +433,41 @@ MIDI keyboard, or the trig's length) and release after. Pitch, Decay,
 Attack, Filter and Resonance work as on the other machines; every knob
 p-locks, slides, takes LFOs and is saved. Details: [DX.md](DX.md).
 
+## LXR
+
+*Plaits Edition only.* The fourteenth machine: drum voices after the Erica
+Synths LXR-02 - a modified, fixed-point port of the drum voices of its
+GPL-3 firmware (not Erica Synths' firmware, not endorsed by them; licence
+in [src/lxr/NOTICE.md](../src/lxr/NOTICE.md)). One voice per track.
+
+**Contour** picks the engine (the page shows its name):
+
+| engine | what it is |
+|---|---|
+| **KICK** | a sine with a pitch envelope and FM that follows it, a click, drive |
+| **TOM** | the same voice higher and rounder |
+| **PERC** | a square wave phase-modulated by a saw: metallic, woody percussion |
+| **SNARE** | a triangle with a snap plus band-passed sample-and-hold noise |
+| **CLAP** | band-passed noise in quick repeats, then a tail |
+| **CL HAT** / **OP HAT** | a square carrier modulated by a sine and by noise, high-passed; short / long |
+| **CYMBAL** | the same, tuned lower, with a long decay |
+
+**Color, Shape, Sweep** are three macros; their labels change with the engine:
+
+| engines | Color | Shape | Sweep |
+|---|---|---|---|
+| KICK, TOM, PERC | **PAMT** pitch envelope amount (up to 5 octaves) | **PTIM** its time (4 ms to 0.4 s) | **FMDR** FM amount and drive |
+| SNARE | **NMIX** tone to noise | **NTON** the noise's rate and filter | **SNAP** the tone's pitch snap |
+| CLAP | **SPRD** time between the claps | **TONE** the noise's filter | **CLPS** how many claps, 1 to 6 |
+| CL HAT, OP HAT, CYMBAL | **TUNE** the metal's pitch | **NOIS** metal to noise | **BRIT** the high-pass, brighter up |
+
+**Pitch** and the keyboard tune it (all engines follow the note).
+**Decay**, **Attack** (PRESET + Decay), **Filter** and **Resonance** (PRESET
++ Sweep / Contour) are the ones every machine has: each engine has its own
+natural length (a closed hat is short, a cymbal long), and the track's Amp
+Decay comes after it - turn Decay up to hear the engine's full length, down
+to shorten it. Every knob p-locks, slides, takes LFOs and is saved.
+
 ## Additions for every machine
 
 - **Attack:** hold **PRESET** and turn **Decay**. From instant up to ~2 s.

@@ -49,8 +49,13 @@ va_pre:
     bras    vp_tr
 vp_dx:
     cmpil   #DX_MACH,%d1          | 12: DX's, and its gate (dx.inc)
-    bnes    vp_dr
+    bnes    vp_lx
     jsr     dx_params
+    bras    vp_tr
+vp_lx:
+    cmpil   #LX_MACH,%d1          | 13: LXR's (lxr_glue.inc)
+    bnes    vp_dr
+    jsr     lx_params
     bras    vp_tr
 vp_dr:
     jsr     dr_params

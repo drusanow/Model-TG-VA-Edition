@@ -228,7 +228,8 @@
     DR_HAT   = 10
     MI_MACH  = 11                 | PLAITS (plaits.inc)
     DX_MACH  = 12                 | DX (dx.inc)
-    MACH_LAST = 12                | the last machine index
+    LX_MACH  = 13                 | LXR (src/lxr/, GPL-3.0-only; glue lxr_glue.inc)
+    MACH_LAST = 13                | the last machine index
     .include "sampler_strings.inc"
     .include "name_swap.inc"
     .include "note_ratio.inc"
@@ -268,10 +269,10 @@ va_descr_atk:                     | the VA's, modifier held: Attack, Filter
 
 
 | machine+1 list for ParameterPageView, now including the Sampler (7), the
-| VA (8), the drums (9..11), PLAITS (12) and DX (13). build.py widens the
-| three sizes at 0x4001bbd0.. to 13 longs.
+| VA (8), the drums (9..11), PLAITS (12), DX (13) and LXR (14). build.py
+| widens the three sizes at 0x4001bbd0.. to 14 longs.
 page_machine_list:
-    .long 1,2,3,4,5,6,7,8,9,10,11,12,13
+    .long 1,2,3,4,5,6,7,8,9,10,11,12,13,14
 
     .align 2
 | Geometric midpoints between adjacent semitones around 45710 (1.0x),
@@ -2673,6 +2674,15 @@ sv_dr2:
     lea.l   %sp@(12),%sp
     braw    sv_nofilt
 sv_dr3:
+    cmpil   #LX_MACH,%d0          | LXR (src/lxr/lxr.c)
+    bnes    sv_dr4
+    movel   %d0,%sp@-
+    movel   %d1,%sp@-
+    movel   %d4,%sp@-
+    jsr     lxr_fill
+    lea.l   %sp@(12),%sp
+    braw    sv_nofilt
+sv_dr4:
     movel   %d0,%sp@-             | the drum (drums.inc)
     movel   %d1,%sp@-             | step
     movel   %d4,%sp@-             | track
@@ -4124,11 +4134,11 @@ descr_hook:
     moveq   #1,%d1
     bras    ns_go
 ns_va:
-    movel   %d0,%d1               | 8..13: the VA's, the drums', PLAITS' and
-    subql   #6,%d1                | DX's labels, 2..7
+    movel   %d0,%d1               | 8..14: the VA's, the drums', PLAITS', DX's
+    subql   #6,%d1                | and LXR's labels, 2..8
     cmpil   #2,%d1
     bcss    ns_none
-    cmpil   #7,%d1
+    cmpil   #8,%d1
     blss    ns_go
 ns_none:
     moveq   #0,%d1
@@ -9534,6 +9544,11 @@ an_dx:
     lea.l   dx_swap,%a1           | 7: DX
     cmpil   #7,%d1
     beqw    an_loop
+    cmpil   #8,%d1                | 8: LXR, for the selected engine's group
+    bnes    an_smp
+    jsr     lx_fillswap
+    lea.l   lx_swap,%a1
+    braw    an_loop
 an_smp:
     lea.l   ui_gran,%a1           | our labels: the selected track's mode picks
     movel   %a1@,%d0              | the set - 1 granular, 2 stretch
@@ -9876,11 +9891,11 @@ descr_b_hook:
     moveq   #1,%d1
     bras    dbh_names
 dbh_va:
-    movel   %d0,%d1               | 7..12: the VA's, the drums', PLAITS' and
-    subql   #5,%d1                | DX's labels, 2..7
+    movel   %d0,%d1               | 7..13: the VA's, the drums', PLAITS', DX's
+    subql   #5,%d1                | and LXR's labels, 2..8
     cmpil   #2,%d1
     bcss    dbh_none
-    cmpil   #7,%d1
+    cmpil   #8,%d1
     blss    dbh_names
 dbh_none:
     moveq   #0,%d1
@@ -19677,6 +19692,7 @@ led_hook:
     jsr     atk_watch
     jsr     gran_watch
     jsr     mi_watch
+    jsr     lx_watch
     jsr     dx_probe
     jsr     slice_watch
     jsr     name_probe
@@ -21070,6 +21086,8 @@ msg_buf:    .space 64
     .include "plaits.inc"
     .align 4
     .include "dx.inc"
+    .align 4
+    .include "lxr_glue.inc"
     .text
     .align 4
     .globl  dx_gate, dx_bus1, dx_bus2
@@ -21103,5 +21121,6 @@ dx_bus2:    .space 32*4
     | while an overrun was suspected here; the real cause was the filesystem
     | cache overwriting the blob, so the padding bought nothing.
     .align 4
+    .globl  sampler_buf           | (src/lxr/lxr.c writes its window)
 sampler_buf:
     .space 512

@@ -57,6 +57,13 @@ keeps working.
   shorter or longer), Sweep the feedback, SETTINGS + Shape the algorithm,
   and Contour
   picks the voice ([docs/DX.md](docs/DX.md)).
+- **LXR** (Plaits Edition), the fourteenth machine: drum voices after the
+  Erica Synths LXR-02 (a modified, fixed-point port of its GPL-3 firmware's
+  voices; not Erica Synths' firmware, nor endorsed by them). Contour picks
+  one of eight engines - KICK, TOM, PERC (FM drum voices with pitch and FM
+  envelopes), SNARE, CLAP, CL HAT, OP HAT, CYMBAL - and Color / Shape / Sweep
+  are three macros, labelled per engine; Attack, Filter, Resonance and Decay
+  are the ones every machine has ([USER_GUIDE](docs/USER_GUIDE.md#lxr)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale
@@ -150,7 +157,12 @@ what is already known about it.
 
 ## License
 
-[MIT](LICENSE) for the code and documentation here. Elektron's firmware is
-not part of this project and is not covered by it. "Elektron" and
+[MIT](LICENSE) for the code and documentation here, except `src/lxr/`
+(the LXR machine): GPL-3.0-only, derived from the Erica Synths LXR-02
+firmware; the firmware patch this repository builds includes it and is
+therefore conveyed under GPL-3.0-only as a whole ([src/lxr/NOTICE.md](src/lxr/NOTICE.md)).
+"Erica Synths", "LXR" and "LXR-02" are Erica Synths' names; this is not
+their firmware and is not endorsed by them. Elektron's firmware is not part
+of this project and is not covered by it. "Elektron" and
 "Model:Cycles" are trademarks of Elektron Music Machines; they are used here
 only to say what this works with.

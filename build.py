@@ -92,7 +92,8 @@ def _as(srcfile,tag):
     o=os.path.join(BUILD,f"_{tag}.o")
     subprocess.run([CROSS+"as","-march=cfv4e","-o",o,srcfile],cwd=proto,check=True)
     return o
-_objs=[_as(src,"b"), _as("phase1.s","a"), _as("track_table.s","s")]
+_objs=[_as(src,"b"), _as("phase1.s","a"), _as("track_table.s","s"),
+       _as("lxr/lxr_gen.s","x")]   # LXR (GPL-3.0-only): tools/gen_lxr.py, all in .ovl
 # ---- the overlay -------------------------------------------------------------
 # Code and tables in `.section .ovl` run from the top of the sample region
 # (OVL_BASE, model_tg.s: cached, past PCM_TOP), not from the cache blocks. The
@@ -269,11 +270,14 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'sfx_rwp','sfx_ok','sfx_rate','sfx_apc',
               'lcc_st','lcc_mask','lcc_tick','lcc_rr','lcc_ld','lcc_dirty','lcc_zero','lcc_name',
               'lcc_last','lcc_msg','lcc_num','lcc_val','lcc_sent','lcc_tk','lcc_lof'}   # pointer tables (menu descriptors), not code
+# compiler output (LXR, tools/gen_lxr.py) branches to local labels the assembler drops: its functions are gcc's
+_COMPILED={_l.split()[2] for _l in subprocess.run([CROSS+"nm",_objs[3]],capture_output=True,text=True,
+           check=True).stdout.splitlines() if len(_l.split())==3}
 _wrapped=[]; _in=None
 for _l in _dis.splitlines():
     _h=_re.match(r'^[0-9a-f]{8} <([^>]+)>:',_l)
     if _h: _in=_h.group(1); continue
-    if _in in _DATA_LABELS: continue
+    if _in in _DATA_LABELS or _in in _COMPILED: continue
     _m=_re.search(r'^\s*([0-9a-f]{8}):\s+[0-9a-f]{4} [0-9a-f]{4}\s*\t(bsrw|braw|b\w\ww)\s+([0-9a-f]{6,8})',_l)
     if _m and int(_m.group(3),16) not in _labels:
         _wrapped.append(_l.strip())
@@ -422,8 +426,8 @@ assert bytes(d[_o:_o+4])==struct.pack('>I',_osum)
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
-MACH_MAX=12                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
-                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS, 12 DX
+MACH_MAX=13                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
+                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS, 12 DX, 13 LXR
 _M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),
