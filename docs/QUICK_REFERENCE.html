@@ -1,0 +1,208 @@
+<!doctype html>
+<!-- Source of flasher/Model-TG-Plaits-Quick-Reference.pdf: print this page to PDF (A4, backgrounds on), e.g. with Chromium or Playwright page.pdf({format: "A4", printBackground: true, preferCSSPageSize: true}). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Model-TG Plaits Edition - Quick Reference</title>
+<style>
+  @page { size: A4; margin: 9mm 10mm 9mm; }
+  * { box-sizing: border-box; }
+  body { font: 8.2pt/1.27 "DejaVu Sans", "Liberation Sans", Arial, sans-serif; color: #1c1c1a; margin: 0; }
+  h1 { font-size: 15pt; margin: 0; letter-spacing: -0.2px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #2f6f4f; padding-bottom: 5px; margin-bottom: 8px; }
+  .top p { margin: 2px 0 0; color: #555; }
+  .top .r { text-align: right; color: #555; font-size: 8pt; }
+  h2 { font-size: 10pt; margin: 7px 0 3px; color: #fff; background: #2f6f4f; padding: 2px 6px; border-radius: 3px; break-after: avoid; }
+  h2 small { font-weight: normal; opacity: .85; font-size: 8pt; }
+  p { margin: 2px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 2px 0 4px; break-inside: avoid; }
+  th, td { border: 1px solid #cfcfc8; padding: 2px 4px; vertical-align: top; text-align: left; }
+  th { background: #eef3ef; font-size: 8pt; }
+  td b, li b { color: #1e4f37; }
+  .k { font-weight: bold; white-space: nowrap; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .box { break-inside: avoid; }
+  ul { margin: 2px 0 4px; padding-left: 14px; }
+  li { margin: 0 0 1px; }
+  .note { color: #555; font-size: 7.8pt; }
+  .tag { display: inline-block; font-size: 7pt; border: 1px solid #b9862b; color: #8a5f12; border-radius: 3px; padding: 0 3px; margin-left: 4px; vertical-align: 1px; }
+  .pb { break-before: page; }
+  footer { margin-top: 8px; border-top: 1px solid #cfcfc8; padding-top: 4px; font-size: 7.4pt; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <h1>Model-TG Plaits Edition · Quick Reference</h1>
+    <p>New machines, macros and shortcuts for the Elektron Model:Cycles (OS 1.13)</p>
+  </div>
+  <div class="r">Install: drusanow.github.io/Model-TG-VA-Edition<br>Full guide: docs/USER_GUIDE.md</div>
+</div>
+
+<p><span class="k">Hold A + B</span> = hold A, press B. Model-TG's pages open with <b>SETTINGS</b> held; tapping SETTINGS alone still opens the Config Menu.
+<b>Every knob on every new machine p-locks, slides, takes LFOs and is saved.</b></p>
+
+<h2>On every machine</h2>
+<table>
+  <tr><th style="width:30%">Control</th><th>What it does</th></tr>
+  <tr><td class="k">PRESET + Decay</td><td><b>Attack</b>: instant up to about 2 s</td></tr>
+  <tr><td class="k">PRESET + Sweep / Contour</td><td><b>Filter</b> / <b>Resonance</b> (a ladder filter; bypassed when fully open)</td></tr>
+  <tr><td class="k">Pitch, Decay</td><td>As stock. Decay is the Amp Decay and comes <i>after</i> each engine's own envelope: turn it up to hear the full sound.</td></tr>
+</table>
+
+<h2>VA <small>machine 8: two-oscillator analogue-style synth</small></h2>
+<table>
+  <tr><th>Color: OSC1</th><th>Shape: OSC2</th><th>Sweep: DTUN</th><th>Contour: MIX</th></tr>
+  <tr><td>Osc 1 wave: 0-42 saw, 43-85 square, 86-127 tri</td><td>Osc 2 wave, same ranges</td><td>Osc 2 tuning: 64 unison, near 64 = cents, 0 / 127 = octave down / up</td><td>0 osc 1 only, 64 both equally, 127 osc 2 only</td></tr>
+</table>
+
+<h2>VA KICK, VA SNARE, VA HIHAT <small>machines 9-11: analogue-style drums</small></h2>
+<table>
+  <tr><th>Machine</th><th>Color</th><th>Shape</th><th>Sweep</th><th>Contour</th></tr>
+  <tr><td class="k">VA KICK</td><td>SWP sweep depth</td><td>STM sweep time</td><td>SAT drive</td><td>CLK click</td></tr>
+  <tr><td class="k">VA SNARE</td><td>NOIS body / noise</td><td>PENV pitch drop</td><td>TONE noise colour</td><td>SAT drive</td></tr>
+  <tr><td class="k">VA HIHAT</td><td>TONE high-pass</td><td>SPRD spread</td><td>NOIS noise</td><td>SAT drive</td></tr>
+</table>
+<p class="note">VA HIHAT: short Decay for a closed hat, long for an open one.</p>
+
+<h2>PLAITS <small>machine 12: ten engines after Mutable Instruments Plaits</small></h2>
+<p><b>Contour (ENG)</b> picks the engine: the screen shows its picture and name, and four clicks move one engine. Color / Shape / Sweep = Plaits' HARMONICS / TIMBRE / MORPH.</p>
+<table>
+  <tr><th style="width:9%">ENG</th><th style="width:25%">Engine</th><th>Color</th><th>Shape</th><th>Sweep</th></tr>
+  <tr><td class="k">WSHP</td><td>waveshaping</td><td>SHPE waveshaper</td><td>FOLD wavefolder</td><td>ASYM slope</td></tr>
+  <tr><td class="k">FM</td><td>2-operator FM</td><td>RATI ratio</td><td>INDX index</td><td>FDBK feedback</td></tr>
+  <tr><td class="k">SWRM</td><td>granular cloud (a grain per trig too)</td><td>SPRD pitch spread</td><td>DENS density</td><td>DUR grain length</td></tr>
+  <tr><td class="k">GRAN</td><td>formants</td><td>FRM2 2nd formant</td><td>FRMT formant</td><td>WDTH grain shape</td></tr>
+  <tr><td class="k">PD</td><td>phase distortion</td><td>RATI ratio</td><td>DIST amount</td><td>ASYM asymmetry</td></tr>
+  <tr><td class="k">CHIP</td><td>chiptune arpeggio (a step per trig)</td><td>CHRD chord</td><td>ARP pattern</td><td>SYNC synced ratio</td></tr>
+  <tr><td class="k">NOIS</td><td>filtered noise</td><td>TYPE LP-BP-HP</td><td>CLK clock</td><td>RESO resonance</td></tr>
+  <tr><td class="k">MODL</td><td>modal resonator (struck per trig)</td><td>MATR string-bell-drum-bar</td><td>BRIG brightness</td><td>DEC decay</td></tr>
+  <tr><td class="k">PART</td><td>particles</td><td>SPRD spread</td><td>DENS density</td><td>RESO resonance</td></tr>
+  <tr><td class="k">STRG</td><td>plucked string</td><td>STIF stiffness</td><td>BRIG brightness</td><td>DAMP damping</td></tr>
+</table>
+
+<h2>DX <small>machine 13: 6-operator FM after the DX7</small></h2>
+<div class="cols">
+  <div class="box">
+    <table>
+      <tr><th style="width:30%">Knob</th><th>What it does</th></tr>
+      <tr><td class="k">Color: BRIG</td><td>Brighter / darker (modulators up to ±12 dB, same loudness)</td></tr>
+      <tr><td class="k">Shape: TIME</td><td>All the voice's envelopes shorter / longer</td></tr>
+      <tr><td class="k">Sweep: FDBK</td><td>Less / more feedback (0 none, 127 most)</td></tr>
+      <tr><td class="k">Contour: VOIC</td><td>The voice: 1-63 built in, or 1-32 of your cartridge; its name is shown</td></tr>
+      <tr><td class="k">SETTINGS + Shape</td><td><b>Algorithm</b>: VCE (the voice's own), A1-A32</td></tr>
+    </table>
+    <p class="note">The macros start in the middle (0 = the voice exactly as saved). Picking a voice resets the macros and sets the algorithm back to VCE.</p>
+  </div>
+  <div class="box">
+    <p><b>Built-in bank (63 voices):</b> 1-32 Legowelt's "Magic DX7", 33-52 a DX9 cartridge, 53-63 our own: INIT, E.PIANO, SYN BASS, GLASS BELL, BRASS, DRAWBARS, FM PLUCK, SOFT PAD, MARIMBA, CLAV, SINE BASS.</p>
+    <p><b>Your own DX7 cartridges:</b></p>
+    <ul>
+      <li>Send a DX7 <code>.syx</code> over USB or MIDI IN (the DX Cartridge Sender page, a SysEx librarian or Dexed). It is saved in <code>/DX7/</code>.</li>
+      <li>On a DX track: <span class="k">FUNCTION + PRESET</span> › <code>DX7</code> › pick it ("Cartridge loaded").</li>
+      <li>The pattern keeps it and reloads it with the project.</li>
+    </ul>
+    <p class="note">Turn Decay up: a low Decay cuts pads short.</p>
+  </div>
+</div>
+
+<h2>LXR <small>machine 14: drum voices after the Erica Synths LXR-02</small> <span class="tag" style="background:#fff">NEW</span></h2>
+<div class="cols">
+  <div class="box">
+    <p><b>Contour (ENG)</b> picks the engine (the screen shows its name):</p>
+    <table>
+      <tr><th style="width:28%">Engine</th><th>Sound</th></tr>
+      <tr><td class="k">KICK</td><td>sine, pitch envelope + FM, click, drive</td></tr>
+      <tr><td class="k">TOM</td><td>the same voice, higher and rounder</td></tr>
+      <tr><td class="k">PERC</td><td>square phase-modulated by a saw: metallic, woody</td></tr>
+      <tr><td class="k">SNARE</td><td>triangle with snap + band-passed noise</td></tr>
+      <tr><td class="k">CLAP</td><td>noise in quick repeats, then a tail</td></tr>
+      <tr><td class="k">CL HAT / OP HAT</td><td>FM metal + noise, high-passed; short / long</td></tr>
+      <tr><td class="k">CYMBAL</td><td>the same, lower, long decay</td></tr>
+    </table>
+  </div>
+  <div class="box">
+    <p><b>Color / Shape / Sweep</b>: three macros; their labels change with the engine:</p>
+    <table>
+      <tr><th>Engines</th><th>Color</th><th>Shape</th><th>Sweep</th></tr>
+      <tr><td class="k">KICK, TOM, PERC</td><td>PAMT pitch env amount</td><td>PTIM pitch env time</td><td>FMDR FM + drive</td></tr>
+      <tr><td class="k">SNARE</td><td>NMIX tone ↔ noise</td><td>NTON noise tone</td><td>SNAP pitch snap</td></tr>
+      <tr><td class="k">CLAP</td><td>SPRD clap spacing</td><td>TONE noise filter</td><td>CLPS 1-6 claps</td></tr>
+      <tr><td class="k">HATS, CYMBAL</td><td>TUNE metal pitch</td><td>NOIS metal ↔ noise</td><td>BRIT brightness</td></tr>
+    </table>
+    <p class="note">Each engine has its own natural length; Amp Decay comes after it.</p>
+  </div>
+</div>
+
+<h2>LFO 2, 3 and 4, and LFOs to MIDI CC</h2>
+<table>
+  <tr><th style="width:30%">Control</th><th>What it does</th></tr>
+  <tr><td class="k">LFO, then tap LFO again</td><td>LFO 1 › LFO 2 › LFO 3 › LFO 4 › close. LFO 3 and 4 can't be p-locked (saved per pattern).</td></tr>
+  <tr><td class="k">Hold LFO + turn a knob</td><td>That parameter becomes the destination of the LFO showing</td></tr>
+  <tr><td class="k">MIDI CC row: DATA, turn, DATA</td><td>The CC that LFO sends (OFF / 0-127), on the track's MIDI channel; switched on at the second press</td></tr>
+  <tr><td class="k">CC Base row: turn DATA</td><td>The value the CC sweeps from (Depth sweeps one way from it). Destination None = only the external gear moves.</td></tr>
+</table>
+
+<div class="cols">
+  <div class="box">
+    <h2>Trig generator</h2>
+    <p><span class="k">SETTINGS + TRACK</span>: <b>RND</b> (chance DNS %) or <b>EUC</b> (HIT trigs, ROT rotation). Options: <b>NOT</b> random notes from SCL / KEY / OCT / RNG, <b>VEL</b> random velocity VMN-VMX. Select <b>GEN</b> and press <b>DATA</b> (again for another result). It <b>replaces the track's trigs</b>; there is no undo.</p>
+  </div>
+  <div class="box">
+    <h2>Quantised mute and solo</h2>
+    <p>While playing, mutes change on the next bar. <span class="k">SETTINGS + pad</span> solos that track (same again = SOLO OFF). <b>Device Config › Mute Q</b>: 1BAR / PTN / OFF.</p>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="box">
+    <h2>Alternative send effects</h2>
+    <p><span class="k">SETTINGS + PAGE</span> › turn <b>DATA</b>, saved per pattern.</p>
+    <ul>
+      <li><b>Delay:</b> DELAY, PING (ping-pong), TAPE, CHORUS (flanger past half Feedback)</li>
+      <li><b>Reverb:</b> REVERB, PHASER, SPRING, RING, DIST, RESO (Size = pitch, Tone = ring)</li>
+    </ul>
+    <p class="note">The FX page's Time / Feedback / Size / Tone knobs drive the chosen effect.</p>
+  </div>
+  <div class="box">
+    <h2>Slide trigs and Scale Lock</h2>
+    <p><span class="k">SETTINGS + trig key</span>: slide trig on/off (double-blinks). Every value that differs glides into the slide trig.</p>
+    <p><span class="k">FUNC + PAGE</span>: Scale menu: <b>Scl</b> and <b>Key</b>; played notes snap to the scale.</p>
+  </div>
+</div>
+
+<h2>Button reference</h2>
+<div class="cols">
+  <table>
+    <tr><th style="width:46%">Buttons</th><th>Does</th></tr>
+    <tr><td class="k">PRESET + Decay</td><td>Attack</td></tr>
+    <tr><td class="k">PRESET + Sweep / Contour</td><td>Filter / Resonance</td></tr>
+    <tr><td class="k">SETTINGS + Shape (DX)</td><td>DX algorithm</td></tr>
+    <tr><td class="k">FUNCTION + PRESET (DX)</td><td>load a DX7 cartridge</td></tr>
+    <tr><td class="k">SETTINGS + TRACK</td><td>trig generator</td></tr>
+    <tr><td class="k">SETTINGS + PAGE</td><td>Send FX</td></tr>
+    <tr><td class="k">SETTINGS + pad</td><td>solo on the next bar</td></tr>
+    <tr><td class="k">SETTINGS + trig key</td><td>slide trig on / off</td></tr>
+  </table>
+  <table>
+    <tr><th style="width:46%">Buttons</th><th>Does</th></tr>
+    <tr><td class="k">SETTINGS + PRESET</td><td>Sampler playback mode</td></tr>
+    <tr><td class="k">SETTINGS + PUNCH</td><td>the mode's options</td></tr>
+    <tr><td class="k">SETTINGS + RECORD</td><td>Resample menu</td></tr>
+    <tr><td class="k">SETTINGS + RETRIG</td><td>retrig page and master FX</td></tr>
+    <tr><td class="k">SETTINGS + return</td><td>master FX off</td></tr>
+    <tr><td class="k">LFO (tap again)</td><td>LFO 2 / 3 / 4</td></tr>
+    <tr><td class="k">TRACK + tap FUNC</td><td>latching mute mode</td></tr>
+    <tr><td class="k">step held + PAGE (stopped)</td><td>trig preview</td></tr>
+  </table>
+</div>
+<p class="note"><b>Device Config</b>: <b>System</b> (CPU and memory load), <b>Mute Q</b>, <b>Transfer</b> CYC / SMP (SMP = upload samples with Transfer; only install an OS when it's set to CYC).</p>
+
+<footer>
+  Unofficial firmware, not made or endorsed by Elektron; back up first. Model-TG by TinyGregAudio (MIT). PLAITS after Mutable Instruments Plaits (MIT).
+  LXR is a modified port of the Erica Synths LXR-02 firmware (GPL-3.0), not endorsed by Erica Synths; the firmware is GPL-3.0 as a whole.
+  Source: github.com/drusanow/Model-TG-VA-Edition.
+</footer>
+</body>
+</html>

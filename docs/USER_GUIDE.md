@@ -3,6 +3,8 @@
 Everything Model-TG adds to the Model:Cycles, and how to play it. To install,
 see [BUILD.md](BUILD.md).
 
+On two pages: the [Quick Reference (PDF)](../flasher/Model-TG-Plaits-Quick-Reference.pdf).
+
 Button names are in **BOLD CAPS**; "hold A + B" means hold A and press B.
 
 Model-TG's own pages open with **SETTINGS** held, so the stock **TRACK**

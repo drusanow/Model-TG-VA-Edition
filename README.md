@@ -114,7 +114,10 @@ keeps working.
 - **Scale Lock**, **sample upload through Elektron Transfer**, a **System**
   page with CPU and memory use, and lower CPU use overall.
 
-The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
+The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**, and every
+knob, macro and shortcut fits on two pages in the
+**[Quick Reference (PDF)](flasher/Model-TG-Plaits-Quick-Reference.pdf)**
+(also on the [web flasher](https://drusanow.github.io/Model-TG-VA-Edition/Model-TG-Plaits-Quick-Reference.pdf)).
 
 ## Getting it
 
