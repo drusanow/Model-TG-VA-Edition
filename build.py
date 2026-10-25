@@ -1168,7 +1168,9 @@ if args.flasher:
         _fver="unknown"
     _fl={"format":1,"name":"Model-TG Plaits Edition","version":_fver,
          "source":"https://github.com/drusanow/model-tg-va-edition",
-         "license":"MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) drumkilla",
+         "license":("GPL-3.0-only as a whole (the LXR voices, src/lxr/, are GPL-3.0-only after the Erica Synths "
+                    "LXR-02 firmware); the rest MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) "
+                    "drumkilla; source: https://github.com/drusanow/model-tg-va-edition"),
          "device":"Model:Cycles","device_id":0x11,"os":"1.13","section":3,
          "stock_sha256":STOCK_SHA256,"stock_len":len(_st),
          "result_sha256":RESULT_SHA256,"result_len":len(_img),

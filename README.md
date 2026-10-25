@@ -6,11 +6,12 @@ style drum machines, a Plaits-style macro machine with ten engines, a DX7-style 
 LFOs a track, a trig generator, resampling, beat-repeat with master FX, and
 more.**
 
-> **This branch (`plaits`) is the Plaits Edition**: everything in the VA
-> Edition plus **PLAITS**, a twelfth machine with ten engines after
-> Mutable Instruments Plaits ([docs/PLAITS.md](docs/PLAITS.md)). It builds
-> its own firmware; the VA Edition (branch `va-machine`) is unchanged, so
-> either can be installed and the other kept as a backup.
+> **The Plaits Edition is this fork's main version** (branch `main`):
+> everything in the VA Edition plus **PLAITS**, **DX** and **LXR**
+> ([docs/PLAITS.md](docs/PLAITS.md), [docs/DX.md](docs/DX.md)). The earlier VA
+> Edition stays on the branch `va-machine`.
+>
+> **Install it from your browser: <https://drusanow.github.io/Model-TG-VA-Edition/>**
 
 This is a fork of [TinyGregAudio/Model-TG](https://github.com/TinyGregAudio/Model-TG)
 that adds four machines - **VA** (index 7) and **VA KICK**, **VA SNARE**,
@@ -117,12 +118,20 @@ The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md
 
 ## Getting it
 
-The easiest way is the web flasher in [`flasher/`](flasher/), published on
-this fork's GitHub Pages (see [docs/FLASHER.md](docs/FLASHER.md)): pick your
-stock OS 1.13 file and it builds Model-TG VA Edition right there in your
-browser. (Upstream's [web flasher](https://tinygregaudio.github.io/Model-TG/)
-builds plain Model-TG, without the VA.) Your file never leaves your computer. Install the result like an
-official OS update.
+The easiest way is the **web flasher: <https://drusanow.github.io/Model-TG-VA-Edition/>**
+(source in [`flasher/`](flasher/), see [docs/FLASHER.md](docs/FLASHER.md)). In
+Chrome, Edge or Opera on a computer:
+
+1. Download the stock **Model:Cycles OS 1.13** from elektron.se and pick it on
+   the page. It builds the Plaits Edition right there in your browser; your
+   file never leaves your computer.
+2. Connect the Cycles over USB (Device Config > Transfer set to **CYC**),
+   close Elektron Transfer, click **Find the Cycles**, then **Send to the
+   Cycles** (about 30 seconds).
+3. Confirm the update on the Cycles' screen (**YES**). It restarts by itself.
+
+Or save the file from the page and send it with Elektron Transfer, as an
+official OS update. The page always builds the latest version on `main`.
 
 Or build it yourself:
 

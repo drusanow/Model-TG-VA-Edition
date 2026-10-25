@@ -1,6 +1,6 @@
 # PLAITS
 
-*Plaits Edition only* (branch `plaits`). This is a separate firmware build,
+*Plaits Edition only* (branch `main`; the VA Edition is on `va-machine`). This is a separate firmware build,
 so the VA Edition stays as it is.
 
 PLAITS is one machine with ten sound engines and four knobs. It is after

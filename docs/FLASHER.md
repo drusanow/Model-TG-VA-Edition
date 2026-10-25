@@ -1,9 +1,11 @@
 # The web flasher
 
-**https://tinygregaudio.github.io/Model-TG/** builds Model-TG in the browser,
-with no toolchain: the user picks their own stock `model-cycles_OS1.13.syx`
-and saves `Model-TG-<version>.syx`, which they install with Elektron Transfer
-as usual ([BUILD.md](BUILD.md#install)).
+**https://drusanow.github.io/Model-TG-VA-Edition/** builds the Plaits Edition
+in the browser, with no toolchain: the user picks their own stock
+`model-cycles_OS1.13.syx`, then either sends the result to the Cycles over
+USB from the page, or saves `Model-TG-Plaits-<version>.syx` and installs it
+with Elektron Transfer as usual ([BUILD.md](BUILD.md#install)). (Upstream's
+flasher, https://tinygregaudio.github.io/Model-TG/, builds plain Model-TG.)
 
 Everything happens on the user's computer. Their OS file is never uploaded,
 and nothing of Elektron's is published: the page only carries Model-TG's own
@@ -50,6 +52,28 @@ instead: `elektron-firmware-tool -i file.syx -d 3 -o dir`.
 
 This fork's `flasher/model-tg.json` is built from this repository and
 includes the VA machine; upstream's web flasher builds plain Model-TG.
+
+## Sending over USB
+
+`flasher/usb.js` is the [Modded-Cycles](https://github.com/18nelli18/Modded-Cycles)
+flasher's core (`docs/flasher/flasher.js`, MIT, copied unchanged apart from its
+credit paragraph). In Chrome, Edge or Opera (Web MIDI with SysEx) the page
+finds the Cycles' USB MIDI port, asks it who it is (it must answer as a
+Model:Cycles, so Device Config > Transfer must be CYC), checks the built
+`.syx` again, and uploads it with Elektron Transfer's OS update protocol in
+2 KB blocks, each CRC-checked and acknowledged by the machine. The Cycles then
+asks on its screen to confirm the update. A stand-in machine checks it:
+
+```sh
+node tools/test_usb.js path/to/model-cycles_OS1.13.syx
+```
+
+## Every update is on the page
+
+`.github/workflows/pages.yml` publishes `flasher/` whenever `main` changes it.
+So after each change: build with `--flasher flasher/model-tg.json` from a
+clean, committed checkout, commit that file, push `main`. The workflow first
+proves the file is exactly what `src/` assembles to.
 
 ## What the patch file holds, and the checks on it
 

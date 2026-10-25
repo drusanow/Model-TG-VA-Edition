@@ -1,6 +1,6 @@
 # DX
 
-*Plaits Edition* (branch `plaits`).
+*Plaits Edition* (branch `main`).
 
 DX is a thirteenth machine: one 6-operator FM voice per track, after the
 Yamaha DX7, as Dexed's engine (msfa) models it. It plays DX7 voices: the 32

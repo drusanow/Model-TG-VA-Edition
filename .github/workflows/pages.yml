@@ -30,7 +30,7 @@ jobs:
       - name: The published code is this source
         run: python3 build.py --assemble-only --check-flasher flasher/model-tg.json
       - name: The flasher's scripts parse
-        run: for f in flasher/*.js tools/test_flasher.js; do node --check "$f"; done
+        run: for f in flasher/*.js tools/test_flasher.js tools/test_usb.js; do node --check "$f"; done
   deploy:
     needs: check
     runs-on: ubuntu-latest

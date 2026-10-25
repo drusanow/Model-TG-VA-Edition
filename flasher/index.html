@@ -58,6 +58,10 @@
     text-decoration: none; cursor: pointer;
   }
   .hidden { display: none; }
+  .card h3 { font-size: 0.98rem; margin: 16px 0 6px; }
+  #ustatus { min-height: 1.5em; color: var(--muted); }
+  #ustatus.err { color: var(--err); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
   footer { color: var(--muted); font-size: 0.85rem; margin-top: 28px; }
   footer p { margin: 0 0 8px; }
 </style>
@@ -99,6 +103,27 @@
 
   <div class="card hidden" id="result">
     <h2>3. Install it</h2>
+    <p><strong>Back up your projects and samples first.</strong> Then choose one way:</p>
+
+    <h3>A. Send it from this page over USB</h3>
+    <p class="hidden" id="usb-no"></p>
+    <div id="usb">
+      <ol>
+        <li>Connect the Cycles to the computer with a USB cable and turn it on. Stay on its
+          usual screen: no menu to open.</li>
+        <li>Check that <strong>Device Config &gt; Transfer</strong> is set to <strong>CYC</strong>
+          (every power-on starts there).</li>
+        <li>Close <strong>Elektron Transfer</strong> and any music software using the Cycles:
+          they hold its USB port.</li>
+        <li>Click <strong>Find the Cycles</strong> and allow MIDI access when the browser asks.</li>
+      </ol>
+      <p><button class="btn" id="find" type="button">Find the Cycles</button>
+        <button class="btn hidden" id="send" type="button">Send to the Cycles</button></p>
+      <div class="bar hidden" id="ubar"><div id="ufill"></div></div>
+      <p id="ustatus" role="status" aria-live="polite"></p>
+    </div>
+
+    <h3>B. Or save the file and use Elektron Transfer</h3>
     <p><a class="btn" id="save" download>Save Model-TG.syx</a></p>
     <ol>
       <li>Connect the Cycles over USB and open <strong>Elektron Transfer</strong>.</li>
@@ -111,13 +136,21 @@
 
   <footer>
     <p>The <a href="https://github.com/drusanow/model-tg-va-edition/blob/main/docs/USER_GUIDE.md">user guide</a>
-      covers everything Model-TG adds, and <a href="https://github.com/drusanow/model-tg-va-edition/blob/main/docs/VA.md">VA.md</a>
-      the VA machine. Source and license:
-      <a href="https://github.com/drusanow/model-tg-va-edition">github.com/drusanow/model-tg-va-edition</a> (MIT),
-      a fork of <a href="https://github.com/TinyGregAudio/Model-TG">TinyGregAudio/Model-TG</a> (MIT).</p>
-    <p>Opens and repacks the OS with a port of
-      <a href="https://github.com/mischa85/elektron-firmware-tool">elektron-firmware-tool</a> (MIT).
-      Includes tweaks from <a href="https://github.com/drumkilla/elektron-model-tweaks">elektron-model-tweaks</a> (MIT).
+      covers everything Model-TG adds. Source: <a href="https://github.com/drusanow/model-tg-va-edition">github.com/drusanow/model-tg-va-edition</a>,
+      a fork of <a href="https://github.com/TinyGregAudio/Model-TG">TinyGregAudio/Model-TG</a>.</p>
+    <p><strong>License.</strong> The firmware patch is conveyed under the
+      <a href="LICENSE-GPL-3.0.txt">GNU GPL version 3</a> as a whole, because its LXR machine is a modified
+      port of the <a href="https://github.com/erica-synths/lxr-desktop-app">Erica Synths LXR-02 firmware</a>
+      (GPL-3.0-only); its complete source is the repository above. This is not Erica Synths' firmware and is not
+      endorsed by them. The rest of the code is MIT: Model-TG and this edition (<a href="LICENSE-Model-TG.txt">license</a>),
+      drumkilla's <a href="https://github.com/drumkilla/elektron-model-tweaks">elektron-model-tweaks</a>
+      (<a href="LICENSE-elektron-model-tweaks.txt">license</a>).</p>
+    <p>This page opens and repacks the OS with a port of
+      <a href="https://github.com/mischa85/elektron-firmware-tool">elektron-firmware-tool</a> (MIT, notice in
+      <code>elektron.js</code>). Sending over USB comes from the
+      <a href="https://github.com/18nelli18/Modded-Cycles">Modded-Cycles</a> flasher by 18nelli18
+      (MIT, <a href="LICENSE-Modded-Cycles.txt">license</a>; it credits <a href="LICENSE-ms-multi-output.txt">ms-multi-output</a>),
+      which follows the update protocol as worked out by <a href="https://github.com/dagargo/elektroid">Elektroid</a>.
       "Elektron" and "Model:Cycles" are trademarks of Elektron Music Machines, used only to say
       what this works with.</p>
   </footer>
@@ -125,10 +158,11 @@
 
 <script src="elektron.js"></script>
 <script src="patch.js"></script>
+<script src="usb.js"></script>
 <script>
 (function () {
   'use strict';
-  var patch = null, busy = false, url = null;
+  var patch = null, busy = false, url = null, built = null;
   var $ = function (id) { return document.getElementById(id); };
 
   function status(text, isErr) {
@@ -154,13 +188,14 @@
   function done(bytes) {
     busy = false;
     if (url) URL.revokeObjectURL(url);
+    built = bytes;
     url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
     var name = 'Model-TG-Plaits-' + patch.version + '.syx';
     $('save').href = url; $('save').download = name;
     $('save').textContent = 'Save ' + name;
     $('hash').textContent = patch.result_sha256;
     $('result').classList.remove('hidden');
-    status('Built and checked. Save it, then install it with Transfer.');
+    status('Built and checked. Install it below.');
   }
   function fail(msg) {
     busy = false;
@@ -194,6 +229,130 @@
       }
     }, function () { fail('Could not read that file.'); });
   }
+
+
+  // ---- Sending over USB (usb.js, from Modded-Cycles): the Transfer update protocol over Web MIDI ----
+  var F = window.MCFlasher, midi = null, port = null, sending = false;
+  function ustatus(html, isErr) {
+    $('ustatus').innerHTML = html;
+    $('ustatus').className = isErr ? 'err' : '';
+  }
+  var isCycles = function (n) { return /model\s*[:_-]?\s*cycles/i.test(n || ''); };
+  var isElektron = function (n) { return /model\s*[:_-]?\s*(cycles|samples)|elektron/i.test(n || ''); };
+  function list(m) { var a = []; m.forEach(function (p) { a.push(p); }); return a; }
+  function inputFor(out) {
+    var ins = list(midi.inputs), name = (out.name || '').trim();
+    return ins.find(function (i) { return (i.name || '').trim() === name; })
+      || ins.find(function (i) { return i.name && name && (i.name.indexOf(name) >= 0 || name.indexOf(i.name) >= 0); })
+      || null;
+  }
+  function errText(e) {
+    var why = e && e.detail ? ' (“' + e.detail + '”)' : '';
+    switch (e && e.code) {
+      case 'busy': return 'The Cycles’ USB port is in use. Close Elektron Transfer and any music software using it, then click Find the Cycles again.';
+      case 'timeout': return 'The Cycles stopped answering. Turn it off and on, then try again, or use way B.';
+      case 'gone': return 'The USB connection was lost. Check the cable, then click Find the Cycles again.';
+      case 'refused': return 'The Cycles refused the update' + why + '. Turn it off and on and try again, or use way B.';
+      case 'write': return 'The update failed on the Cycles' + why + '. Turn it off and on and try again, or use way B.';
+      default: return 'Something went wrong: ' + ((e && e.message) || e) + '. Try again, or use way B.';
+    }
+  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // Ask the machine who it is: must be a Model:Cycles (CYC). A second try for one still starting.
+  function identify(out, inp) {
+    var tries = 0;
+    function attempt() {
+      tries++;
+      var session = null;
+      return F.xferOpen(inp, out).then(function (s) {
+        session = s;
+        return F.xferIdentify(s);
+      }).then(function (info) {
+        session.close(); return info;
+      }, function (e) {
+        if (session) session.close();
+        if (e.code === 'busy' || tries >= 2) throw e;
+        return sleep(2000).then(attempt);
+      });
+    }
+    return attempt();
+  }
+
+  function find() {
+    if (sending) return;
+    $('send').classList.add('hidden');
+    port = null;
+    var p = midi ? Promise.resolve(midi) : (ustatus('Asking for MIDI access… Click “Allow” when the browser asks.'),
+      navigator.requestMIDIAccess({ sysex: true }));
+    p.then(function (m) {
+      midi = m;
+      var outs = list(midi.outputs).filter(function (o) { return isElektron(o.name); });
+      var out = outs.find(function (o) { return isCycles(o.name); }) || outs[0];
+      if (!out) { ustatus('No Model:Cycles on USB. Connect it, turn it on, then click Find the Cycles again.', true); return; }
+      var inp = inputFor(out);
+      if (!inp) { ustatus('The page can’t hear back from “' + out.name + '”. Reconnect the cable and try again.', true); return; }
+      ustatus('Asking “' + out.name + '” who it is…');
+      return identify(out, inp).then(function (info) {
+        if (info.device === 'Model:Samples') {
+          ustatus('This machine answers as a Model:Samples. On the Cycles, set <strong>Device Config &gt; Transfer</strong> ' +
+            'to <strong>CYC</strong> (or turn it off and on), then click Find the Cycles again.', true);
+          return;
+        }
+        if (info.device !== 'Model:Cycles') {
+          ustatus('“' + out.name + '” is not a Model:Cycles. Connect only the Cycles and try again.', true);
+          return;
+        }
+        port = { out: out, inp: inp };
+        ustatus('Found the Model:Cycles (OS ' + (info.version || '?') + '). Click Send to the Cycles: it takes about 30 seconds.');
+        $('send').classList.remove('hidden');
+      });
+    }).catch(function (e) {
+      if (e && e.name === 'SecurityError') ustatus('MIDI access was refused. Click the icon left of the address, allow MIDI, reload the page and try again.', true);
+      else ustatus(errText(e), true);
+    });
+  }
+
+  function send() {
+    if (sending || !port || !built) return;
+    try {
+      var v = F.verify(built);
+      if (v.product !== 0x11) throw new Error('this file is not a Model:Cycles firmware');
+    } catch (e) { ustatus('The built file did not pass the check: ' + e.message, true); return; }
+    sending = true;
+    $('send').disabled = true; $('find').disabled = true;
+    $('ubar').classList.remove('hidden'); $('ufill').style.width = '0%';
+    ustatus('Sending… The Cycles checks every block as it arrives. Don’t unplug it.');
+    var session = null;
+    F.xferOpen(port.inp, port.out).then(function (s) {
+      session = s;
+      return F.xferIdentify(s);
+    }).then(function (info) {
+      if (info.device !== 'Model:Cycles') throw new F.XferError('refused', 'not a Model:Cycles set to CYC');
+      return F.upgradeFast(session, built, { onProgress: function (d, t) { $('ufill').style.width = Math.round(d / t * 100) + '%'; } });
+    }).then(function () {
+      $('ufill').style.width = '100%';
+      ustatus('<strong>Now confirm the update on the Cycles’ screen (YES).</strong> It writes the firmware and ' +
+        'restarts by itself: don’t turn it off until it has restarted.');
+    }, function (e) {
+      ustatus(errText(e), true);
+    }).then(function () {
+      if (session) session.close();
+      sending = false;
+      $('send').disabled = false; $('find').disabled = false;
+    });
+  }
+
+  if (!navigator.requestMIDIAccess || (window.isSecureContext === false)) {
+    $('usb').classList.add('hidden');
+    $('usb-no').classList.remove('hidden');
+    $('usb-no').innerHTML = window.isSecureContext === false
+      ? 'Sending over USB needs the online page (https). Use way B, or open the page online.'
+      : 'This browser can’t talk to MIDI devices. Open this page in <strong>Chrome, Edge or Opera</strong> on a ' +
+        'computer to send it over USB, or use way B.';
+  }
+  $('find').addEventListener('click', find);
+  $('send').addEventListener('click', send);
 
   $('file').addEventListener('change', function () {
     if (this.files[0]) run(this.files[0]);
