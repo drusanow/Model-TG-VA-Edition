@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Writes LXR's generated files (machine 13, src/lxr/, GPL-3.0-only):
 
-  src/lxr/lxr_tables.h  the sine (1024 + 1 entries, Q15) and the band-limited triangle, saw and square tables,
-                        eleven octave bands of 512 entries (additive synthesis, computed here)
+  src/lxr/lxr_tables.h  the band-limited triangle, saw and square tables, eleven octave bands of 512 entries
+                        (additive synthesis, computed here); the sine is the stock OS's, in its SRAM (lxr.c)
   src/lxr/lxr_gen.s     src/lxr/lxr.c compiled for the ColdFire (gcc -S), every section moved to the overlay
                         (.ovl, build.py), checked to call nothing outside itself (no FPU, no libgcc)
 
@@ -44,12 +44,7 @@ def wave(kind, band):
 
 
 def tables():
-    t = [HEAD, '#define LX_BANDS %d\n' % BANDS,
-         'static const short lx_sin[1025] __attribute__((section(".lxr_ro"))) = {\n']
-    sin = [int(round(32767 * math.sin(2 * math.pi * i / 1024))) for i in range(1025)]
-    for i in range(0, 1025, 16):
-        t.append('\t' + ', '.join(map(str, sin[i:i + 16])) + ',\n')
-    t.append('};\n')
+    t = [HEAD, '#define LX_BANDS %d\n' % BANDS]
     t.append('static const short lx_wav[3][%d][%d] __attribute__((section(".lxr_ro"))) = {\n' % (BANDS, N))
     for kind in ('tri', 'saw', 'rec'):
         t.append(' {\n')

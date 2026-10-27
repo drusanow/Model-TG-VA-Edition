@@ -19,7 +19,7 @@ Layout of the image:
   + stock-area patches, each asserted against the stock bytes it replaces
   + the vendored tweaks in tweaks/, also asserted
 """
-import struct, subprocess, sys, os, argparse, shutil, hashlib
+import math, struct, subprocess, sys, os, argparse, shutil, hashlib
 BASE=0x40000400
 STOCK_END=0x401aa140          # where stock Cycles OS 1.13 ends
 # section 3 (MAIN OS) of the unmodified model-cycles_OS1.13.syx, decompressed
@@ -48,6 +48,9 @@ _ap.add_argument("--check-flasher", metavar="FILE",
 _ap.add_argument("--space-test", action="store_true",
                  help="pad the overlay with pseudo-random bytes up to 4 KiB short of the "
                       "bootstrap's limit: a test that the Cycles takes the largest image")
+_ap.add_argument("--dx-own-sine", action="store_true",
+                 help="DX reads its own 8192-entry sine table instead of the stock one in the "
+                      "SRAM (src/dx.inc): a build for comparing the two on a Cycles")
 _ap.add_argument("--assemble-only", action="store_true",
                  help="assemble, link and self-check src/ only - no stock firmware needed")
 args=_ap.parse_args()
@@ -90,7 +93,8 @@ CACHE_BASE=0x401ab750
 assert BLOB>=CACHE_BASE, "nothing of ours may live below the first cache block"
 def _as(srcfile,tag):
     o=os.path.join(BUILD,f"_{tag}.o")
-    subprocess.run([CROSS+"as","-march=cfv4e","-o",o,srcfile],cwd=proto,check=True)
+    subprocess.run([CROSS+"as","-march=cfv4e"]+(["--defsym","DX_OWN_SINE=1"] if args.dx_own_sine else [])
+                   +["-o",o,srcfile],cwd=proto,check=True)
     return o
 _objs=[_as(src,"b"), _as("phase1.s","a"), _as("track_table.s","s"),
        _as("lxr/lxr_gen.s","x")]   # LXR (GPL-3.0-only): tools/gen_lxr.py, all in .ovl
@@ -269,7 +273,8 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'sfx_db','sfx_dl','sfx_dr','sfx_wp','sfx_ph1','sfx_ph2','sfx_rt','sfx_rcl',
               'sfx_rwp','sfx_ok','sfx_rate','sfx_apc',
               'lcc_st','lcc_mask','lcc_tick','lcc_rr','lcc_ld','lcc_dirty','lcc_zero','lcc_name',
-              'lcc_last','lcc_msg','lcc_num','lcc_val','lcc_sent','lcc_tk','lcc_lof'}   # pointer tables (menu descriptors), not code
+              'lcc_last','lcc_msg','lcc_num','lcc_val','lcc_sent','lcc_tk','lcc_lof',
+              'lx_swap','lx_labs','lx_engn','lx_cont','lx_lab'}   # pointer tables (menu descriptors), not code
 # compiler output (LXR, tools/gen_lxr.py) branches to local labels the assembler drops: its functions are gcc's
 _COMPILED={_l.split()[2] for _l in subprocess.run([CROSS+"nm",_objs[3]],capture_output=True,text=True,
            check=True).stdout.splitlines() if len(_l.split())==3}
@@ -694,6 +699,15 @@ for _a,_hex in ((0x4005b278,'41f94010ee04 2018 5480 35990a00 b1fc4010ee38 66f0 4
     assert bytes(d[_a-BASE:_a-BASE+len(_b)])==_b, (hex(_a), bytes(d[_a-BASE:_a-BASE+len(_b)]).hex())
 _m=[struct.unpack('>i',bytes(d[_x-BASE:_x-BASE+4]))[0] for _x in range(0x4010ee04,0x4010ee38,4)]
 assert max(_m)+2<=6, _m          # the FX save's highest word: +4 + 2 x 4 = +12
+# LXR's sine is the stock one in the internal SRAM (lxr.c, LX_SIN): the boot
+# copy 0x4000045c puts 0x401a2a50.. at 0x80008000.., so the table at 0x8000eee4
+# comes from 0x401a9934 - 257 longs, round(2^31 sin(2 pi i / 256)) clipped -
+# and the stock voices only read it (its address is handed to them).
+assert bytes(d[0x40000486-BASE:0x40000496-BASE])==bytes.fromhex('45f9401a2a5043f980008000229a41e9'), \
+    bytes(d[0x40000486-BASE:0x40000496-BASE]).hex()
+assert bytes(d[0x401a9934-BASE:0x401a9934-BASE+1028])==b''.join(
+    struct.pack('>i',max(-2**31,min(2**31-1,round(2**31*math.sin(2*math.pi*_i/256))))) for _i in range(257)), \
+    'the stock SRAM sine table'
 # Start/End waveform: slot 0x90 of the parameter view's vtable, the value popup
 # 0x4001d818, goes through wf_popup (stock for everything but Sampler Start/End).
 assert struct.unpack('>I',bytes(d[0x401005bc-BASE:0x401005c0-BASE]))[0]==0x4001d818, \

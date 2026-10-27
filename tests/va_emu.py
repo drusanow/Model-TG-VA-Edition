@@ -28,6 +28,15 @@ STUB_RENDER = 0x400fc000                           # stand-ins for the machines'
 STUB_PARAM = 0x400fc100                            # render / parameter functions
 STACK_TOP = 0x422f0000
 
+SRAM_SIN = 0x8000eee4                              # the stock sine table, in the SRAM
+
+
+def stock_sine():
+    import math
+    return b''.join(struct.pack('>i', max(-2 ** 31, min(2 ** 31 - 1, round(2 ** 31 * math.sin(2 * math.pi * i / 256)))))
+                    for i in range(257))
+
+
 D = [UC_M68K_REG_D0 + i for i in range(8)]
 A = [UC_M68K_REG_A0 + i for i in range(8)]
 
@@ -94,6 +103,11 @@ class Emu:
         # the sample region (Pluck's delay lines, the retrig histories, the
         # slice tables live at its top); host pages are only touched if used
         uc.mem_map(0x48000000, 0x08000000)
+        # the internal SRAM, with the stock sine table the OS fills at boot
+        # (0x8000eee4: 257 longs, round(2^31 sin(2 pi i / 256)) clipped - checked
+        # against the stock image in test_va.py when it is there)
+        uc.mem_map(0x80000000, 0x10000)
+        uc.mem_write(SRAM_SIN, stock_sine())
         # the overlay, where boot_extra_hook copies it
         if 'ovl_start' in self.sym:
             lo = self.sym['ovl_lma'] - BLOB

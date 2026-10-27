@@ -11,8 +11,9 @@ Levien, Apache 2.0) models it.
            tests/test_dx.py checks it against the DX7's algorithm diagrams
            (ALGOS below).
   dx_e2    2^(-i/256), Q15, i = 0..255: a level in 1/256 octave -> a gain
-  dx_sin   sin(2 pi (i + 0.5) / 8192), Q15: the operators' sine, read with the
-           phase's top 13 bits (the half step makes the truncation a rounding)
+  dx_sin   sin(2 pi (i + 0.5) / 8192), Q15: the operators' old sine, read with the
+           phase's top 13 bits (the half step makes the truncation a rounding); only
+           in a build.py --dx-own-sine build - DX reads the stock SRAM sine otherwise
   dx_sol   msfa's scaleoutlevel below 20 (output levels 0..19)
   dx_exps  msfa's exponential keyboard level scaling curve (33 groups)
   dx_pms   pitch modulation sensitivity 0..7 (msfa's pitchmodsenstab)
@@ -320,11 +321,13 @@ def main():
     e2 = [round(32767 * 2 ** (-i / 256)) for i in range(256)]
     for i in range(0, 256, 16):
         lines.append('    .word ' + ', '.join(str(x) for x in e2[i:i + 16]))
+    lines.append('.ifdef DX_OWN_SINE')               # only for build.py --dx-own-sine (dx.inc: DXSIN)
     lines.append('dx_sin:')
     sn = [round(32767 * __import__('math').sin(2 * __import__('math').pi * (i + 0.5) / 8192))
           for i in range(8192)]
     for i in range(0, 8192, 16):
         lines.append('    .word ' + ', '.join(str(x & 0xffff) for x in sn[i:i + 16]))
+    lines.append('.endif')
     lines.append('dx_sol:')
     lines.append('    .byte ' + ', '.join(str(x) for x in LEVELLUT))
     lines.append('dx_exps:')

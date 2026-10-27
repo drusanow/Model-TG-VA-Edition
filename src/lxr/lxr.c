@@ -117,6 +117,20 @@ static inline u32 rnd(u32 *s)
 }
 
 /* one sample of an oscillator, phase-modulated by pm (a phase offset, 32 bits) */
+/* The sine: the stock OS's own table in the internal SRAM (0x8000eee4, filled at boot and only read by
+ * the stock voices: 257 longs, round(2^31 sin(2 pi i / 256)), Q31). Its high halves are a Q15 sine; read
+ * there, interpolated, it costs what a table of ours did, but it never misses the data cache (the SRAM
+ * answers in one cycle) and takes no cache line from the other voices. */
+#define LX_SIN ((const s16 *)0x8000eee4)
+
+static inline s32 sram_sin(u32 ph)
+{
+	u32 i = (ph >> 24) << 1;                /* 256 steps; the high half of long i */
+	s32 frac = (ph >> 8) & 0xffff;
+	s32 a = LX_SIN[i], b = LX_SIN[i + 2];
+	return a + (((b - a) * (frac >> 1)) >> 15);
+}
+
 static inline s32 osc_tick(Osc *o, u32 pm, u32 *seed)
 {
 	u32 ph = o->phase + pm;
@@ -124,13 +138,8 @@ static inline s32 osc_tick(Osc *o, u32 pm, u32 *seed)
 	u32 last = o->phase;
 	o->phase += o->inc;
 	switch (o->wave) {
-	case W_SINE: {
-		u32 i = ph >> 22;                       /* 1024 entries */
-		frac = (ph >> 6) & 0xffff;
-		a = lx_sin[i];
-		b = lx_sin[i + 1];
-		return a + (((b - a) * (frac >> 1)) >> 15);
-	}
+	case W_SINE:
+		return sram_sin(ph);
 	case W_NOISE:                               /* LXR calcNoiseBlock: a new value each wrap */
 		if (o->phase < last)
 			o->out = (s32)(s16)(rnd(seed) >> 16);
@@ -262,7 +271,8 @@ static inline s32 svf(Svf *s, s32 in, s32 f, s32 q, s32 mode)
 static s32 svf_f(s32 hz)                         /* 2 sin(pi hz / 48000), Q15, hz <= 12000 */
 {
 	u32 ph = hz_inc((u32)hz << 4) >> 1;     /* pi hz / fs as a phase: hz/96000 of a turn */
-	return (2 * lx_sin[(ph >> 22) & 1023]) > 32767 ? 32767 : 2 * lx_sin[(ph >> 22) & 1023];
+	s32 s = 2 * sram_sin(ph);
+	return s > 32767 ? 32767 : s;
 }
 
 /* ---- the engines' settings ------------------------------------------------------------------------------ */

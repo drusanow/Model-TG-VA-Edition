@@ -320,8 +320,21 @@ bytes), the machine page's second line of markers (five).
 
 **CPU** (`tests/test_dx.py`, `VA_TEST_VERBOSE=1`): the worst block, six
 operators sounding with feedback, the LFO and amplitude modulation on every
-operator, is **~5,600 instructions**, against PLAITS' heaviest engine at
+operator, is **~7,100 instructions**, against PLAITS' heaviest engine at
 ~6,800.
+
+**The sine** is the stock OS's own table in the processor's internal SRAM
+(`0x8000eee4`: 257 longs, filled at boot, only ever read by the stock voices;
+`build.py` checks its bytes in the stock image and the boot copy that puts
+it there), interpolated (`DXSIN` in `dx.inc`). It replaced an 8,192-entry
+table of ours (16 KiB) that six operators swept every block: ~180 different
+cache lines a block, read from SDRAM on a Cycles, where a cache miss costs far
+more than an instruction. The SRAM answers in one cycle and takes no cache
+line from the other tracks. It costs ~1,500 more instructions a block (the
+interpolation; ~5,600 before) and is more exact (-82 dB against -72). The
+emulator counts instructions but not cache misses, so whether it is cheaper
+on the machine is for a Cycles to say: `build.py --dx-own-sine` builds the
+old table, to compare the DX tracks' share on Device Config > System.
 
 ## Verification
 

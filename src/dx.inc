@@ -25,6 +25,42 @@
 
 | DX_MACH (12) and the sample-region areas (DX_CARTS, DX_TST) are set in
 | model_tg.s.
+| The operators' sine. By default the stock OS's table in the internal SRAM
+| (0x8000eee4, filled at boot, only read by the stock voices; build.py checks
+| it: 257 longs, round(2^31 sin(2 pi i / 256))), its high halves read as Q15
+| and interpolated over 2^24 phase steps: more exact than the 8192-entry table
+| it replaces (-82 dB against -72), and a one-cycle read that never misses the
+| data cache - a 16 KiB table swept by six operators took ~180 cache lines a
+| block. ~8 more instructions an operator sample. build.py --dx-own-sine
+| builds the old table instead, for comparing the two on a Cycles.
+| DXSIN: d0 = the phase -> d0 = sin, Q15. Clobbers d1, d5. a0 = DXSIN_BASE.
+    .macro DXSIN_BASE
+.ifdef DX_OWN_SINE
+    lea.l   dx_sin,%a0
+.else
+    lea.l   0x8000eee4,%a0
+.endif
+    .endm
+    .macro DXSIN
+.ifdef DX_OWN_SINE
+    moveq   #19,%d1
+    lsrl    %d1,%d0
+    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+.else
+    lsrl    #8,%d0
+    mvzw    %d0,%d5               | the fraction, 16 bits
+    swap    %d0
+    mvzw    %d0,%d0               | the step, 0..255
+    mvsw    %a0@(4,%d0:l:4),%d1   | the next one's high half
+    mvsw    %a0@(0,%d0:l:4),%d0   | this one's
+    subl    %d0,%d1
+    mulsl   %d5,%d1               | |next - this| <= 804: fits
+    swap    %d1
+    extl    %d1                   | >> 16
+    addl    %d1,%d0
+.endif
+    .endm
+
 DX_TS   = 512                     | bytes of state per track (DX_TST)
 DX_VELW = 0x40fe4cdc              | the OS's note velocity per track, << 8
 DX_GMAX = 0x10000000              | a gain's largest step a block (Q14 << 16)
@@ -925,7 +961,8 @@ dx_opl:
     braw    dx_nx
 dx_go:
     moveq   #31,%d6
-    lea.l   dx_sin,%a0
+    movea.l %d5,%a4               | the level's step (d5: DXSIN's scratch)
+    DXSIN_BASE
     movel   %d7,%d0
     andil   #0xc0,%d0
     cmpil   #0xc0,%d0
@@ -940,16 +977,14 @@ dx_go:
 dx_n1:
     movel   %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     addl    %d0,%a2@+
     subql   #1,%d6
     bpls    dx_n1
@@ -957,16 +992,14 @@ dx_n1:
 dx_n0:
     movel   %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     movel   %d0,%a2@+
     subql   #1,%d6
     bpls    dx_n0
@@ -981,16 +1014,14 @@ dx_i1:
     lsll    %d1,%d0
     addl    %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     addl    %d0,%a2@+
     subql   #1,%d6
     bpls    dx_i1
@@ -1001,16 +1032,14 @@ dx_i0:
     lsll    %d1,%d0
     addl    %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     movel   %d0,%a2@+
     subql   #1,%d6
     bpls    dx_i0
@@ -1030,16 +1059,14 @@ dx_f1:
     lsll    %d1,%d0
     addl    %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     movea.l %d7,%a1
     movel   %d0,%d7
     addl    %d0,%a2@+
@@ -1053,16 +1080,14 @@ dx_f0:
     lsll    %d1,%d0
     addl    %d2,%d0
     addl    %d3,%d2
-    moveq   #19,%d1
-    lsrl    %d1,%d0
-    mvsw    %a0@(0,%d0:l:2),%d0   | dx_sin
+    DXSIN
     movel   %d4,%d1
     swap    %d1
     extl    %d1
     mulsw   %d1,%d0
     asrl    #8,%d0
     asrl    #6,%d0
-    addl    %d5,%d4
+    addl    %a4,%d4
     movea.l %d7,%a1
     movel   %d0,%d7
     movel   %d0,%a2@+

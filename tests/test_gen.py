@@ -27,7 +27,7 @@ def emu():
         EMU = Emu()
     else:
         EMU.reset()
-    EMU.uc.mem_map(0x80000000, 0x10000)          # the audio clock 0x8000184c
+    # the SRAM (the audio clock 0x8000184c) is mapped by va_emu
     return EMU
 
 
