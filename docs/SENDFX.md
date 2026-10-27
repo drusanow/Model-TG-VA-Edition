@@ -58,9 +58,11 @@ the stock delay and reverb.
 - SPRING is mono: the two sides are summed on the way in. It comes out in
   stereo.
 - The Send FX menu and the types are not p-lockable.
-- The stock delay and reverb keep running on silence while another effect
-  is chosen, so that switching back is clean. The new effect's cost comes
-  on top of theirs (see below).
+- While another effect is chosen, the stock delay or reverb keeps running on
+  silence until all it holds has died away, so that switching back is clean.
+  Once it has put out silence for 10.9 s (one turn of the delay's memory) it
+  stops, and only the chosen effect costs CPU. Switching back to the stock
+  effect starts it again from there.
 - Sample memory is 640 KB smaller: the delay's lines (512 KB), and the
   spring's and RESO's (128 KB), sit at the top of the sample region. LFO
   3/4's per-pattern blocks take another 12 KB there.
@@ -222,7 +224,13 @@ CPU, instructions a block (the Plaits engines run 880 to 6,830 a track):
 | DIST | ~3,350 |
 | RESO | ~4,190 |
 
-These are on top of the stock delay and reverb, which keep running.
+For its first 10.9 s, a new effect's cost comes on top of the stock
+effect's it replaces, which is dying away (~2,700 instructions a block for the
+stock delay, ~8,200 for the stock reverb, counted on the stock code). After
+that the stock one is no longer run (`sfx_dq` / `sfx_rq` reach `FX_HOLD`, the
+rule `fx_off` uses for the whole effects section), so choosing another reverb
+frees ~8,200 instructions a block and another delay ~2,700, less the chosen
+effect's own cost.
 
 `build.py` asserts the stock bytes of the FX default fill's prologue.
 

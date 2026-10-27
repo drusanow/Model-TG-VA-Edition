@@ -23,7 +23,14 @@
 | silence (SFX_ZERO, cleared before each call: the stock reverb uses its
 | input buffer as scratch) so that what it holds dies away, its rings,
 | positions and DMA exactly as always - and ours then writes the bus's
-| output in its place. A type that changes starts from silence: its lines
+| output in its place. Once it has put out silence for FX_HOLD blocks in a
+| row (one turn of the delay's ring, 10.9 s: all it holds is below the
+| silence level, fx_off's rule), it is no longer called (sfx_dq / sfx_rq):
+| its state stays as it was, as fx_off leaves it, and it carries on from
+| there when its slot goes back to the stock type. That saves ~2,700
+| instructions a block for the delay, ~8,200 for the reverb. Its setup, ring
+| step and DMA still run (the other slot may be stock; they only move what
+| is already silent). A type that changes starts from silence: its lines
 | are cleared, a 16 KiB chunk a block, while it puts out silence (32 blocks,
 | 21 ms, for the delay's; 4 for the spring's). Samples are 32-bit (16-bit <<
 | 16); the effects work on the top 16 bits, coefficients Q14.
@@ -152,6 +159,9 @@ sfx_dly:
     cmpl    sfx_dt,%d0
     beqs    sd_same
     movel   %d0,sfx_dt            | another type: from silence
+    bnes    sd_keepq
+    clrl    sfx_dq                | back to stock: it runs, its count restarts
+sd_keepq:
     bsr     sfx_init
     clrl    sfx_dcl
     clrl    sfx_db
@@ -163,12 +173,26 @@ sd_same:
     bnes    sd_alt
     jmp     0x40057488            | the stock delay
 sd_alt:
+    movel   sfx_dq,%d0
+    cmpil   #FX_HOLD,%d0          | silent a whole ring turn: no longer run
+    bccs    sd_cnt
     bsr     sfx_z
     movel   %sp@(12),%sp@-        | the stock delay, fed silence: what it holds
     pea     SFX_ZERO              | dies away, its ring and DMA as always
     movel   %sp@(12),%sp@-
     jsr     0x40057488
     lea.l   %sp@(12),%sp
+    movea.l %sp@(4),%a0           | what it put out: silent?
+    moveq   #64,%d0
+    jsr     fx_quiet
+    bnes    sd_loud
+    movel   sfx_dq,%d0            | quiet: one block more
+    addql   #1,%d0
+    bras    sd_cnt
+sd_loud:
+    moveq   #0,%d0
+sd_cnt:
+    movel   %d0,sfx_dq
     movel   sfx_dcl,%d0
     cmpil   #2*(SFX_DMASK+1)*2,%d0
     bccs    sfx_ddsp
@@ -533,6 +557,9 @@ sfx_rev:
     cmpl    sfx_rt,%d0
     beqs    sr_same
     movel   %d0,sfx_rt            | another type: from silence
+    bnes    sr_keepq
+    clrl    sfx_rq                | back to stock: it runs, its count restarts
+sr_keepq:
     bsr     sfx_init
     clrl    sfx_rcl
     lea.l   sfx_rs,%a0
@@ -546,12 +573,26 @@ sr_same:
     bnes    sr_alt
     jmp     0x400579c4            | the stock reverb
 sr_alt:
+    movel   sfx_rq,%d0
+    cmpil   #FX_HOLD,%d0          | silent a whole ring turn: no longer run
+    bccs    sr_cnt
     bsr     sfx_z
     movel   %sp@(12),%sp@-        | the stock reverb, fed silence
     pea     SFX_ZERO
     movel   %sp@(12),%sp@-
     jsr     0x400579c4
     lea.l   %sp@(12),%sp
+    movea.l %sp@(4),%a0           | what it put out: silent?
+    moveq   #64,%d0
+    jsr     fx_quiet
+    bnes    sr_loud
+    movel   sfx_rq,%d0            | quiet: one block more
+    addql   #1,%d0
+    bras    sr_cnt
+sr_loud:
+    moveq   #0,%d0
+sr_cnt:
+    movel   %d0,sfx_rq
     movel   sfx_rcl,%d0
     cmpil   #SFX_RSZ,%d0
     bccs    sfx_rdsp
@@ -1145,6 +1186,8 @@ sfx_wp:       .long 0          | the lines' write point
 sfx_ph1:      .long 0          | TAPE's wow / CHORUS's LFO
 sfx_ph2:      .long 0          | TAPE's flutter
 sfx_rt:       .long 0          | the reverb slot's type running
+sfx_dq:       .long 0          | blocks the stock delay, fed silence, has been
+sfx_rq:       .long 0          | ... and the stock reverb: silent (FX_HOLD: off)
 sfx_rcl:      .long 0          | ... how much of the spring's lines is clear
 sfx_rwp:      .long 0          | the spring's write point
 sfx_ok:       .long 0          | sfx_init has run

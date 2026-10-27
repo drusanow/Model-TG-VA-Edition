@@ -43,6 +43,7 @@ class Base(unittest.TestCase):
         e.w32(CUR_KIT, KIT_BASE + self.KIT * KIT_SIZE)
         e.w32(TEMPO, 120 * 120)                      # 120 BPM
         self.fed = []
+        self.stock_out = None                        # what the stock stand-ins put out
         for a in (DLY, REV):
             e.uc.hook_add(UC_HOOK_CODE, self._fed, begin=a, end=a)
 
@@ -53,6 +54,8 @@ class Base(unittest.TestCase):
         self.fed.append((addr, out, inp, par, silent))
         if inp != IN:                                # the stock reverb scribbles on
             uc.mem_write(inp, b'\x77' * 256)        # its input buffer
+        if self.stock_out is not None:
+            uc.mem_write(out, self.stock_out)
 
     def blk(self, n=None):
         return self.s['lfo34_kits'] + 172 * (self.KIT if n is None else n)
@@ -94,6 +97,82 @@ class Base(unittest.TestCase):
         for _ in range(blocks):
             a, b = self.block(fn, [0] * 32)
             self.assertEqual(a + b, [0] * 64)
+
+
+HOLD = 16384                                         # FX_HOLD: one turn of the delay's ring
+
+
+class THidden(Base):
+    """A stock effect hidden behind another type stops being run once it has put out
+    silence for FX_HOLD blocks in a row (fed silence, as fx_off's rule)."""
+
+    def calls(self, fn, n, left=8000):
+        self.fed = []
+        outs = [self.block(fn, [left] * 32) for _ in range(n)]
+        return len(self.fed), outs
+
+    def test_stops_after_a_ring_turn_of_silence(self):
+        e = self.e
+        self.types(1, 2)
+        self.params(1792, 16384)
+        self.stock_out = bytes(256)                  # a hidden stock effect gone silent
+        for fn, q in (('sfx_dly', 'sfx_dq'), ('sfx_rev', 'sfx_rq')):
+            self.settle(fn, 32)
+            self.assertEqual(e.r32(e.sym[q]), 32)    # counting while it runs
+            e.w32(e.sym[q], HOLD - 3)
+            n, _ = self.calls(fn, 10)
+            self.assertEqual(n, 3, fn)               # three more blocks, then no more calls
+            self.assertEqual(e.r32(e.sym[q]), HOLD)
+
+    def test_frozen_or_not_ours_sounds_the_same(self):
+        e = self.e
+        self.stock_out = bytes(256)
+        got = []
+        for frozen in (False, True):
+            e.reset()
+            e.w32(CUR_KIT, KIT_BASE + self.KIT * KIT_SIZE)
+            e.w32(TEMPO, 120 * 120)
+            self.types(2, 3)
+            self.params(1792, 16384)
+            self.settle('sfx_dly', 32)
+            self.settle('sfx_rev', 5)
+            outs = []
+            for i in range(200):
+                for q in ('sfx_dq', 'sfx_rq'):
+                    e.w32(e.sym[q], HOLD if frozen else 0)
+                sig = [int(9000 * ((i * 32 + k) % 37 - 18) / 18) for k in range(32)]
+                outs.append(self.block('sfx_dly', sig))
+                outs.append(self.block('sfx_rev', sig))
+            got.append(outs)
+        self.assertEqual(got[0], got[1])
+
+    def test_a_sound_restarts_the_count(self):
+        e = self.e
+        self.types(1, 2)
+        self.params(1792, 16384)
+        self.stock_out = struct.pack('>64i', *([3 * FS] * 64))   # still ringing
+        for fn, q in (('sfx_dly', 'sfx_dq'), ('sfx_rev', 'sfx_rq')):
+            e.w32(e.sym[q], HOLD - 1)
+            n, _ = self.calls(fn, 4)
+            self.assertEqual(n, 4, fn)
+            self.assertEqual(e.r32(e.sym[q]), 0)
+
+    def test_back_to_stock_runs_it_again(self):
+        e = self.e
+        self.types(1, 2)
+        self.params(1792, 16384)
+        self.stock_out = bytes(256)
+        for fn, q, stock, d, r in (('sfx_dly', 'sfx_dq', DLY, 0, None), ('sfx_rev', 'sfx_rq', REV, None, 0)):
+            self.settle(fn, 32)
+            e.w32(e.sym[q], HOLD)
+            self.assertEqual(self.calls(fn, 2)[0], 0)
+            self.types(3 if d is not None else None, 4 if r is not None else None)   # another
+            self.assertEqual(self.calls(fn, 2)[0], 0, fn)                            # still frozen
+            self.types(d, r)                         # the stock type: run again, at once
+            self.assertEqual(e.run_to_any(fn, (stock,), stack=[OUT, IN, PAR]), stock)
+            self.assertEqual(e.r32(e.sym[q]), 0)
+            self.types(1 if d is not None else None, 2 if r is not None else None)
+            self.assertEqual(self.calls(fn, 2)[0], 2, fn)                            # hidden again: counted afresh
 
 
 class TSlots(Base):
@@ -334,8 +413,11 @@ class TReso(Base):
 
 class TCpu(Base):
     def test_a_block_each(self):
-        """Instructions a block, every type: the budget the docs quote."""
+        """Instructions a block, every type: the budget the docs quote - once the hidden
+        stock effect has gone quiet and is no longer run (its count at FX_HOLD)."""
         e = self.e
+        e.w32(e.sym['sfx_dq'], HOLD)
+        e.w32(e.sym['sfx_rq'], HOLD)
         e.uc.mem_write(IN, b''.join(struct.pack('>i', (i * 7919 % 60000 - 30000) * FS) for i in range(64)))
         self.params(100 << 8, 100 << 8)
         got = {}
