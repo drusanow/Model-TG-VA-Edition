@@ -274,7 +274,8 @@ _DATA_LABELS={'st_fields','st_fields_end','st_reset','key_value_strings',
               'sfx_rwp','sfx_ok','sfx_rate','sfx_apc',
               'lcc_st','lcc_mask','lcc_tick','lcc_rr','lcc_ld','lcc_dirty','lcc_zero','lcc_name',
               'lcc_last','lcc_msg','lcc_num','lcc_val','lcc_sent','lcc_tk','lcc_lof',
-              'lx_swap','lx_labs','lx_engn','lx_cont','lx_lab'}   # pointer tables (menu descriptors), not code
+              'lx_swap','lx_labs','lx_engn','lx_cont','lx_lab','lx_icons','lx_ic_kick','lx_ic_tom',
+              'lx_ic_perc','lx_ic_snar','lx_ic_clap','lx_ic_chat','lx_ic_ohat','lx_ic_cymb'}   # pointer tables (menu descriptors), not code
 # compiler output (LXR, tools/gen_lxr.py) branches to local labels the assembler drops: its functions are gcc's
 _COMPILED={_l.split()[2] for _l in subprocess.run([CROSS+"nm",_objs[3]],capture_output=True,text=True,
            check=True).stdout.splitlines() if len(_l.split())==3}

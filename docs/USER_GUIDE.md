@@ -442,26 +442,28 @@ Synths LXR-02 - a modified, fixed-point port of the drum voices of its
 GPL-3 firmware (not Erica Synths' firmware, not endorsed by them; licence
 in [src/lxr/NOTICE.md](../src/lxr/NOTICE.md)). One voice per track.
 
-**Contour** picks the engine (the page shows its name):
+**Contour** picks the engine. Its screen is PLAITS': the engine's picture
+on the left, a pip for each of the eight engines, and its name; the machine
+page shows the selected track's engine picture too.
 
 | engine | what it is |
 |---|---|
 | **KICK** | a sine with a pitch envelope and FM that follows it, a click, drive |
 | **TOM** | the same voice higher and rounder |
 | **PERC** | a square wave phase-modulated by a saw: metallic, woody percussion |
-| **SNARE** | a triangle with a snap plus band-passed sample-and-hold noise |
+| **SNAR** (snare) | a triangle with a snap plus band-passed sample-and-hold noise |
 | **CLAP** | band-passed noise in quick repeats, then a tail |
-| **CL HAT** / **OP HAT** | a square carrier modulated by a sine and by noise, high-passed; short / long |
-| **CYMBAL** | the same, tuned lower, with a long decay |
+| **CHAT** / **OHAT** (closed / open hat) | a square carrier modulated by a sine and by noise, high-passed; short / long |
+| **CYMB** (cymbal) | the same, tuned lower, with a long decay |
 
 **Color, Shape, Sweep** are three macros; their labels change with the engine:
 
 | engines | Color | Shape | Sweep |
 |---|---|---|---|
 | KICK, TOM, PERC | **PAMT** pitch envelope amount (up to 5 octaves) | **PTIM** its time (4 ms to 0.4 s) | **FMDR** FM amount and drive |
-| SNARE | **NMIX** tone to noise | **NTON** the noise's rate and filter | **SNAP** the tone's pitch snap |
+| SNAR | **NMIX** tone to noise | **NTON** the noise's rate and filter | **SNAP** the tone's pitch snap |
 | CLAP | **SPRD** time between the claps | **TONE** the noise's filter | **CLPS** how many claps, 1 to 6 |
-| CL HAT, OP HAT, CYMBAL | **TUNE** the metal's pitch | **NOIS** metal to noise | **BRIT** the high-pass, brighter up |
+| CHAT, OHAT, CYMB | **TUNE** the metal's pitch | **NOIS** metal to noise | **BRIT** the high-pass, brighter up |
 
 **Pitch** and the keyboard tune it (all engines follow the note).
 **Decay**, **Attack** (PRESET + Decay), **Filter** and **Resonance** (PRESET

@@ -62,7 +62,7 @@ keeps working.
   Erica Synths LXR-02 (a modified, fixed-point port of its GPL-3 firmware's
   voices; not Erica Synths' firmware, nor endorsed by them). Contour picks
   one of eight engines - KICK, TOM, PERC (FM drum voices with pitch and FM
-  envelopes), SNARE, CLAP, CL HAT, OP HAT, CYMBAL - and Color / Shape / Sweep
+  envelopes), SNAR, CLAP, CHAT, OHAT, CYMB - and Color / Shape / Sweep
   are three macros, labelled per engine; Attack, Filter, Resonance and Decay
   are the ones every machine has ([USER_GUIDE](docs/USER_GUIDE.md#lxr)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the

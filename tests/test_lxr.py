@@ -5,7 +5,7 @@ pairs, the page's labels and engine names, cost. HOST verification only: how it 
 
     python3 -m unittest tests.test_lxr -v
 """
-import os, sys, random, unittest
+import os, sys, random, struct, unittest
 
 import numpy as np
 
@@ -15,7 +15,7 @@ from va_emu import *  # noqa
 LX = 13
 STEP1 = 0x10000                                   # note 60
 KICK, TOM, PERC, SNARE, CLAP, CHAT, OHAT, CYMB = range(8)
-NAMES = ['KICK', 'TOM', 'PERC', 'SNARE', 'CLAP', 'CL HAT', 'OP HAT', 'CYMBAL']
+NAMES = ['KICK', 'TOM', 'PERC', 'SNAR', 'CLAP', 'CHAT', 'OHAT', 'CYMB']   # 4 letters, as PLAITS'
 TD = SCRATCH + 0x60000                            # a stand-in trackData
 EMU = None
 
@@ -192,6 +192,74 @@ class TPage(unittest.TestCase):
                 sp = e.uc.reg_read(UC_M68K_REG_A7)
                 name = e.r32(sp + 12)
                 self.assertEqual(bytes(e.uc.mem_read(name, 8)).split(b'\0')[0].decode(), NAMES[eng])
+
+
+    def test_knob_screen_is_plaits_own(self):
+        """Contour's screen: the engine's picture on the left, eight pips centred on x 96 (the
+        engine's filled), its 4-letter name in the big font centred on 96 - as PLAITS'."""
+        e = emu(); s = e.sym
+        calls = []
+        def hook(fn, kind, n):
+            e.uc.hook_add(UC_HOOK_CODE, lambda uc, a, z, u: calls.append(
+                (kind,) + struct.unpack('>%di' % n, uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 4, 4 * n))),
+                begin=fn, end=fn)
+        hook(0x40070efc, 'fill', 6); hook(0x40070c4e, 'box', 6)
+        hook(0x40071da4, 'icon', 5); hook(0x40071c10, 'text', 9)
+        e.uc.mem_write(0x40072102, bytes.fromhex('70284e75'))   # width: 40
+        e.uc.mem_write(0x400720f8, bytes.fromhex('70074e75'))   # the font's handle: 7
+        rd = lambda a: bytes(e.uc.mem_read(a, 8)).split(b'\0')[0].decode()
+        for eng in range(8):
+            calls.clear()
+            e.run('lx_draw', stack=[0x1000, contour(eng), 0x5555, 0x60, 0x22, 0])
+            fills = [c for c in calls if c[0] == 'fill']
+            self.assertEqual(fills[0][1:], (0x5555, 14, 1, 50, 37, 0))      # black behind
+            self.assertEqual(fills[1][1:], (0x5555, 70, 22, 122, 28, 0))    # stock pips off
+            icon = [c for c in calls if c[0] == 'icon'][0]
+            self.assertEqual(icon[3:], (32, 19, 1))
+            self.assertEqual(e.r32(icon[2] + 16), s[f'lx_ic_{NAMES[eng].lower()}'])
+            pips = [c for c in calls if c[0] in ('box', 'fill')][2:]
+            self.assertEqual(len(pips), 8)
+            for i, p in enumerate(pips):                 # 77 .. 115: centred on 96
+                self.assertEqual(p[1:], (0x5555, 77 + 5 * i, 0x17, 80 + 5 * i, 0x1b, 1))
+                self.assertEqual(p[0], 'fill' if i == eng else 'box', (eng, i))
+            text = [c for c in calls if c[0] == 'text'][0]
+            self.assertEqual(text[1:5], (0x5555, 7, 96 - 20, 0x22))          # big font, centred on 96
+            self.assertEqual(rd(text[9] & M32), NAMES[eng])
+        for n in NAMES:                                  # the names fit as PLAITS' do
+            self.assertLessEqual(len(n), 4)
+
+    def test_knob_screen_installed_for_lxr(self):
+        e = emu(); s = e.sym
+        DRW = 0x40a73460
+        stock = (0x11111111, 0x22222222, 0, 0x44444444)
+        for i, v in enumerate(stock):
+            e.w32(DRW + 4 * i, v)
+        for i, v in enumerate((0xa1, 0xa2, 0xa3)):
+            e.w32(0x40a727e0 + 4 * i, v)                 # Pitch's words
+        e.run('mi_fmtswap', regs={D[1]: 8})
+        self.assertEqual([e.r32(DRW + 4 * i) for i in range(4)], [0xa1, 0xa2, 0xa3, s['lx_draw']])
+        self.assertEqual(e.r32(0x40a7345c), s['lx_eng_fmt'])
+        e.run('mi_fmtswap', regs={D[1]: 6})              # PLAITS' after it
+        self.assertEqual(e.r32(DRW + 12), s['mi_draw'])
+        e.run('mi_fmtswap', regs={D[1]: 0})              # anything else: stock again
+        self.assertEqual([e.r32(DRW + 4 * i) for i in range(4)], list(stock))
+
+    def test_machine_page_picture_follows_the_engine(self):
+        e = emu(); s = e.sym
+        TB = SCRATCH + 0x70000                           # table B: 14 entries
+        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 392)
+        e.uc.mem_write(0x400cf866, bytes.fromhex('70004e75'))
+        e.uc.mem_write(0x4000eb90, bytes.fromhex('70004e75'))
+        e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))   # the selected track: 2
+        e.w32(e.arr('trk_mach', 2), LX)
+        for eng in (CYMB, KICK, SNARE, CHAT, CLAP, TOM, OHAT, PERC):
+            e.w16(TD + 28, contour(eng))
+            e.run('lx_params', regs={D[2]: 2, A[2]: TD})
+            e.run('lx_watch')
+            self.assertEqual(e.r32(TB + 364 + 16), s[f'lx_ic_{NAMES[eng].lower()}'], eng)
+        e.w32(e.arr('trk_mach', 2), 7)                   # not an LXR: its own picture
+        e.run('lx_watch')
+        self.assertEqual(e.r32(TB + 364 + 16), s['lxr_icon_b_pixels'])
 
 
 class TCost(unittest.TestCase):

@@ -2376,19 +2376,24 @@ mi_fmtswap:
     beqs    5f
     movel   %d0,mi_fmt0           | the stock one, kept
     movel   %a1,%a0@
-5:  | ...and its knob screen: mi_draw for PLAITS, dx_draw for DX
+5:  | ...and its knob screen: mi_draw for PLAITS, dx_draw for DX, lx_draw for LXR
     lea.l   MI_ENG_DRW,%a0
     suba.l  %a1,%a1               | the one wanted
     cmpil   #6,%d1
     bnes    1f
     lea.l   mi_draw,%a1
 1:  cmpil   #7,%d1
-    bnes    2f
+    bnes    12f
     lea.l   dx_draw,%a1
+12: cmpil   #8,%d1
+    bnes    2f
+    lea.l   lx_draw,%a1
 2:  movel   %a0@(12),%d0
     cmpl    %a1,%d0
     beqs    7f                    | already
     cmpil   #mi_draw,%d0
+    beqs    3f
+    cmpil   #lx_draw,%d0
     beqs    3f
     cmpil   #dx_draw,%d0
     bnes    4f
@@ -2438,15 +2443,25 @@ mi_fmtswap:
 |  - the pips: the stock five cleared, ten drawn in their place, the
 |    engine's filled (0x40070efc filled / 0x40070c4e outlined, as stock)
 |  - the engine's name in the big font, centred on the pips (x 96)
-MI_PIP0 = 72                      | the first pip's left edge; 5 apart
+| LXR's (lx_draw, lxr_glue.inc) is the same screen: eng_draw draws both,
+| from the engine (d7), the engine count (fp-20), the pictures (fp-12) and
+| the names (fp-16) its caller leaves; the pips centred on x 96, 5 apart.
 mi_draw:
     linkw   %fp,#-60
     moveml  %d2-%d7/%a2-%a5,%sp@
-    movel   %fp@(16),%d2          | ctx
-    movel   %fp@(24),%d3          | y
     movel   %fp@(12),%d0          | the engine
     bsr     mi_eidx
     movel   %d0,%d7
+    lea.l   mi_icons,%a0
+    movel   %a0,%fp@(-12)
+    lea.l   mi_engn,%a0
+    movel   %a0,%fp@(-16)
+    moveq   #10,%d0
+    movel   %d0,%fp@(-20)
+    .globl  eng_draw
+eng_draw:                         | (lx_draw jumps here, its frame as mi_draw's)
+    movel   %fp@(16),%d2          | ctx
+    movel   %fp@(24),%d3          | y
     lea.l   0x40070efc,%a2        | filled
     lea.l   0x40070c4e,%a3        | outlined
     clrl    %sp@-                 | the picture: black behind it
@@ -2457,7 +2472,7 @@ mi_draw:
     movel   %d2,%sp@-
     jsr     %a2@
     lea.l   %sp@(24),%sp
-    lea.l   mi_icons,%a0
+    movea.l %fp@(-12),%a0         | the engine's picture
     movel   %a0@(0,%d7:l:4),%d0
     lea.l   mi_icobj,%a0
     movel   %d0,%a0@(16)
@@ -2476,8 +2491,15 @@ mi_draw:
     movel   %d2,%sp@-
     jsr     %a2@
     lea.l   %sp@(24),%sp
-    moveq   #0,%d4                | ...and ten drawn, 4 wide
-    moveq   #MI_PIP0,%d5
+    moveq   #0,%d4                | ...and one an engine, 4 wide, centred
+    movel   %fp@(-20),%d5         | on x 96: from 96 - (5 n - 1) / 2
+    movel   %d5,%d0
+    lsll    #2,%d5
+    addl    %d0,%d5
+    subql   #1,%d5
+    lsrl    #1,%d5
+    negl    %d5
+    addil   #96,%d5
 3:  pea     1
     pea     0x1b
     movel   %d5,%d0
@@ -2494,10 +2516,9 @@ mi_draw:
     lea.l   %sp@(24),%sp
     addql   #5,%d5
     addql   #1,%d4
-    moveq   #10,%d0
-    cmpl    %d4,%d0
+    cmpl    %fp@(-20),%d4
     bnes    3b
-    lea.l   mi_engn,%a0           | the name, centred on the pips
+    movea.l %fp@(-16),%a0         | the name, centred on the pips
     movea.l %a0@(0,%d7:l:4),%a4
     movea.l %a4,%a0               | its length
     moveq   #0,%d6
