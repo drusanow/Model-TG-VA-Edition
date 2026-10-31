@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Host tests for LXR (machine 13, src/lxr/lxr.c, GPL-3.0-only; glue src/lxr_glue.inc): eight drum engines after the
-Erica Synths LXR-02's voices - sound, pitch, the macros, the clap's repeats, the hats' decays, bounds, the 48 kHz
-pairs, the page's labels and engine names, cost. HOST verification only: how it sounds needs a Model:Cycles.
+"""Host tests for LXR (machine 13, src/lxr/lxr.c, GPL-3.0-only; glue src/lxr_glue.inc): the Erica Synths LXR-02's
+voices, ported. The firmware's own code runs (Unicorn) and is checked against the LXR's own code: tests/data/
+lxr_ref.json holds the original's envelope, spectrum and pitch for each voice of its init kit (tools/lxr_reference.py
+renders them from the LXR firmware's sources). Also: the presets, the macros, the clap's repeats, the hats' decays,
+bounds, the 48 kHz pairs, the page's labels and names, cost. How it sounds on a Model:Cycles needs one.
 
     python3 -m unittest tests.test_lxr -v
 """
-import os, sys, random, struct, unittest
+import json, os, sys, random, struct, unittest
 
 import numpy as np
 
@@ -15,8 +17,10 @@ from va_emu import *  # noqa
 LX = 13
 STEP1 = 0x10000                                   # note 60
 KICK, TOM, PERC, SNARE, CLAP, CHAT, OHAT, CYMB = range(8)
+SNAR = SNARE
 NAMES = ['KICK', 'TOM', 'PERC', 'SNAR', 'CLAP', 'CHAT', 'OHAT', 'CYMB']   # 4 letters, as PLAITS'
 TD = SCRATCH + 0x60000                            # a stand-in trackData
+REF = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'lxr_ref.json')))
 EMU = None
 
 
@@ -72,75 +76,107 @@ def zc_rate(x):
     return s.sum() * 48000 / 2 / len(x)
 
 
+class TReference(unittest.TestCase):
+    """the machine's voices against the LXR's own (its init kit, every macro at 64: the preset as it is)"""
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
+        from lxr_reference import features
+        cls.got = {}
+        for name in REF['voices']:
+            e = emu()
+            x = play(e, 1500, eng=NAMES.index(name))
+            cls.got[name] = features(x, 48000)
+
+    def test_envelopes(self):
+        """within a fraction of a dB; the hats within 2 dB: their energy is mostly 16..22 kHz, the top of the LXR's
+        band, which going from its 44.14 kHz to our 48 kHz trims by a few dB (to 20 kHz: lxr_reference.features)"""
+        for name, ref in REF['voices'].items():
+            g = np.array(self.got[name]['env']); r = np.array(ref['env'])
+            live = r > r.max() - 50
+            d = np.abs(g - r)[live]
+            self.assertLess(np.median(d), 2.0 if name in ('CHAT', 'OHAT') else 0.8, name)
+            self.assertLess(d.max(), 3.0, name)
+
+    def test_spectra(self):
+        """every band holding more than 1/1000 of the voice's energy, within 3 dB"""
+        for name, ref in REF['voices'].items():
+            for i, (g, r) in enumerate(zip(self.got[name]['bands'], ref['bands'])):
+                if r > -30:
+                    self.assertLess(abs(g - r), 3.0, (name, REF['bands'][i], g, r))
+
+    def test_pitch(self):
+        for name, ref in REF['voices'].items():
+            for g, r in zip(self.got[name].get('f0', []), ref.get('f0', [])):
+                if r:
+                    self.assertAlmostEqual(g / r, 1.0, delta=0.03, msg=name)
+
+
 class TSound(unittest.TestCase):
     def test_silent_until_triggered(self):
         e = emu()
         x = play(e, 20, trig=False, eng=KICK)
         self.assertFalse(x.any())
 
-    def test_every_engine_sounds_and_differs(self):
+    def test_every_preset_sounds_and_differs(self):
         outs = []
         for eng in range(8):
             e = emu()
-            x = play(e, 120, eng=eng)
-            self.assertGreater(rms(x), 300, NAMES[eng])
+            x = play(e, 300, eng=eng)
+            self.assertGreater(rms(x[:9600]), 300, NAMES[eng])
             self.assertLessEqual(np.abs(x).max(), 32767)
             outs.append(x)
         for a in range(8):
             for b in range(a + 1, 8):
-                self.assertLess(abs(np.corrcoef(outs[a], outs[b])[0, 1]), 0.9, (NAMES[a], NAMES[b]))
+                if {a, b} != {CHAT, OHAT}:          # the same hat; their decays differ (test_hats_...)
+                    self.assertLess(abs(np.corrcoef(outs[a], outs[b])[0, 1]), 0.9, (NAMES[a], NAMES[b]))
 
     def test_pitch_follows_the_note(self):
         rates = []
         for step in (STEP1, STEP1 * 2):           # note 60, note 72
             e = emu()
-            x = play(e, 200, step=step, eng=TOM, color=0, sweep=0)
-            rates.append(peak_hz(x[2400:19200], 40, 1000))   # the body, past the click and envelope
-        self.assertAlmostEqual(rates[1] / rates[0], 2.0, delta=0.02)
-        self.assertAlmostEqual(rates[0], 110, delta=3)        # TOM's base at note 60
+            x = play(e, 200, step=step, eng=TOM)
+            rates.append(peak_hz(x[2400:7200], 40, 1000))
+        self.assertAlmostEqual(rates[1] / rates[0], 2.0, delta=0.04)
 
-    def test_kick_pitch_envelope_amount_and_time(self):
-        def start(color, shape):
+    def test_kick_macros(self):
+        def zc(color, shape, lo, hi):
             e = emu()
-            x = play(e, 40, eng=KICK, color=color, shape=shape, sweep=0)
-            return zc_rate(x[200:900])
-        self.assertGreater(start(127, 64), 2 * start(0, 64))   # Color: more sweep, higher start
-        def at(shape):
-            e = emu()
-            x = play(e, 40, eng=KICK, color=100, shape=shape, sweep=0)
-            return zc_rate(x[600:1300])
-        self.assertGreater(at(127), at(0))                     # Shape: a longer sweep
+            x = play(e, 60, eng=KICK, color=color, shape=shape)
+            return zc_rate(x[lo:hi])
+        self.assertGreater(zc(127, 64, 0, 480), 1.3 * zc(0, 64, 0, 480))      # Color: more pitch sweep
+        self.assertGreater(zc(64, 127, 960, 1920), zc(64, 0, 960, 1920))       # Shape: a longer sweep
 
-    def test_every_macro_changes_every_engine(self):
+    def test_every_macro_changes_every_preset(self):
         for eng in range(8):
             for knob in ('color', 'shape', 'sweep'):
                 xs = []
                 for v in (0, 127):
                     e = emu()
-                    xs.append(play(e, 60, eng=eng, **{knob: v}))
+                    xs.append(play(e, 200, eng=eng, **{knob: v}))
                 self.assertGreater(rms(xs[0] - xs[1]), 100, (NAMES[eng], knob))
 
     def test_clap_repeats(self):
         def onsets(n_knob):
             e = emu()
-            x = np.abs(play(e, 300, eng=CLAP, color=64, sweep=n_knob))    # 200 ms: six claps 16 ms apart
+            x = np.abs(play(e, 400, eng=CLAP, sweep=n_knob))
             env = np.array([np.sqrt(np.mean(x[i:i + 96] ** 2)) for i in range(0, len(x) - 96, 96)])
             return sum(1 for i in range(1, len(env)) if env[i] > 1.6 * env[i - 1] + 50)
-        self.assertGreaterEqual(onsets(127) - onsets(0), 4)    # six claps: five more onsets than one
+        self.assertGreaterEqual(onsets(127) - onsets(0), 3)
 
     def test_hats_closed_shorter_than_open(self):
         tails = []
         for eng in (CHAT, OHAT, CYMB):
             e = emu()
-            x = play(e, 400, eng=eng)
-            tails.append(rms(x[9600:12800]))      # 200..267 ms
+            x = play(e, 1500, eng=eng)
+            tails.append(rms(x[9600:12000]))      # 200..250 ms
         self.assertLess(tails[0] * 10, tails[1])
         self.assertLess(tails[1], tails[2])
 
     def test_engine_change_starts_from_rest(self):
         e = emu()
         play(e, 30, eng=OHAT)
-        x = play(e, 5, trig=False, eng=KICK)      # no new trig: the new engine is silent
+        x = play(e, 5, trig=False, eng=KICK)      # no new trig: the new preset is silent
         self.assertFalse(x.any())
 
     def test_bounds_random(self):
@@ -161,6 +197,12 @@ class TSound(unittest.TestCase):
         b = play(e, 60, t=0, eng=SNARE)
         self.assertTrue(np.array_equal(a, b))
 
+    def test_goes_idle(self):
+        e = emu()
+        play(e, 1500, eng=CHAT)                   # long after the closed hat
+        n = e.count_instructions('lxr_fill', RET, stack=[0, STEP1, LX])
+        self.assertLess(n, 300)
+
 
 class TPage(unittest.TestCase):
     def _names(self, e):
@@ -173,10 +215,11 @@ class TPage(unittest.TestCase):
         e.uc.mem_write(0x4000eb90, bytes.fromhex('70004e75'))
         e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))
         e.w32(e.arr('trk_mach', 2), LX)
-        want = {KICK: ['Pitch Amt', 'Pitch Dec', 'FM Drive', 'Engine'],
+        want = {KICK: ['Pitch Amt', 'Pitch Dec', 'FM Amount', 'Engine'],
                 SNARE: ['Noise Mix', 'NoiseTone', 'Snap', 'Engine'],
                 CLAP: ['Spread', 'Tone', 'Claps', 'Engine'],
-                OHAT: ['Tune', 'Noise', 'Bright', 'Engine']}
+                OHAT: ['Tune', 'Metal', 'Bright', 'Engine'],
+                CYMB: ['Tune', 'Ring', 'Bright', 'Engine']}
         for eng, names in want.items():
             e.w16(TD + 28, contour(eng))
             e.run('lx_params', regs={D[2]: 2, A[2]: TD})
@@ -269,11 +312,13 @@ class TCost(unittest.TestCase):
             e = emu()
             dials(e, 0, eng, 127, 127, 127)
             e.w8(e.sym['dr_trig'], 1)
-            n = max(e.count_instructions('lxr_fill', RET, stack=[0, STEP1, LX]) for _ in range(3))
-            worst[NAMES[eng]] = n
+            first = e.count_instructions('lxr_fill', RET, stack=[0, STEP1, LX])     # its curves made
+            n = max(e.count_instructions('lxr_fill', RET, stack=[0, STEP1, LX]) for _ in range(6))
+            worst[NAMES[eng]] = (first, n)
         if os.environ.get('VA_TEST_VERBOSE'):
-            print("\n  lxr_fill instructions a block:", worst)
-        self.assertLess(max(worst.values()), 7200, worst)
+            print("\n  lxr_fill instructions a block (first, then):", worst)
+        self.assertLess(max(w[1] for w in worst.values()), 11000, worst)     # the hats are the heaviest
+        self.assertLess(max(w[0] for w in worst.values()), 12500, worst)
 
 
 if __name__ == '__main__':

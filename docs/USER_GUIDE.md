@@ -437,40 +437,54 @@ p-locks, slides, takes LFOs and is saved. Details: [DX.md](DX.md).
 
 ## LXR
 
-*Plaits Edition only.* The fourteenth machine: drum voices after the Erica
-Synths LXR-02 - a modified, fixed-point port of the drum voices of its
-GPL-3 firmware (not Erica Synths' firmware, not endorsed by them; licence
-in [src/lxr/NOTICE.md](../src/lxr/NOTICE.md)). One voice per track.
+*Plaits Edition only.* The fourteenth machine: the Erica Synths LXR-02's drum
+voices, ported from its GPL-3 firmware (a modified version: not Erica Synths'
+firmware, not endorsed by them; licence in
+[src/lxr/NOTICE.md](../src/lxr/NOTICE.md)). Its four voices are computed as
+the LXR computes them - same oscillators, envelopes, filter, distortion, at
+the LXR's own 44.14 kHz - and checked against the LXR's own code: see
+[LXR.md](LXR.md). One voice per track.
 
-**Contour** picks the engine. Its screen is PLAITS': the engine's picture
-on the left, a pip for each of the eight engines, and its name; the machine
-page shows the selected track's engine picture too.
+**Contour** picks the preset. Its screen is PLAITS': the preset's picture on
+the left, a pip for each of the eight, and its name; the machine page shows
+the selected track's picture too. The presets are the voices of the LXR's
+own init kit, the sound an LXR loads:
 
-| engine | what it is |
+| preset | the LXR voice |
 |---|---|
-| **KICK** | a sine with a pitch envelope and FM that follows it, a click, drive |
-| **TOM** | the same voice higher and rounder |
-| **PERC** | a square wave phase-modulated by a saw: metallic, woody percussion |
-| **SNAR** (snare) | a triangle with a snap plus band-passed sample-and-hold noise |
-| **CLAP** | band-passed noise in quick repeats, then a tail |
-| **CHAT** / **OHAT** (closed / open hat) | a square carrier modulated by a sine and by noise, high-passed; short / long |
-| **CYMB** (cymbal) | the same, tuned lower, with a long decay |
+| **KICK** | drum voice 1: a sine with a fast pitch drop |
+| **TOM** | drum voice 2: a sine with a slow pitch drop |
+| **PERC** | drum voice 3: a sine with a big, very fast pitch drop |
+| **SNAR** (snare) | the snare: a triangle with a pitch drop, plus sample-and-hold noise |
+| **CLAP** | the snare voice in its repeat mode: band-passed noise, four quick claps, a tail |
+| **CHAT** / **OHAT** (closed / open hat) | the hi-hat: a carrier phase-modulated by two oscillators, high-passed |
+| **CYMB** (cymbal) | the cymbal: a noise carrier through a high-pass, a long decay |
 
-**Color, Shape, Sweep** are three macros; their labels change with the engine:
+**Color, Shape, Sweep** move the preset's own LXR settings; at **64**
+(where they start) the preset is exactly the LXR's. Their labels change with
+the preset:
 
-| engines | Color | Shape | Sweep |
+| presets | Color | Shape | Sweep |
 |---|---|---|---|
-| KICK, TOM, PERC | **PAMT** pitch envelope amount (up to 5 octaves) | **PTIM** its time (4 ms to 0.4 s) | **FMDR** FM amount and drive |
-| SNAR | **NMIX** tone to noise | **NTON** the noise's rate and filter | **SNAP** the tone's pitch snap |
-| CLAP | **SPRD** time between the claps | **TONE** the noise's filter | **CLPS** how many claps, 1 to 6 |
-| CHAT, OHAT, CYMB | **TUNE** the metal's pitch | **NOIS** metal to noise | **BRIT** the high-pass, brighter up |
+| KICK, TOM, PERC | **PAMT** pitch drop amount | **PTIM** pitch drop time | **FMAM** FM amount |
+| SNAR | **NMIX** tone to noise | **NTON** the noise's rate | **SNAP** the tone's pitch drop |
+| CLAP | **SPRD** time between the claps | **TONE** the filter | **CLPS** how many claps |
+| CHAT, OHAT | **TUNE** the pitch, in semitones | **METL** the modulators: metallic | **BRIT** the filter: brighter up |
+| CYMB | **TUNE** the noise's rate | **RING** the filter's resonance | **BRIT** the filter |
 
-**Pitch** and the keyboard tune it (all engines follow the note).
+**Pitch** and the keyboard tune it (every preset follows the note).
 **Decay**, **Attack** (PRESET + Decay), **Filter** and **Resonance** (PRESET
-+ Sweep / Contour) are the ones every machine has: each engine has its own
-natural length (a closed hat is short, a cymbal long), and the track's Amp
-Decay comes after it - turn Decay up to hear the engine's full length, down
-to shorten it. Every knob p-locks, slides, takes LFOs and is saved.
++ Sweep / Contour) are the ones every machine has, after the LXR voice: each
+preset has its own natural length (a closed hat is short, a cymbal long), and
+the track's Amp Decay comes after it - turn Decay up to hear the preset's full
+length, down to shorten it. Every knob p-locks, slides, takes LFOs and is
+saved.
+
+Not ported: the LXR's sampled attack transients (their source recordings'
+terms are unclear; a kit using one plays without it, as an LXR missing the
+sample would), user samples as oscillator waves, its LFOs and velocity
+routing (the Cycles has its own), pan. Every other setting of an LXR voice is
+in the engine; a page to edit them all is next.
 
 ## Additions for every machine
 

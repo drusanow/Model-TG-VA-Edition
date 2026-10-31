@@ -735,6 +735,6 @@ dr_defaults:
     .word 80<<8, 64<<8, 16<<8, 48<<8   | HIHAT: TONE 80 SPRD 64 NOIS 16 SAT 48
     .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
     .word 64<<8, 64<<8, 64<<8, 0       | DX: BRIG, AENV, MENV at the voice's, VOIC 1
-    .word 40<<8, 48<<8, 32<<8, 0       | LXR: PAMT 40 PTIM 48 FMDR 32 ENG KICK
+    .word 64<<8, 64<<8, 64<<8, 8<<8    | LXR: the preset as it is (64), KICK (the middle of its 16)
     .include "drum_tables.inc"
     .align 2

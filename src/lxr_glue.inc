@@ -39,14 +39,19 @@ lx_eidx:
     movel   %d1,%d0
 2:  rts
 
-| d0 = an engine -> d0 = its label group: 0 drums, 1 snare, 2 clap, 3 metal
+| d0 = an engine -> d0 = its label group: 0 drums, 1 snare, 2 clap, 3 hats,
+| 4 cymbal
 lx_group:
     cmpil   #3,%d0                | (each branch right after its compare)
     bcss    1f
     beqs    2f
     cmpil   #4,%d0
     beqs    3f
-    moveq   #3,%d0                | 5..7: metal
+    cmpil   #7,%d0
+    beqs    4f
+    moveq   #3,%d0                | 5, 6: the hats
+    rts
+4:  moveq   #4,%d0                | 7: the cymbal
     rts
 1:  moveq   #0,%d0                | 0..2: drums
     rts
@@ -167,7 +172,8 @@ lx_labs:
     .long s_lxpa, s_lxpas, s_lxpt, s_lxpts, s_lxfm, s_lxfms       | drums
     .long s_lxnm, s_lxnms, s_lxnt, s_lxnts, s_lxsn, s_lxsns       | snare
     .long s_lxsp, s_lxsps, s_lxto, s_lxtos, s_lxcl, s_lxcls       | clap
-    .long s_lxtu, s_lxtus, s_lxno, s_lxnos, s_lxbr, s_lxbrs       | metal
+    .long s_lxtu, s_lxtus, s_lxno, s_lxnos, s_lxbr, s_lxbrs       | hats
+    .long s_lxtu, s_lxtus, s_lxrg, s_lxrgs, s_lxbr, s_lxbrs       | cymbal
 lx_engn:
     .long s_lxk, s_lxt, s_lxp, s_lxs, s_lxcp, s_lxch, s_lxoh, s_lxcy
 lx_icons:                         | tools/gen_lxr_icons.py
@@ -182,8 +188,8 @@ s_lxpa:  .asciz "Pitch Amt"
 s_lxpas: .asciz "PAMT"
 s_lxpt:  .asciz "Pitch Dec"
 s_lxpts: .asciz "PTIM"
-s_lxfm:  .asciz "FM Drive"
-s_lxfms: .asciz "FMDR"
+s_lxfm:  .asciz "FM Amount"
+s_lxfms: .asciz "FMAM"
 s_lxnm:  .asciz "Noise Mix"
 s_lxnms: .asciz "NMIX"
 s_lxnt:  .asciz "NoiseTone"
@@ -198,8 +204,10 @@ s_lxcl:  .asciz "Claps"
 s_lxcls: .asciz "CLPS"
 s_lxtu:  .asciz "Tune"
 s_lxtus: .asciz "TUNE"
-s_lxno:  .asciz "Noise"
-s_lxnos: .asciz "NOIS"
+s_lxno:  .asciz "Metal"
+s_lxnos: .asciz "METL"
+s_lxrg:  .asciz "Ring"
+s_lxrgs: .asciz "RING"
 s_lxbr:  .asciz "Bright"
 s_lxbrs: .asciz "BRIT"
 | the engines' names: four letters at most, as PLAITS' - they are drawn in

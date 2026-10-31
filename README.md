@@ -58,13 +58,13 @@ keeps working.
   shorter or longer), Sweep the feedback, SETTINGS + Shape the algorithm,
   and Contour
   picks the voice ([docs/DX.md](docs/DX.md)).
-- **LXR** (Plaits Edition), the fourteenth machine: drum voices after the
-  Erica Synths LXR-02 (a modified, fixed-point port of its GPL-3 firmware's
-  voices; not Erica Synths' firmware, nor endorsed by them). Contour picks
-  one of eight engines - KICK, TOM, PERC (FM drum voices with pitch and FM
-  envelopes), SNAR, CLAP, CHAT, OHAT, CYMB - and Color / Shape / Sweep
-  are three macros, labelled per engine; Attack, Filter, Resonance and Decay
-  are the ones every machine has ([USER_GUIDE](docs/USER_GUIDE.md#lxr)).
+- **LXR** (Plaits Edition), the fourteenth machine: the Erica Synths LXR-02's
+  drum voices, ported from its GPL-3 firmware (a modified version; not Erica
+  Synths' firmware, nor endorsed by them) and checked against the LXR's own
+  code. Contour picks one of eight presets - the voices of the LXR's init kit:
+  KICK, TOM, PERC, SNAR, CLAP, CHAT, OHAT, CYMB - and Color / Shape / Sweep
+  move their LXR settings; Attack, Filter, Resonance and Decay are the ones
+  every machine has ([USER_GUIDE](docs/USER_GUIDE.md#lxr), [LXR.md](docs/LXR.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale
