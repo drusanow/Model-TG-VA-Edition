@@ -22,6 +22,7 @@ LXR's four voices, as its firmware computes them:
 | `ResonantFilter.c` | the zero-delay-feedback state-variable filter (LP, HP, BP, unity BP, notch, peak, the naive 2-pole, off) with its input drive and soft clip |
 | `distortion.c` | the distortion curve |
 | `mixer.c` | the per-voice sample-rate decimator |
+| `transientGenerator.c`, `transientTables.c` | the twelve sampled attack transients, played from the trigger at their pitch (and the snap and offset modes) |
 
 **At the LXR's rate, in its blocks.** The voice runs at 44.14 kHz, the LXR's
 own rate: its oscillators alias as they do on an LXR (much of a metallic hat's
@@ -37,8 +38,14 @@ a coefficient is the LXR's own formula (`Decay.c`, `SlopeEg2.c`, `MidiParser.c`,
 `ResonantFilter.c`, `valueShaper.h`, ...), evaluated by `tools/gen_lxr.py` in
 the LXR's float or double arithmetic into `lxr_tables.h`.
 
-**The LXR's data.** Its wavetables (`lxr_wave.h`) and its init kit
-(`lxr_presets.h`) are imported from its sources by `tools/lxr_import.py`. The
+**The LXR's data.** Its wavetables (`lxr_wave.h`), its twelve sampled
+transients (`lxr_trans.h`) and its init kit (`lxr_presets.h`) are imported from
+its sources by `tools/lxr_import.py`. Erica Synths confirmed the transients are
+free or open source and free to use in LXR ports. They are, by the names in its
+source: js_expClick, js_click2, 4102__patchen__atik-2-10-stereoatik,
+82279__kevoy__acoustic-kick, altemark_rs03 rimshot, neotone_drip2, pj cohen
+pedal chic, Shiftr 808 clap, Mattel kick, md 16 17, md 16 36, md 16 81
+(transient waves 2 to 13). The
 sine is the stock OS's table in the Cycles' SRAM (see
 [DX.md](DX.md)), read as the LXR's: its `sine_table` is in fact a negative
 cosine, which `lxr.c` keeps.
@@ -94,21 +101,30 @@ At 48 kHz, as on the Cycles, against the LXR:
 | CHAT, OHAT | 1.5 dB | within 2 dB; their energy is mostly 16..22 kHz, the top of the LXR's band, which 44.14 -> 48 kHz trims |
 | CYMB | 0.6 dB | within 2 dB (4.4 dB in its 50..200 Hz band, under 1/2000 of its energy) |
 
+With its sampled transients on (the reference holds five: the kick with the
+acoustic kick, the tom with js_expClick, the snare with the 808 clap, the closed
+hat with the pedal chick, the kick in offset mode): at the LXR's rate the tonal
+ones match its code to -46 dB, the hat to -26 dB; at 48 kHz their envelopes and
+spectra are checked as above.
+
 Not checked against the LXR (the reference is its init kit as it is): settings
 the macros reach, and the knobs the presets leave at the LXR's defaults - the
 same code computes them, through the same curves.
 
-**Not ported:** the sampled attack transients (their source recordings' terms
-are unclear: a kit asking for one plays without it, as an LXR whose sample is
-missing), user samples as oscillator waves (silent likewise), the LFOs and the
-velocity routing (the Cycles has its own), pan.
+**Not ported:** user samples as oscillator waves (silent, as an LXR without
+them), the LFOs and the velocity routing (the Cycles has its own), pan.
 
 ## CPU
 
-`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 8,300 to
-10,700 instructions a block (the hats the most: three oscillators and the
+`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 7,400 to
+8,700 instructions a block (the hats the most: three oscillators and the
 filter), against a stock voice's ~7,600; its first block after a change of
-preset or of the distortion knob ~1,300 more. A silent LXR track costs nothing.
+preset or of the distortion knob ~3,500 more (its distortion curve and tuning
+made). A silent LXR track costs nothing. Made cheaper without changing a sample:
+the filter's output chosen once a block rather than every sample, the
+oscillators' FM test out of their loops, the distortion a branch-free table, the
+oscillators' tuning cached (its multiplications only when a note or knob
+changes).
 
 ## Files
 
@@ -116,6 +132,6 @@ preset or of the distortion knob ~1,300 more. A silent LXR track costs nothing.
 |---|---|
 | `src/lxr/lxr.c` | the port (GPL-3.0-only) |
 | `src/lxr/lxr_tables.h`, `lxr_gen.s` | written by `tools/gen_lxr.py`: the curves; the ColdFire assembly |
-| `src/lxr/lxr_wave.h`, `lxr_presets.h` | imported by `tools/lxr_import.py` from the LXR's sources |
+| `src/lxr/lxr_wave.h`, `lxr_trans.h`, `lxr_presets.h` | imported by `tools/lxr_import.py` from the LXR's sources |
 | `src/lxr_glue.inc` | the machine's glue: labels, names, pictures, the Contour screen (MIT) |
 | `tools/lxr_ref/`, `tools/lxr_reference.py` | the reference renderer, and `tests/data/lxr_ref.json` |

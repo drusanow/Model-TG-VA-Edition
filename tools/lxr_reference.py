@@ -23,7 +23,14 @@ DSP = ['DrumVoice', 'Decay', 'SlopeEg2', 'snapEg', 'transientGenerator', 'transi
        'distortion', 'BufferTools', 'random', '1PoleLp', 'dither', 'squareRootLut', 'wavetable', 'Snare', 'HiHat',
        'CymbalVoice', 'Samples', 'lfo', 'TiltEq']
 VOICES = [('KICK', 0), ('TOM', 1), ('PERC', 2), ('SNAR', 3), ('CHAT', 5), ('OHAT', 6), ('CYMB', 4)]
-TONAL = ('KICK', 'TOM', 'PERC', 'SNAR')
+# and with its sampled transients (and the offset mode): name, voice, its LXR parameters (number=value), the same
+# as lxr.c's knobs (P_TWAVE, P_TVOL, P_TFREQ: 27, 28, 29) for the preset
+VARIANTS = [('KICK+kick', 0, {203: 5, 197: 100, 209: 40}, {27: 5, 28: 100, 29: 40}),     # 82279 kevoy acoustic kick
+            ('KICK+offset', 0, {203: 1, 197: 60}, {27: 1, 28: 60}),
+            ('SNAR+clap', 3, {206: 9, 200: 127, 212: 34}, {27: 9, 28: 127, 29: 34}),     # Shiftr 808 clap
+            ('CHAT+chick', 5, {208: 8, 202: 90, 214: 60}, {27: 8, 28: 90, 29: 60}),      # pj cohen pedal chic
+            ('TOM+click', 1, {204: 2, 198: 110, 210: 20}, {27: 2, 28: 110, 29: 20})]      # js_expClick
+TONAL = ('KICK', 'TOM', 'PERC', 'SNAR', 'KICK+kick', 'KICK+offset', 'TOM+click')
 BANDS = [(50, 200), (200, 500), (500, 1000), (1000, 2000), (2000, 4000), (4000, 8000), (8000, 16000)]
 FS = 44140
 
@@ -80,7 +87,7 @@ def build(lxr, tmp):
 def main():
     lxr = sys.argv[1]
     wavdir = sys.argv[sys.argv.index('--wav') + 1] if '--wav' in sys.argv else None
-    ref = {'fs': FS, 'bands': BANDS, 'voices': {}}
+    ref = {'fs': FS, 'bands': BANDS, 'voices': {}, 'variants': {}}
     with tempfile.TemporaryDirectory() as tmp:
         exe = build(lxr, tmp)
         for name, v in VOICES:
@@ -92,6 +99,16 @@ def main():
             if name not in TONAL:
                 del m['f0']
             ref['voices'][name] = m
+        for name, v, pars, knobs in VARIANTS:
+            f = os.path.join(wavdir or tmp, f'lxr_{name}.wav')
+            subprocess.run([exe, str(v), f, '1.0'] + [f'{k}={x}' for k, x in pars.items()], check=True)
+            w = wave.open(f)
+            x = np.frombuffer(w.readframes(w.getnframes()), '<i2').astype(float)
+            m = features(x, FS)
+            if name not in TONAL:
+                del m['f0']
+            m['knobs'] = knobs
+            ref['variants'][name] = m
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(ref, open(OUT, 'w'), indent=1)
     print('wrote tests/data/lxr_ref.json')

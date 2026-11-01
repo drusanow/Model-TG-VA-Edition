@@ -480,11 +480,10 @@ the track's Amp Decay comes after it - turn Decay up to hear the preset's full
 length, down to shorten it. Every knob p-locks, slides, takes LFOs and is
 saved.
 
-Not ported: the LXR's sampled attack transients (their source recordings'
-terms are unclear; a kit using one plays without it, as an LXR missing the
-sample would), user samples as oscillator waves, its LFOs and velocity
-routing (the Cycles has its own), pan. Every other setting of an LXR voice is
-in the engine; a page to edit them all is next.
+Its twelve sampled attack transients are in (the init kit's presets use the
+snap instead, as on an LXR). Not ported: user samples as oscillator waves,
+its LFOs and velocity routing (the Cycles has its own), pan. Every other
+setting of an LXR voice is in the engine; a page to edit them all is next.
 
 ## Additions for every machine
 

@@ -61,6 +61,8 @@ def lxr_curves():
     # snapEg.c: falls by SNAP_REDUCTION (0.2) x the transient's pitch a block; pitch = 1 + (x / 33.9 - 0.75)
     pitch = (F(1) + ((d / F(33.9)).astype(F) - F(0.75))).astype(F)
     c['snap'] = (F(0.2) * pitch).astype(F)
+    # transientGenerator.c: the sample's step, pitch x (1 << 20), added to its uint32 phase
+    c['tpitch'] = (pitch * F(1 << 20)).astype(F)
     # the filter: valueShaperF2F(x / 127, FILTER_SHAPER = -0.9), f = x 0.45, g = fastTan(pi f); reso: q = 1 - x / 127
     # (under 0.1: 0.02); SVF_setDrive: 0.4 + x^2 x 6
     k = F(2 * -0.9 / (1.0001 - -0.9))
@@ -102,7 +104,7 @@ def tables():
         'psl': (32768, 's32'), 'vsl': (32768, 's32'), 'pamt': (4096, 's32'),
         'freq': (256, 'u32'), 'det': (65536, 'u32'), 'snap': (1 << 24, 'u32'),
         'ff': (65536, 's32'), 'fg': (4096, 's32'), 'fq': (4096, 's32'), 'fdrv': (4096, 's32'),
-        'flp2': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32')}
+        'flp2': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32'), 'tpitch': (1, 'u32')}
     t = [HEAD, '/* the LXR-02\'s knob curves (tools/gen_lxr.py: lxr_curves) and its filter\'s shapers, fixed point */\n']
     for name, (scale, typ) in fix.items():
         vals = [int(round(float(v) * scale)) for v in c[name]]

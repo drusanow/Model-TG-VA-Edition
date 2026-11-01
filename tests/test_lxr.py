@@ -105,6 +105,34 @@ class TReference(unittest.TestCase):
                 if r > -30:
                     self.assertLess(abs(g - r), 3.0, (name, REF['bands'][i], g, r))
 
+    def test_sampled_transients(self):
+        """the LXR's sampled transients (and its offset mode), switched on in a preset: as the LXR plays them"""
+        for name, ref in REF['variants'].items():
+            e = emu()
+            base = NAMES.index(name.split('+')[0])
+            at = e.sym['lx_presets'] + base * 31
+            for k, val in ref['knobs'].items():
+                e.w8(at + int(k), val)
+            from lxr_reference import features
+            g = features(play(e, 1500, eng=base), 48000)
+            r = np.array(ref['env'])                # over its top 40 dB (a hat's far tail is its top partials)
+            d = np.abs(np.array(g['env']) - r)[r > r.max() - 40]
+            self.assertLess(np.median(d), 2.0 if name.startswith('CHAT') else 0.8, name)
+            self.assertLess(d.max(), 3.5, name)
+            for i, (gb, rb) in enumerate(zip(g['bands'], ref['bands'])):
+                if rb > -30:
+                    self.assertLess(abs(gb - rb), 3.0, (name, REF['bands'][i], gb, rb))
+            if 'f0' in ref:
+                self.assertAlmostEqual(g['f0'][0] / ref['f0'][0], 1.0, delta=0.03, msg=name)
+
+    def test_transients_change_the_sound(self):
+        e = emu()
+        plain = play(e, 100, eng=KICK)
+        e = emu()
+        at = e.sym['lx_presets'] + KICK * 31
+        e.w8(at + 27, 5); e.w8(at + 28, 100); e.w8(at + 29, 40)
+        self.assertGreater(rms(play(e, 100, eng=KICK) - plain), 300)
+
     def test_pitch(self):
         for name, ref in REF['voices'].items():
             for g, r in zip(self.got[name].get('f0', []), ref.get('f0', [])):
@@ -317,7 +345,7 @@ class TCost(unittest.TestCase):
             worst[NAMES[eng]] = (first, n)
         if os.environ.get('VA_TEST_VERBOSE'):
             print("\n  lxr_fill instructions a block (first, then):", worst)
-        self.assertLess(max(w[1] for w in worst.values()), 11000, worst)     # the hats are the heaviest
+        self.assertLess(max(w[1] for w in worst.values()), 9000, worst)      # the hats are the heaviest
         self.assertLess(max(w[0] for w in worst.values()), 12500, worst)
 
 

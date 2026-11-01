@@ -3,6 +3,8 @@
 """Imports, once, the data LXR (machine 13, src/lxr/, GPL-3.0-only) takes from the Erica Synths LXR-02 firmware
 (https://github.com/erica-synths/lxr-desktop-app, GPL-3.0-only) into src/lxr/:
 
+  lxr_trans.h    its twelve sampled attack transients (transientTables.c: transientData, 12 x 2205 signed 8-bit
+                 samples, as it plays them), with their names; Erica Synths: free to use in LXR ports
   lxr_wave.h     its band-limited triangle, saw and square wavetables (Core/Src/Soundengine/DSPAudio/wavetable.c:
                  triTable, sawTable, recTable, 11 octaves of 1024 samples), as they are
   lxr_presets.h  the six voices of its init kit (Core/Src/Preset/initKit.c, "from hrtlkits_batch3"), as the raw
@@ -123,6 +125,20 @@ def tables(lxr):
     return out
 
 
+def transients(lxr):
+    """transientTables.c's transientData: (name, 2205 samples) x 12, its comments naming them"""
+    s = open(os.path.join(lxr, 'Core', 'Src', 'Soundengine', 'DSPAudio', 'transientTables.c')).read()
+    body = s[s.index('transientData[NUM_TRANSIENTS][TRANSIENT_SAMPLE_LENGTH]'):]
+    body = body[body.index('{') + 1:]
+    out = []
+    for m in re.finditer(r'//\s*([^\n]+)\n\s*\{([^}]*)\}', body):
+        vals = [int(x, 16) for x in re.findall(r'0x([0-9A-Fa-f]{2})', m.group(2))]
+        vals = [v - 256 if v > 127 else v for v in vals]
+        out.append((m.group(1).strip(), vals + [0] * (2205 - len(vals))))   # (C zero-fills a short one: the last)
+    assert len(out) == 12 and all(len(v) == 2205 for _, v in out), [(n, len(v)) for n, v in out]
+    return out
+
+
 def main():
     lxr = sys.argv[1]
     num, kit = par_numbers(lxr), init_kit(lxr)
@@ -137,6 +153,14 @@ def main():
         w.append(' },\n')
     w.append('};\n')
     open(os.path.join(D, 'lxr_wave.h'), 'w').write(''.join(w))
+    tr = transients(lxr)
+    t = [HEAD, '/* transientData: the twelve sampled attack transients, signed 8-bit, 2205 samples each, played from the\n'
+         ' * trigger at their pitch (transient wave 2..13). Erica Synths: free or open source, free to use in LXR ports. */\n',
+         'static const signed char lx_trans[12][2205] __attribute__((section(".lxr_ro"))) = {\n']
+    for name, v in tr:
+        t.append('  /* %s */ {%s},\n' % (name.replace('*/', ''), ','.join(map(str, v))))
+    t.append('};\n')
+    open(os.path.join(D, 'lxr_trans.h'), 'w').write(''.join(t))
     p = [HEAD, '/* the presets: the init kit\'s voices ("from hrtlkits_batch3"), knob values 0..127, in P_* order */\n',
          '#define N_PRESETS %d\n' % len(PRESETS),
          'static const u8 lx_presets[N_PRESETS][N_P] __attribute__((section(".lxr_ro"))) = {\n']
@@ -154,7 +178,7 @@ def main():
     p.append('static const u8 lx_open[N_PRESETS] __attribute__((section(".lxr_ro"))) = {%s};\n'
              % ', '.join('1' if name == 'OHAT' else '0' for name, _, _, _ in PRESETS))
     open(os.path.join(D, 'lxr_presets.h'), 'w').write(''.join(p))
-    print('wrote src/lxr/lxr_wave.h, src/lxr/lxr_presets.h')
+    print('wrote src/lxr/lxr_wave.h, src/lxr/lxr_trans.h, src/lxr/lxr_presets.h')
 
 
 if __name__ == '__main__':

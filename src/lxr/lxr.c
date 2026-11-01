@@ -21,10 +21,10 @@
  * 2-pole, off) with its input drive, distortion, volume and sample-rate decimation. A voice's sound is the LXR's
  * knob values for it (P_*, 0..127, as an LXR kit stores them); every curve that turns a knob into a coefficient is
  * the LXR's own, evaluated by tools/gen_lxr.py into lxr_tables.h. The wavetables are the LXR's (lxr_wave.h); the sine
- * is the stock OS's in the SRAM, interpolated. The presets are the LXR's init kit (lxr_presets.h).
- * Not ported: the sampled transients (their source recordings carry their own terms - a kit asking for one plays
- * without it, as an LXR whose sample is missing), user samples as oscillator waves (silent likewise), the LFOs and
- * velocity routing (the Cycles has its own), pan.
+ * is the stock OS's in the SRAM, interpolated. Its twelve sampled attack transients are the LXR's (lxr_trans.h; Erica
+ * Synths: free to use in LXR ports). The presets are the LXR's init kit (lxr_presets.h).
+ * Not ported: user samples as oscillator waves (silent, as an LXR without them), the LFOs and velocity routing (the
+ * Cycles has its own), pan.
  *
  * Contract (as dx_fill / mi_fill): lxr_params(track, trackData) once a block, before lxr_fill(track, step, machine),
  * which writes 64 values at sampler_buf+32 (96 kHz, each 48 kHz sample twice, a sample << 15) and reads and clears
@@ -70,6 +70,7 @@ enum { EG_STOP, EG_A, EG_D, EG_REP };
 #include "lxr_tables.h"
 #include "lxr_wave.h"
 #include "lxr_presets.h"
+#include "lxr_trans.h"
 
 #ifdef LX_HOST
 extern unsigned char dr_trig[8];
@@ -88,6 +89,8 @@ extern s32 sampler_buf[];
 typedef struct {
 	u32 phase, inc;
 	s32 wave, band, out;
+	u32 base, kstep, kmod;                  /* osc_tune's cache: the increment before modulation, its inputs */
+	s32 knote;
 } Osc;
 
 typedef struct {
@@ -112,9 +115,10 @@ typedef struct {
 	s16 hist[4];                            /* the last four samples of the block before */
 	s32 bpos;                               /* the place in the LXR's block, 0..63 */
 	s32 vol, cv, fa, pe, inst;              /* this LXR block's control values */
+	u32 tphase;                             /* the sampled transient's place: 2204 << 20 at its end */
 	s32 cooked;                             /* the dials and preset p[] was made from; -1: none */
 	s32 dknob;                              /* the distortion knob dcurve was made for; -1: none */
-	s16 dcurve[65];
+	s16 dcurve[130];
 } Voice;
 
 static Voice v_[6] OVL;
@@ -211,22 +215,22 @@ static void osc_block(Osc *o, s16 *buf, s32 n, s32 gain, const s16 *mod, s32 fm,
 	s32 i;
 	u32 ph = o->phase, inc = o->inc;
 	switch (o->wave) {
-	case W_SINE:
-		for (i = 0; i < n; i++, ph += inc) {
-			u32 p = ph;
-			if (mod)
-				p += pmod(mod[i], fm) << 17;
-			buf[i] = (s16)((sin_at(p) * gain) >> 15);
-		}
+	case W_SINE:                            /* (the loops for FM and without, apart: cheaper) */
+		if (mod)
+			for (i = 0; i < n; i++, ph += inc)
+				buf[i] = (s16)((sin_at(ph + (pmod(mod[i], fm) << 17)) * gain) >> 15);
+		else
+			for (i = 0; i < n; i++, ph += inc)
+				buf[i] = (s16)((sin_at(ph) * gain) >> 15);
 		break;
 	case W_TRI: case W_SAW: case W_REC: {
 		const s16 *t = lx_wav[o->wave - W_TRI][o->band];
-		for (i = 0; i < n; i++, ph += inc) {
-			u32 p = ph;
-			if (mod)
-				p += pmod(mod[i], fm) << 19;
-			buf[i] = (s16)((tab_at(t, p) * gain) >> 15);
-		}
+		if (mod)
+			for (i = 0; i < n; i++, ph += inc)
+				buf[i] = (s16)((tab_at(t, ph + (pmod(mod[i], fm) << 19)) * gain) >> 15);
+		else
+			for (i = 0; i < n; i++, ph += inc)
+				buf[i] = (s16)((tab_at(t, ph) * gain) >> 15);
 		break;
 	}
 	case W_NOISE:                           /* calcNoiseBlock: a new random value at each wrap */
@@ -261,11 +265,20 @@ static void osc_block(Osc *o, s16 *buf, s32 n, s32 gain, const s16 *mod, s32 fm,
 /* a frequency (the LXR's note table x its detune x our note x a modulation, Q12) -> the increment and band */
 static void osc_tune(Osc *o, s32 coarse, s32 fine, u32 step, u32 mod_q12)
 {
-	u32 inc = mulshr(lx_freq[coarse], KF, 16);
-	inc = mulshr(inc, lx_det[fine], 16);
-	inc = mulshr(inc, step, 16);
-	o->inc = mulshr(inc, mod_q12, 12);
-	o->band = band_of(o->inc);
+	s32 note = coarse | fine << 8;
+	if (note != o->knote || step != o->kstep) {     /* (cached: these change rarely) */
+		u32 inc = mulshr(lx_freq[coarse], KF, 16);
+		inc = mulshr(inc, lx_det[fine], 16);
+		o->base = mulshr(inc, step, 16);
+		o->knote = note;
+		o->kstep = step;
+		o->kmod = 0;
+	}
+	if (mod_q12 != o->kmod) {
+		o->inc = mod_q12 == 4096 ? o->base : mulshr(o->base, mod_q12, 12);
+		o->band = band_of(o->inc);
+		o->kmod = mod_q12;
+	}
 }
 
 /* the LXR's trigger phase: a sine starts a quarter turn in, a table wave just under, the rest at 0; offset mode
@@ -336,53 +349,50 @@ static void svf_block(Svf *s, s32 type, s32 freq, s32 reso, s32 drive, s16 *buf,
 		s32 den = (1 << 24) / (f1 + 4096);                     /* 1 / (f1 + 1) */
 		s32 gg0 = (g * g0) >> 12, g2 = 2 * g, r2 = 2 * R;
 		s32 s1 = s->s1, s2 = s->s2;
-		for (i = 0; i < n; i++) {
-			s32 x = softclip((buf[i] * drv) >> 15);
-			s32 y1 = ((((f1 * x) >> 12) + s2 + ((gg0 * s1) >> 12)) * den) >> 12;
-			s32 xx = clampq(x - y1, 65535);
-			s32 sc = softclip(s1);
-			s32 y0 = ((sc + ((g * xx) >> 12)) * g0) >> 12;
-			s32 ugb = (r2 * y0) >> 12;                         /* 2 R y0 */
-			s32 out;
-			s1 = clampq(sc + ((g2 * (xx - ugb)) >> 12), 32767);
-			s2 = clampq(s2 + ((g2 * y0) >> 12), 32767);
-			if (type == F_LP)
-				out = ftanh(y1);
-			else if (type == F_BP)
-				out = y0 * 8;
-			else if (type == F_HP)
-				out = (x - ugb - y1) * 8;
-			else if (type == F_UBP)
-				out = ugb * 8;
-			else if (type == F_NOTCH)
-				out = (x - ugb) * 8;
-			else                                /* F_PEAK: y1 - h */
-				out = (y1 - (x - ugb - y1)) * 8;
-			buf[i] = (s16)sat16(out);
+		/* one loop per output (cheaper than choosing it every sample) */
+#define SVF_LOOP(OUT)                                                                    \
+		for (i = 0; i < n; i++) {                                                \
+			s32 x = softclip((buf[i] * drv) >> 15);                          \
+			s32 y1 = ((((f1 * x) >> 12) + s2 + ((gg0 * s1) >> 12)) * den) >> 12; \
+			s32 xx = x - y1;                                                 \
+			s32 sc = softclip(s1);                                           \
+			s32 y0 = ((sc + ((g * xx) >> 12)) * g0) >> 12;                   \
+			s32 ugb = (r2 * y0) >> 12;              /* 2 R y0 */             \
+			s1 = clampq(sc + ((g2 * (xx - ugb)) >> 12), 32767);              \
+			s2 = clampq(s2 + ((g2 * y0) >> 12), 32767);                      \
+			(void)ugb;                                                       \
+			buf[i] = (s16)sat16(OUT);                                        \
 		}
+		switch (type) {
+		case F_LP: SVF_LOOP(ftanh(y1)); break;
+		case F_HP: SVF_LOOP((x - ugb - y1) * 8); break;
+		case F_BP: SVF_LOOP(y0 * 8); break;
+		case F_UBP: SVF_LOOP(ugb * 8); break;
+		case F_NOTCH: SVF_LOOP((x - ugb) * 8); break;
+		default: SVF_LOOP((y1 - (x - ugb - y1)) * 8); break;       /* F_PEAK: y1 - h */
+		}
+#undef SVF_LOOP
 		s->s1 = s1;
 		s->s2 = s2;
 	}
 }
 
 /* ---- the distortion: (1+k) x / (1+k|x|), k = 2a / (1-a), a = the knob - 1/128 ------------------------------ */
-/* its curve, 64 steps over 0..1, rebuilt when the knob moves: a sample is then an interpolation, not a division */
+/* its curve, 128 steps over -1..1, rebuilt when the knob moves: a sample is then an interpolation, not a division */
 static void dist_curve(s16 *t, s32 d)
 {
 	s32 i, a = lx_dist[d];
-	for (i = 0; i <= 64; i++)
-		t[i] = (s16)sat16(slope(i * 512, a));
+	for (i = 0; i <= 128; i++)
+		t[i] = (s16)sat16(slope(i * 512 - 32768, a));
 }
 
-static inline s32 dist(const s16 *t, s32 x)
+static inline s32 dist(const s16 *t, s32 x)     /* x: a 16-bit sample */
 {
-	s32 neg = x < 0, i, fr, y;
-	if (neg)
-		x = -x;
+	s32 i, fr;
+	x += 32768;
 	i = x >> 9;
 	fr = x & 511;
-	y = i >= 64 ? t[64] : t[i] + (((t[i + 1] - t[i]) * fr) >> 9);
-	return neg ? -y : y;
+	return t[i] + (((t[i + 1] - t[i]) * fr) >> 9);
 }
 
 /* ---- envelopes ---------------------------------------------------------------------------------------------- */
@@ -527,9 +537,34 @@ static inline s32 q15(s32 knob127)              /* a knob as the LXR's value.flt
 	return (knob127 * 32768 + 63) / 127;
 }
 
+/* the transient's kind: 0 the snap EG, 1 the phase offset, 2..13 a sample (transient_setWaveform: past 13, 0) */
+static inline s32 twave(const Voice *v)
+{
+	return v->p[P_TWAVE] < 14 ? v->p[P_TWAVE] : 0;
+}
+
+#define T_END 2311061504u                       /* 2204 << 20 */
+
+/* transient_calcBlock: the sample from the trigger at its pitch, x its volume, added to buf (saturating); none for
+ * the snap and the offset, nor once it has ended */
+static void trans_add(Voice *v, s16 *buf, s32 n)
+{
+	s32 i, w = twave(v), vol;
+	const signed char *t;
+	u32 ph = v->tphase, inc;
+	if (w < 2 || ph >= T_END)
+		return;
+	t = lx_trans[w - 2];
+	vol = q15(v->p[P_TVOL]);
+	inc = lx_tpitch[v->p[P_TFREQ]];
+	for (i = 0; i < n && ph < T_END; i++, ph += inc)
+		buf[i] = (s16)sat16(buf[i] + ((vol * (t[ph >> 20] * 256)) >> 15));
+	v->tphase = ph < T_END ? ph : T_END;
+}
+
 static void trigger(Voice *v, s32 kind)
 {
-	s32 off = v->p[P_TWAVE] == 1 ? 32768 - q15(v->p[P_TVOL]) : 32768;
+	s32 off = twave(v) == 1 ? 32768 - q15(v->p[P_TVOL]) : 32768;
 	v->osc.phase = start_phase(v->osc.wave = v->p[P_WAVE], off);
 	if (kind == K_DRUM) {
 		v->mod.phase = start_phase(v->mod.wave = v->p[P_WAVE2], 32768);
@@ -542,6 +577,7 @@ static void trigger(Voice *v, s32 kind)
 	}
 	vol_trigger(v);
 	v->snap = 1 << 24;
+	v->tphase = 0;
 }
 
 /* ---- once an LXR block (calc...Async): the envelopes, the tuning, the gains -------------------------------- */
@@ -555,7 +591,7 @@ static void control(Voice *v, s32 kind, u32 step)
 		v->pe = pitch_calc(v);
 		pm += (v->pe * (lx_pamt[v->p[P_PAMT]] >> 3)) >> 12;     /* (Q15 x Q9: no overflow at x32) */
 	}
-	if (v->p[P_TWAVE] == 0)
+	if (twave(v) == 0)
 		pm += (snap_calc(v) * q15(v->p[P_TVOL])) >> 15;
 	v->osc.wave = v->p[P_WAVE];
 	osc_tune(&v->osc, v->p[P_COARSE], v->p[P_FINE], step, (u32)pm);
@@ -598,6 +634,7 @@ static void render(Voice *v, s32 kind, s16 *buf, s32 n, s32 b)
 				buf[i] = (s16)sat16(buf[i] + mb[i]);
 		} else                              /* FM: by amount x the pitch EG */
 			osc_block(&v->osc, buf, n, 32768, mb, (v->fa * v->pe) >> 15, pwm, &v->seed);
+		trans_add(v, buf, n);
 		svf_block(&v->f, v->p[P_FTYPE] + 1, v->p[P_FFREQ], v->p[P_FRESO], v->p[P_FDRIVE], buf, n);
 		{                                   /* the gain, ramped over the LXR's block (addGainInterpolated),
 		                                     * Q22; the distortion; the volume */
@@ -614,7 +651,10 @@ static void render(Voice *v, s32 kind, s16 *buf, s32 n, s32 b)
 		svf_block(&v->f, v->p[P_FTYPE] + 1, v->p[P_FFREQ], v->p[P_FRESO], v->p[P_FDRIVE], mb, n);
 		osc_block(&v->osc, buf, n, 32768 - mix, 0, 0, pwm, &v->seed);
 		for (i = 0; i < n; i++)
-			buf[i] = (s16)dist(v->dcurve, (s16)sat16((((((mb[i] * mix) >> 15) + buf[i]) * v->cv) >> 15)));
+			mb2[i] = 0;
+		trans_add(v, mb2, n);                   /* transBuf: summed with the tone and noise unclipped */
+		for (i = 0; i < n; i++)
+			buf[i] = (s16)dist(v->dcurve, (s16)sat16(((((mb[i] * mix) >> 15) + buf[i] + mb2[i]) * v->cv) >> 15));
 	} else {                                /* the cymbal and the hat */
 		osc_block(&v->mod, mb, n, q15(v->p[P_GAIN1]), 0, 0, pwm, &v->seed);
 		osc_block(&v->mod2, mb2, n, q15(v->p[P_GAIN2]), 0, 0, pwm, &v->seed);
@@ -622,6 +662,7 @@ static void render(Voice *v, s32 kind, s16 *buf, s32 n, s32 b)
 			mb[i] = (s16)sat16(mb[i] + mb2[i]);
 		osc_block(&v->osc, buf, n, kind == K_HAT ? 16384 : 32768, mb, 32768, pwm, &v->seed);
 		svf_block(&v->f, v->p[P_FTYPE] + 1, v->p[P_FFREQ], v->p[P_FRESO], v->p[P_FDRIVE], buf, n);
+		trans_add(v, buf, n);
 		for (i = 0; i < n; i++)
 			buf[i] = (s16)dist(v->dcurve, (buf[i] * v->cv) >> 15);
 	}
@@ -667,6 +708,7 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 		v->bpos = 0;
 		v->seed = 0x2545f491u * (u32)(track + 1);
 		v->cooked = v->dknob = -1;
+		v->osc.knote = v->mod.knote = v->mod2.knote = -1;
 	}
 	{
 		s32 key = pr | (v->dial[0] >> 8) << 4 | (v->dial[1] >> 8) << 11 | (v->dial[2] >> 8) << 18;

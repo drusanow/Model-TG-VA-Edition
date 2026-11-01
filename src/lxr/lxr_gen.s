@@ -66,458 +66,179 @@ mulshr:
 	.align	2
 	.type	osc_tune, @function
 osc_tune:
-	lea (-20,%sp),%sp
-	movem.l #3100,(%sp)
+	lea (-24,%sp),%sp
+	movem.l #3132,(%sp)
+	move.l 36(%sp),%d5
+	move.l %d5,%d2
+	lsl.l #8,%d2
+	move.l 32(%sp),%d0
+	move.l 28(%sp),%a2
+	move.l 40(%sp),%d4
+	move.l 44(%sp),%d3
+	or.l %d0,%d2
+	cmp.l 32(%a2),%d2
+	jeq .L24
+.L7:
 	pea 16.w
-	moveq #16,%d2
 	move.l #24909643,-(%sp)
-	moveq #12,%d3
-	move.l 36(%sp),%d0
-	move.l 32(%sp),%a3
 	lea lx_freq,%a0
+	lea mulshr,%a3
 	move.l (%a0,%d0.l*4),-(%sp)
-	lea mulshr,%a2
-	jsr (%a2)
+	jsr (%a3)
 	addq.l #8,%sp
 	moveq #16,%d1
 	move.l %d1,(%sp)
-	move.l 36(%sp),%d1
 	lea lx_det,%a0
-	move.l (%a0,%d1.l*4),-(%sp)
+	move.l (%a0,%d5.l*4),-(%sp)
 	move.l %d0,-(%sp)
-	jsr (%a2)
+	moveq #16,%d5
+	jsr (%a3)
 	addq.l #8,%sp
-	move.l %d2,(%sp)
-	move.l 40(%sp),-(%sp)
+	move.l %d5,(%sp)
+	move.l %d4,-(%sp)
 	move.l %d0,-(%sp)
-	jsr (%a2)
-	addq.l #8,%sp
-	move.l %d3,(%sp)
-	move.l 44(%sp),-(%sp)
-	move.l %d0,-(%sp)
-	jsr (%a2)
+	jsr (%a3)
 	lea (12,%sp),%sp
-	move.l %d0,4(%a3)
+	move.l %d2,32(%a2)
+	move.l %d4,24(%a2)
+	clr.l %d1
+	move.l %d0,20(%a2)
+	clr.l 28(%a2)
+.L8:
+	cmp.l %d3,%d1
+	jeq .L6
+	move.l 20(%a2),%d0
+	cmp.l #4096,%d3
+	jeq .L10
+	pea 12.w
+	move.l %d3,-(%sp)
+	move.l %d0,-(%sp)
+	jsr mulshr
+	lea (12,%sp),%sp
+.L10:
+	move.l %d0,4(%a2)
 	cmp.l #42813447,%d0
-	jls .L9
+	jls .L13
 	cmp.l #85626895,%d0
-	jls .L10
+	jls .L14
 	move.l #85626896,%d2
 	moveq #5,%d1
-	move.l %d2,%d3
-	addq.l #1,%d1
-	add.l %d3,%d3
-	moveq #10,%d4
-	cmp.l %d1,%d4
-	jeq .L7
-.L17:
-	cmp.l %d0,%d3
-	jhi .L7
-	tst.l %d2
-	jlt .L7
-	move.l %d3,%d2
-	move.l %d2,%d3
-	add.l %d3,%d3
-	addq.l #1,%d1
-	moveq #10,%d4
-	cmp.l %d1,%d4
-	jne .L17
-.L7:
-	move.l %d1,12(%a3)
-	movem.l (%sp),#3100
-	lea (20,%sp),%sp
-	rts
-.L9:
-	moveq #4,%d1
-	move.l %d1,12(%a3)
-	movem.l (%sp),#3100
-	lea (20,%sp),%sp
-	rts
-.L10:
-	moveq #5,%d1
-	move.l %d1,12(%a3)
-	movem.l (%sp),#3100
-	lea (20,%sp),%sp
-	rts
-	.size	osc_tune, .-osc_tune
-	.align	2
-	.type	svf_block, @function
-svf_block:
-	lea (-72,%sp),%sp
-	move.l 84(%sp),%d1
-	move.l #4096,%d0
-	movem.l #31996,(%sp)
-	move.l 80(%sp),%d5
-	move.l #29484,%d2
-	move.l 100(%sp),%a2
-	move.l %d0,56(%sp)
-	lea lx_ff,%a0
-	cmp.l (%a0,%d1.l*4),%d2
-	jlt .L19
-	move.l 88(%sp),%d4
-	lea lx_fq,%a0
-	move.l (%a0,%d4.l*4),%d4
-	move.l %d4,56(%sp)
-.L19:
-	moveq #8,%d7
-	cmp.l %d5,%d7
-	jeq .L18
-	lea lx_fg,%a0
-	moveq #7,%d2
-	move.l (%a0,%d1.l*4),%d7
-	move.l 92(%sp),%a1
-	lea lx_fdrv,%a0
-	move.l (%a0,%a1.l*4),%d0
-	move.l %d0,60(%sp)
-	cmp.l %d5,%d2
-	jeq .L69
-	move.l 56(%sp),%d1
-	moveq #12,%d0
-	move.l #16777216,%d4
-	move.l %d7,%d2
-	move.l %d7,%d6
-	muls.l %d7,%d1
-	muls.l %d7,%d2
-	move.l 76(%sp),%a0
-	add.l %d6,%d6
-	move.l (%a0),%a1
-	move.l 4(%a0),%a0
-	add.l %d1,%d1
-	asr.l %d0,%d2
-	asr.l %d0,%d1
-	add.l #4096,%d1
-	divs.l %d1,%d4
-	move.l %d4,%d1
-	muls.l %d2,%d1
-	move.l %d4,%d2
-	muls.l %d7,%d2
-	move.l %d4,48(%sp)
-	lsr.l %d0,%d1
-	asr.l %d0,%d2
-	move.l #16777216,%d0
-	move.l %d1,52(%sp)
-	add.l #4096,%d1
-	move.l %d2,64(%sp)
-	divs.l %d1,%d0
-	move.l %d0,68(%sp)
-	tst.l %a2
-	jle .L27
-	move.l %a2,%d0
-	add.l %d0,%d0
-	move.w #32767,%a5
-	move.l 96(%sp),%a2
-	lea lx_soft,%a3
-	lea lx_tanh,%a6
-	move.l %d7,44(%sp)
-	lea (%a2,%d0.l),%a4
-.L55:
-	mvs.w (%a2)+,%d0
-	move.l 60(%sp),%d1
-	moveq #15,%d7
-	move.l 64(%sp),%d2
-	moveq #12,%d4
-	muls.l %d1,%d0
-	move.l %a1,%d1
-	muls.l %d2,%d1
-	moveq #63,%d2
-	asr.l %d7,%d0
-	asr.l %d4,%d1
-	add.l #65536,%d0
-	and.l %d0,%d2
-	asr.l #6,%d0
-	move.l (%a3,%d0.l*4),%d3
-	move.l 4(%a3,%d0.l*4),%d0
-	sub.l %d3,%d0
-	muls.l %d2,%d0
-	asr.l #6,%d0
-	add.l %d0,%d3
-	move.l 52(%sp),%d0
-	muls.l %d3,%d0
-	asr.l %d4,%d0
-	move.l %d0,%d2
-	add.l %a0,%d2
-	move.l 68(%sp),%d0
-	add.l %d1,%d2
-	move.l %d3,%d1
-	muls.l %d0,%d2
-	asr.l %d4,%d2
-	sub.l %d2,%d1
-	cmp.l #-65535,%d1
-	jge .L28
-	move.l #-65535,%d1
-.L29:
-	move.l %a1,%d0
-	add.l #65536,%d0
-	cmp.l #131072,%d0
-	jcc .L70
-.L30:
-	moveq #63,%d4
-	and.l %d0,%d4
-	asr.l #6,%d0
-	move.l (%a3,%d0.l*4),%a1
-	move.l 4(%a3,%d0.l*4),%d0
-	sub.l %a1,%d0
-	muls.l %d4,%d0
-	asr.l #6,%d0
-	add.l %d0,%a1
-.L31:
-	move.l 44(%sp),%d0
-	moveq #12,%d4
-	move.l 48(%sp),%d7
-	muls.l %d1,%d0
-	asr.l %d4,%d0
-	add.l %a1,%d0
-	muls.l %d7,%d0
-	moveq #12,%d7
-	asr.l %d4,%d0
-	move.l 56(%sp),%d4
-	muls.l %d0,%d4
-	add.l %d4,%d4
-	asr.l %d7,%d4
-	sub.l %d4,%d1
-	muls.l %d6,%d1
-	asr.l %d7,%d1
-	add.l %d1,%a1
-	cmp.l #-32767,%a1
-	jge .L32
-	move.w #-32767,%a1
-.L33:
-	move.l %d6,%d1
-	moveq #12,%d7
-	muls.l %d0,%d1
-	asr.l %d7,%d1
-	add.l %d1,%a0
-	cmp.l #-32767,%a0
-	jge .L34
-	move.w #-32767,%a0
-.L35:
-	moveq #1,%d1
-	cmp.l %d5,%d1
-	jeq .L71
-	moveq #3,%d7
-	cmp.l %d5,%d7
-	jeq .L72
-	moveq #2,%d0
-	cmp.l %d5,%d0
-	jeq .L73
-	moveq #4,%d1
-	cmp.l %d5,%d1
-	jeq .L74
-	sub.l %d4,%d3
-	moveq #5,%d4
-	cmp.l %d5,%d4
-	jeq .L75
-	sub.l %d2,%d3
-	move.l %d2,%d0
-	sub.l %d3,%d0
-	lsl.l #3,%d0
-	cmp.l #-32768,%d0
-	jlt .L66
-.L53:
-	cmp.l #32767,%d0
-	jle .L38
-	move.l #32767,%d0
-.L38:
-	move.w %d0,-2(%a2)
-	cmp.l %a4,%a2
-	jne .L55
-.L27:
-	move.l 76(%sp),%a2
-	move.l %a1,(%a2)
-	move.l %a0,4(%a2)
-.L18:
-	movem.l (%sp),#31996
-	lea (72,%sp),%sp
-	rts
-.L71:
-	add.l #8192,%d2
-	cmp.l #16383,%d2
-	jhi .L76
-	moveq #31,%d1
-	and.l %d2,%d1
-	asr.l #5,%d2
-	move.l (%a6,%d2.l*4),%d0
-	move.l 4(%a6,%d2.l*4),%d2
-	sub.l %d0,%d2
-	muls.l %d1,%d2
-	asr.l #5,%d2
-	add.l %d2,%d0
-	cmp.l #-32768,%d0
-	jge .L42
-.L66:
-	move.l #-32768,%d0
-.L77:
-	move.w %d0,-2(%a2)
-	cmp.l %a4,%a2
-	jne .L55
-	jra .L27
-.L34:
-	cmp.l #32767,%a0
-	jle .L35
-	move.w #32767,%a0
-	jra .L35
-.L32:
-	cmp.l #32767,%a1
-	jle .L33
-	move.l %a5,%a1
-	jra .L33
-.L28:
-	cmp.l #65536,%d1
-	jlt .L29
-	move.l %a1,%d0
-	move.l #65535,%d1
-	add.l #65536,%d0
-	cmp.l #131072,%d0
-	jcs .L30
-.L70:
-	move.w #8635,%a1
-	tst.l %d0
-	jge .L31
-	move.w #-8635,%a1
-	jra .L31
-.L72:
-	lsl.l #3,%d0
-	cmp.l #-32768,%d0
-	jlt .L66
-.L42:
-	cmp.l #32767,%d0
-	jle .L38
-	move.l %a5,%d0
-	move.w %d0,-2(%a2)
-	cmp.l %a4,%a2
-	jne .L55
-	jra .L27
-.L73:
-	move.l %d3,%d0
-	sub.l %d4,%d0
-	sub.l %d2,%d0
-	lsl.l #3,%d0
-	cmp.l #-32768,%d0
-	jge .L53
-	move.l #-32768,%d0
-	jra .L77
-.L76:
-	move.w #32767,%d0
-	tst.l %d2
-	jge .L38
-	move.w #-32767,%d0
-	move.w %d0,-2(%a2)
-	cmp.l %a4,%a2
-	jne .L55
-	jra .L27
-.L74:
-	move.l %d4,%d0
-	lsl.l #3,%d0
-	cmp.l #-32768,%d0
-	jge .L53
-	move.l #-32768,%d0
-	jra .L77
-.L75:
-	move.l %d3,%d0
-	lsl.l #3,%d0
-	cmp.l #-32768,%d0
-	jge .L53
-	move.l #-32768,%d0
-	jra .L77
-.L69:
-	move.l 88(%sp),%d4
-	move.l #4096,%d2
-	lea lx_fq,%a0
-	moveq #12,%d7
-	move.l #5734,%d0
-	sub.l (%a0,%d4.l*4),%d2
-	lea lx_flp2,%a0
-	move.l (%a0,%d1.l*4),%d3
 	move.l %d2,%d4
-	move.l #4096,%d1
-	lsl.l %d7,%d4
-	sub.l %d3,%d1
-	muls.l %d0,%d2
-	asr.l %d7,%d2
-	divs.l %d1,%d4
-	add.l %d2,%d4
-	tst.l %a2
-	jle .L18
-	move.l %a2,%d1
-	add.l %d1,%d1
-	move.l 76(%sp),%a1
-	move.l 76(%sp),%a3
-	move.l 60(%sp),%a4
-	move.l 8(%a1),%a0
-	move.l 12(%a3),%d2
-	move.l 96(%sp),%a1
-	move.l %a1,%d5
-	lea lx_soft,%a3
-	add.l %d1,%d5
-.L26:
-	mvs.w (%a1)+,%d1
-	move.l %a0,%d7
-	sub.l %d2,%d7
-	muls.l %d4,%d7
-	move.l %a4,%d0
-	moveq #63,%d6
-	muls.l %d0,%d1
-	moveq #12,%d0
-	asr.l %d0,%d7
-	moveq #15,%d0
-	asr.l %d0,%d1
-	add.l #65536,%d1
-	and.l %d1,%d6
-	asr.l #6,%d1
-	move.l (%a3,%d1.l*4),%d0
-	move.l 4(%a3,%d1.l*4),%d1
-	sub.l %d0,%d1
-	muls.l %d6,%d1
-	asr.l #6,%d1
-	add.l %d1,%d0
-	sub.l %a0,%d0
-	add.l %d7,%d0
-	muls.l %d3,%d0
-	moveq #12,%d1
-	asr.l %d1,%d0
-	add.l %d0,%a0
-	cmp.l #-4096,%a0
-	jge .L22
-	move.w #-4096,%a0
-.L23:
-	move.l %a0,%d0
-	sub.l %d2,%d0
-	muls.l %d3,%d0
-	moveq #12,%d7
-	asr.l %d7,%d0
-	add.l %d0,%d2
-	cmp.l #-4096,%d2
-	jge .L24
-	move.l #-4096,%d2
+	addq.l #1,%d1
+	add.l %d4,%d4
+	moveq #10,%d5
+	cmp.l %d1,%d5
+	jeq .L11
 .L25:
-	move.l %d2,%d1
-	moveq #15,%d0
-	lsl.l %d0,%d1
-	moveq #12,%d7
-	sub.l %d2,%d1
-	asr.l %d7,%d1
-	move.w %d1,-2(%a1)
-	cmp.l %d5,%a1
-	jne .L26
-	move.l 76(%sp),%a1
-	move.l 96(%sp),%a3
-	move.l %d2,12(%a1)
-	move.l %a0,8(%a1)
-	move.w %d1,-2(%a3,%a2.l*2)
-	movem.l (%sp),#31996
-	lea (72,%sp),%sp
+	cmp.l %d0,%d4
+	jhi .L11
+	tst.l %d2
+	jlt .L11
+	move.l %d4,%d2
+	move.l %d2,%d4
+	add.l %d4,%d4
+	addq.l #1,%d1
+	moveq #10,%d5
+	cmp.l %d1,%d5
+	jne .L25
+.L11:
+	move.l %d1,12(%a2)
+	move.l %d3,28(%a2)
+.L6:
+	movem.l (%sp),#3132
+	lea (24,%sp),%sp
 	rts
 .L24:
-	cmp.l #4096,%d2
-	jle .L25
-	move.l #4096,%d2
-	jra .L25
-.L22:
-	cmp.l #4096,%a0
-	jle .L23
-	move.w #4096,%a0
-	jra .L23
-	.size	svf_block, .-svf_block
+	cmp.l 24(%a2),%d4
+	jne .L7
+	move.l 28(%a2),%d1
+	jra .L8
+.L13:
+	moveq #4,%d1
+	move.l %d1,12(%a2)
+	move.l %d3,28(%a2)
+	jra .L6
+.L14:
+	moveq #5,%d1
+	move.l %d1,12(%a2)
+	move.l %d3,28(%a2)
+	jra .L6
+	.size	osc_tune, .-osc_tune
+	.align	2
+	.type	trans_add, @function
+trans_add:
+	lea (-32,%sp),%sp
+	moveq #13,%d1
+	movem.l #3324,(%sp)
+	move.l 36(%sp),%a2
+	mvz.b 27(%a2),%d0
+	cmp.l %d0,%d1
+	jcs .L26
+	move.l 292(%a2),%d1
+	moveq #1,%d2
+	cmp.l %d0,%d2
+	jcc .L26
+	cmp.l #-1983905793,%d1
+	jhi .L26
+	mvz.b 28(%a2),%d2
+	moveq #15,%d4
+	subq.l #2,%d0
+	mvz.b 29(%a2),%d3
+	move.l #2205,%d5
+	lsl.l %d4,%d2
+	lea lx_tpitch,%a0
+	muls.l %d5,%d0
+	move.l (%a0,%d3.l*4),%d4
+	moveq #127,%d5
+	add.l #63,%d2
+	divs.l %d5,%d2
+	tst.l 44(%sp)
+	jle .L28
+	move.l 44(%sp),%d3
+	move.l %d0,%a1
+	move.w #-32768,%a3
+	move.l 40(%sp),%a0
+	add.l #lx_trans,%a1
+	add.l %d3,%d3
+	move.l #32767,%d6
+	add.l %a0,%d3
+.L31:
+	moveq #20,%d5
+	move.l %d1,%d0
+	lsr.l %d5,%d0
+	moveq #15,%d5
+	mvs.w (%a0)+,%d7
+	mvs.b (%a1,%d0.l),%d0
+	muls.l %d2,%d0
+	lsl.l #8,%d0
+	asr.l %d5,%d0
+	add.l %d7,%d0
+	cmp.l #-32768,%d0
+	jge .L29
+	move.l %a3,%d0
+.L30:
+	move.w %d0,-2(%a0)
+	add.l %d4,%d1
+	cmp.l %d3,%a0
+	jeq .L28
+	cmp.l #-1983905793,%d1
+	jls .L31
+.L28:
+	cmp.l #-1983905792,%d1
+	jls .L32
+	move.l #-1983905792,%d1
+.L32:
+	move.l %d1,292(%a2)
+.L26:
+	movem.l (%sp),#3324
+	lea (32,%sp),%sp
+	rts
+.L29:
+	cmp.l #32767,%d0
+	jle .L30
+	move.l %d6,%d0
+	jra .L30
+	.size	trans_add, .-trans_add
 	.align	2
 	.type	osc_block, @function
 osc_block:
@@ -525,368 +246,1502 @@ osc_block:
 	moveq #4,%d1
 	movem.l #31996,(%sp)
 	move.l 56(%sp),%a3
-	move.l 60(%sp),%a0
-	move.l 68(%sp),%d6
+	move.l 68(%sp),%d5
+	move.l 72(%sp),%a0
 	move.l 8(%a3),%d0
-	move.l 72(%sp),%a1
-	move.l 84(%sp),%a2
-	move.l (%a3),%d7
+	move.l 84(%sp),%a1
+	move.l (%a3),%d6
 	move.l 4(%a3),%d4
 	cmp.l %d0,%d1
-	jeq .L79
-	jlt .L80
+	jeq .L37
+	jlt .L38
 	tst.l %d0
-	jeq .L81
+	jeq .L39
 	subq.l #1,%d0
 	moveq #2,%d2
 	cmp.l %d0,%d2
-	jcs .L82
-	tst.l 64(%sp)
-	jle .L84
-	moveq #11,%d1
-	moveq #11,%d5
-	muls.l %d1,%d0
-	move.l 64(%sp),%d3
-	move.l %d7,%d2
-	clr.l %d1
-	move.l %d7,%a4
-	add.l %d3,%d3
+	jcs .L40
+	moveq #11,%d3
+	muls.l %d3,%d0
 	add.l 12(%a3),%d0
-	lsl.l %d5,%d0
-	move.l %d0,%a2
-	add.l #lx_wav,%a2
-.L94:
-	tst.l %a1
-	jeq .L106
-	mvs.w (%a1,%d1.l),%d0
-	move.l 76(%sp),%d7
-	muls.l %d7,%d0
-	moveq #15,%d7
-	move.l %d0,%d5
-	asr.l %d7,%d5
-	tst.l %d0
-	jlt .L117
-	move.l %d5,%d0
-	moveq #19,%d7
-	lsl.l %d7,%d0
-	add.l %d2,%d0
-.L92:
-	moveq #22,%d5
-	add.l %d4,%d2
+	lsl.l %d3,%d0
+	move.l %d0,%a1
+	add.l #lx_wav,%a1
+	tst.l %a0
+	jeq .L81
+	tst.l 64(%sp)
+	jle .L45
+	move.l 64(%sp),%d2
+	move.l %d6,%d1
+	move.l 60(%sp),%a2
+	move.l %d6,%a4
+	move.l 76(%sp),%d3
+	add.l %d2,%d2
+	add.l %a0,%d2
+.L54:
+	mvs.w (%a0)+,%d0
+	moveq #15,%d6
+	muls.l %d3,%d0
 	move.l %d0,%d7
-	lsr.l %d5,%d7
+	asr.l %d6,%d7
+	tst.l %d0
+	jlt .L82
+.L53:
+	moveq #19,%d0
+	moveq #22,%d6
+	lsl.l %d0,%d7
+	move.l %d7,%d0
+	add.l %d1,%d0
+	move.l %d0,%d7
+	lsr.l %d6,%d7
 	lsr.l #7,%d0
-	move.l %d7,%a6
-	addq.l #1,%a6
-	move.l %a6,%d5
-	and.l #1023,%d5
-	mvs.w (%a2,%d7.l*2),%d7
-	move.l %d5,%a6
-	move.l %d0,%d5
-	and.l #32767,%d5
-	mvs.w (%a2,%a6.l*2),%d0
+	add.l %d4,%d1
+	move.l %d7,%a5
+	addq.l #1,%a5
+	move.l %a5,%d6
+	and.l #1023,%d6
+	mvs.w (%a1,%d7.l*2),%d7
+	move.l %d6,%a5
+	move.l %d0,%d6
+	and.l #32767,%d6
+	mvs.w (%a1,%a5.l*2),%d0
 	sub.l %d7,%d0
-	muls.l %d5,%d0
-	moveq #15,%d5
-	asr.l %d5,%d0
-	add.l %d7,%d0
 	muls.l %d6,%d0
-	asr.l %d5,%d0
-	move.w %d0,(%a0,%d1.l)
-	addq.l #2,%d1
-	cmp.l %d3,%d1
-	jne .L94
-.L119:
-	move.l %a4,%d7
-.L113:
+	moveq #15,%d6
+	asr.l %d6,%d0
+	add.l %d7,%d0
+	muls.l %d5,%d0
+	asr.l %d6,%d0
+	move.w %d0,(%a2)+
+	cmp.l %d2,%a0
+	jne .L54
+	move.l %a4,%d6
+.L75:
 	move.l 64(%sp),%d0
 	subq.l #1,%d0
 	muls.l %d4,%d0
-	add.l %d4,%d7
-	add.l %d0,%d7
-.L84:
-	move.l %d7,(%a3)
+	add.l %d4,%d6
+	add.l %d0,%d6
+.L45:
+	move.l %d6,(%a3)
 	movem.l (%sp),#31996
 	lea (52,%sp),%sp
 	rts
-.L117:
-	clr.l %d5
-	move.l %d5,%d0
-	moveq #19,%d7
-	lsl.l %d7,%d0
-	add.l %d2,%d0
-	jra .L92
-.L80:
+.L38:
 	subq.l #5,%d0
 	tst.l %d0
-	jne .L82
-	move.l 12(%a3),%d1
-	moveq #11,%d5
-	add.l #11,%d1
-	lsl.l %d5,%d1
+	jne .L40
 	move.l 80(%sp),%d0
+	moveq #11,%d3
+	move.l 12(%a3),%d1
+	add.l #11,%d1
+	lsl.l %d3,%d1
 	swap %d0
 	clr.w %d0
 	move.l %d1,%a2
 	add.l #lx_wav,%a2
-	tst.l 64(%sp)
-	jle .L84
-	move.l 64(%sp),%d1
-	move.l %d7,%a4
-	move.l %d7,44(%sp)
-	move.l %a3,48(%sp)
-	add.l %d1,%d1
-	clr.l %d5
 	move.l %d0,%a6
-	move.l %d4,%a3
+	tst.l 64(%sp)
+	jle .L45
+	move.l 64(%sp),%d0
 	move.l %d6,%d7
-	move.l %d1,%a5
-.L102:
-	tst.l %a1
-	jeq .L107
-	mvs.w (%a1,%d5.l),%d0
+	move.l 60(%sp),%a4
+	sub.l %a1,%a1
+	move.l %d6,44(%sp)
+	add.l %d0,%d0
+	move.l %a3,48(%sp)
+	move.l %d4,%a3
+	move.l %d5,%d6
+	move.l %d0,%a5
+.L63:
+	tst.l %a0
+	jeq .L66
+	mvs.w (%a0,%a1.l),%d0
 	move.l 76(%sp),%d1
 	moveq #15,%d2
 	muls.l %d1,%d0
 	move.l %d0,%d1
 	asr.l %d2,%d1
 	tst.l %d0
-	jlt .L118
+	jlt .L83
 	moveq #19,%d3
 	lsl.l %d3,%d1
 	move.l %d1,%d2
-	add.l %a4,%d2
-.L98:
+	add.l %d7,%d2
+.L59:
 	moveq #22,%d0
 	move.l %d2,%d3
 	add.l %a6,%d3
 	move.l %d2,%d4
-	move.l %d3,%d6
+	move.l %d3,%d5
 	lsr.l %d0,%d4
-	lsr.l %d0,%d6
+	lsr.l %d0,%d5
 	lsr.l #7,%d2
 	lsr.l #7,%d3
 	move.l %d4,%d0
 	addq.l #1,%d0
-	move.l %d6,%d1
+	move.l %d5,%d1
 	addq.l #1,%d1
 	and.l #1023,%d0
 	and.l #1023,%d1
 	and.l #32767,%d2
 	and.l #32767,%d3
 	mvs.w (%a2,%d4.l*2),%d4
-	mvs.w (%a2,%d6.l*2),%d6
+	mvs.w (%a2,%d5.l*2),%d5
 	mvs.w (%a2,%d0.l*2),%d0
 	mvs.w (%a2,%d1.l*2),%d1
 	sub.l %d4,%d0
 	muls.l %d2,%d0
-	sub.l %d6,%d1
+	sub.l %d5,%d1
 	muls.l %d3,%d1
 	moveq #15,%d2
 	asr.l %d2,%d0
 	asr.l %d2,%d1
 	add.l %d4,%d0
-	add.l %d6,%d1
+	add.l %d5,%d1
 	sub.l %d1,%d0
 	cmp.l #-32768,%d0
-	jge .L100
+	jge .L61
 	move.l #-32768,%d0
-.L101:
-	muls.l %d7,%d0
+.L62:
+	muls.l %d6,%d0
 	moveq #15,%d3
-	add.l %a3,%a4
+	add.l %a3,%d7
 	asr.l %d3,%d0
-	move.w %d0,(%a0,%d5.l)
-	addq.l #2,%d5
-	cmp.l %a5,%d5
-	jne .L102
+	move.w %d0,(%a4,%a1.l)
+	addq.l #2,%a1
+	cmp.l %a5,%a1
+	jne .L63
 	move.l %a3,%d4
 	move.l 64(%sp),%d0
 	subq.l #1,%d0
 	muls.l %d4,%d0
-	move.l 44(%sp),%d7
-	add.l %d4,%d7
+	move.l 44(%sp),%d6
+	add.l %d4,%d6
 	move.l 48(%sp),%a3
-	add.l %d0,%d7
-	jra .L84
-.L106:
-	moveq #22,%d5
-	move.l %d2,%d0
-	move.l %d0,%d7
-	lsr.l %d5,%d7
-	lsr.l #7,%d0
-	add.l %d4,%d2
-	move.l %d7,%a6
-	addq.l #1,%a6
-	move.l %a6,%d5
-	and.l #1023,%d5
-	mvs.w (%a2,%d7.l*2),%d7
-	move.l %d5,%a6
-	move.l %d0,%d5
-	and.l #32767,%d5
-	mvs.w (%a2,%a6.l*2),%d0
-	sub.l %d7,%d0
-	muls.l %d5,%d0
-	moveq #15,%d5
-	asr.l %d5,%d0
-	add.l %d7,%d0
-	muls.l %d6,%d0
-	asr.l %d5,%d0
-	move.w %d0,(%a0,%d1.l)
-	addq.l #2,%d1
-	cmp.l %d3,%d1
-	jne .L94
-	jra .L119
-.L79:
+	add.l %d0,%d6
+	jra .L45
+.L37:
 	tst.l 64(%sp)
-	jle .L84
-	move.l 64(%sp),%d2
-	move.l %d7,%d1
+	jle .L45
+	move.l 64(%sp),%d3
+	move.l %d6,%d1
+	move.l 60(%sp),%a0
 	move.l %d1,%d0
 	add.l %d4,%d1
-	add.l %d2,%d2
-	add.l %a0,%d2
+	add.l %d3,%d3
+	add.l %a0,%d3
 	cmp.l %d1,%d0
-	jhi .L95
-.L120:
+	jhi .L56
+.L84:
 	move.l 16(%a3),%d0
-	moveq #15,%d3
-	muls.l %d6,%d0
-	asr.l %d3,%d0
+	moveq #15,%d2
+	muls.l %d5,%d0
+	asr.l %d2,%d0
 	move.w %d0,(%a0)+
-	cmp.l %d2,%a0
-	jeq .L113
-.L116:
+	cmp.l %d3,%a0
+	jeq .L75
+.L78:
 	move.l %d1,%d0
 	add.l %d4,%d1
 	cmp.l %d1,%d0
-	jls .L120
-.L95:
-	move.l #1664525,%d0
-	moveq #15,%d3
-	muls.l (%a2),%d0
-	move.l %d0,%a1
-	add.l #1013904223,%a1
-	mvs.w %a1,%d0
-	move.l %a1,(%a2)
+	jls .L84
+.L56:
+	move.l #1664525,%d2
+	muls.l (%a1),%d2
+	add.l #1013904223,%d2
+	mvs.w %d2,%d0
+	move.l %d2,(%a1)
+	moveq #15,%d2
 	move.l %d0,16(%a3)
-	muls.l %d6,%d0
-	asr.l %d3,%d0
+	muls.l %d5,%d0
+	asr.l %d2,%d0
 	move.w %d0,(%a0)+
-	cmp.l %d2,%a0
-	jne .L116
-	jra .L113
-.L82:
+	cmp.l %d3,%a0
+	jne .L78
+	jra .L75
+.L40:
 	tst.l 64(%sp)
-	jle .L104
+	jle .L65
 	move.l 64(%sp),%d0
+	move.l 60(%sp),%a0
 	add.l %d0,%d0
 	add.l %a0,%d0
-.L103:
+.L64:
 	clr.w (%a0)+
 	cmp.l %d0,%a0
-	jne .L103
-.L104:
-	move.l 64(%sp),%d5
-	muls.l %d5,%d4
-	add.l %d4,%d7
-	move.l %d7,(%a3)
+	jne .L64
+.L65:
+	move.l 64(%sp),%d2
+	muls.l %d2,%d4
+	add.l %d4,%d6
+	move.l %d6,(%a3)
 	movem.l (%sp),#31996
 	lea (52,%sp),%sp
 	rts
-.L81:
+.L39:
+	tst.l %a0
+	jeq .L85
 	tst.l 64(%sp)
-	jle .L84
-	move.l 64(%sp),%d0
-	move.l %d7,%d3
-	move.l 76(%sp),%d1
-	clr.l %d2
+	jle .L45
+	move.l 64(%sp),%d2
+	move.l %d6,%d1
+	move.l 60(%sp),%a1
+	add.l #-1073741824,%d1
+	move.l 76(%sp),%d3
 	move.l #-2147422492,%a4
-	add.l %d0,%d0
+	add.l %d2,%d2
 	move.l #-2147422488,%a2
-	move.l %d7,%a6
-	move.l %d1,44(%sp)
-	move.l %d0,%a5
-.L91:
-	tst.l %a1
-	jeq .L105
-	mvs.w (%a1,%d2.l),%d0
-	move.l 44(%sp),%d5
-	moveq #15,%d7
-	muls.l %d5,%d0
-	move.l %d0,%d5
-	asr.l %d7,%d5
-	tst.l %d0
-	jlt .L121
-	moveq #17,%d0
-	lsl.l %d0,%d5
-	move.l %d5,%d0
-	add.l %d3,%d0
-.L89:
-	add.l #-1073741824,%d0
-	moveq #24,%d1
-	add.l %d4,%d3
-	move.l %d0,%d5
-	lsr.l %d1,%d5
+	move.l %d6,%a5
+	add.l %a0,%d2
+.L50:
+	mvs.w (%a0)+,%d0
+	moveq #15,%d6
+	muls.l %d3,%d0
 	move.l %d0,%d7
-	moveq #9,%d1
-	lsr.l %d1,%d7
-	move.l %d5,%d0
+	asr.l %d6,%d7
+	tst.l %d0
+	jlt .L86
+.L49:
+	moveq #17,%d0
+	moveq #24,%d6
+	lsl.l %d0,%d7
+	add.l %d1,%d7
+	move.l %d7,%d0
+	lsr.l %d6,%d0
+	moveq #9,%d6
+	add.l %d4,%d1
+	lsr.l %d6,%d7
 	lsl.l #2,%d0
-	and.l #32767,%d7
-	mvs.w (%a4,%d0.l),%d5
+	move.l %d7,%d6
+	and.l #32767,%d6
+	mvs.w (%a4,%d0.l),%d7
 	mvs.w (%a2,%d0.l),%d0
-	sub.l %d5,%d0
-	muls.l %d7,%d0
-	moveq #15,%d7
-	asr.l %d7,%d0
-	add.l %d5,%d0
+	sub.l %d7,%d0
 	muls.l %d6,%d0
-	asr.l %d7,%d0
-	move.w %d0,(%a0,%d2.l)
-	addq.l #2,%d2
-	cmp.l %a5,%d2
-	jne .L91
+	moveq #15,%d6
+	asr.l %d6,%d0
+	add.l %d7,%d0
+	muls.l %d5,%d0
+	asr.l %d6,%d0
+	move.w %d0,(%a1)+
+	cmp.l %d2,%a0
+	jne .L50
 	move.l 64(%sp),%d0
 	subq.l #1,%d0
 	muls.l %d4,%d0
-	move.l %a6,%d7
-	add.l %d4,%d7
-	add.l %d0,%d7
-	jra .L84
-.L121:
-	moveq #17,%d0
-	clr.l %d5
-	lsl.l %d0,%d5
-	move.l %d5,%d0
-	add.l %d3,%d0
-	jra .L89
-.L118:
+	move.l %a5,%d6
+	add.l %d4,%d6
+	add.l %d0,%d6
+	jra .L45
+.L83:
 	clr.l %d1
 	moveq #19,%d3
 	lsl.l %d3,%d1
 	move.l %d1,%d2
-	add.l %a4,%d2
-	jra .L98
-.L100:
+	add.l %d7,%d2
+	jra .L59
+.L82:
+	clr.l %d7
+	jra .L53
+.L86:
+	clr.l %d7
+	jra .L49
+.L81:
+	tst.l 64(%sp)
+	jle .L45
+	move.l 64(%sp),%d2
+	move.l %d6,%d1
+	move.l 60(%sp),%a0
+	add.l %d2,%d2
+	add.l %a0,%d2
+.L55:
+	moveq #22,%d0
+	move.l %d1,%d7
+	lsr.l %d0,%d7
+	move.l %d1,%d3
+	lsr.l #7,%d3
+	add.l %d4,%d1
+	move.l %d7,%d0
+	addq.l #1,%d0
+	and.l #1023,%d0
+	and.l #32767,%d3
+	mvs.w (%a1,%d7.l*2),%d7
+	mvs.w (%a1,%d0.l*2),%d0
+	sub.l %d7,%d0
+	muls.l %d3,%d0
+	moveq #15,%d3
+	asr.l %d3,%d0
+	add.l %d7,%d0
+	muls.l %d5,%d0
+	asr.l %d3,%d0
+	move.w %d0,(%a0)+
+	cmp.l %d2,%a0
+	jeq .L75
+	moveq #22,%d0
+	move.l %d1,%d7
+	lsr.l %d0,%d7
+	move.l %d1,%d3
+	lsr.l #7,%d3
+	add.l %d4,%d1
+	move.l %d7,%d0
+	addq.l #1,%d0
+	and.l #1023,%d0
+	and.l #32767,%d3
+	mvs.w (%a1,%d7.l*2),%d7
+	mvs.w (%a1,%d0.l*2),%d0
+	sub.l %d7,%d0
+	muls.l %d3,%d0
+	moveq #15,%d3
+	asr.l %d3,%d0
+	add.l %d7,%d0
+	muls.l %d5,%d0
+	asr.l %d3,%d0
+	move.w %d0,(%a0)+
+	cmp.l %d2,%a0
+	jne .L55
+	jra .L75
+.L85:
+	tst.l 64(%sp)
+	jle .L45
+	move.l 64(%sp),%d0
+	move.l %d6,%d1
+	move.l 60(%sp),%a0
+	add.l #-1073741824,%d1
+	move.l #-2147422492,%a4
+	add.l %d0,%d0
+	move.l #-2147422488,%a2
+	lea (%a0,%d0.l),%a1
+.L51:
+	moveq #24,%d2
+	move.l %d1,%d0
+	lsr.l %d2,%d0
+	moveq #9,%d2
+	move.l %d1,%d3
+	lsr.l %d2,%d3
+	add.l %d4,%d1
+	lsl.l #2,%d0
+	and.l #32767,%d3
+	mvs.w (%a4,%d0.l),%d2
+	mvs.w (%a2,%d0.l),%d0
+	sub.l %d2,%d0
+	muls.l %d3,%d0
+	moveq #15,%d3
+	asr.l %d3,%d0
+	add.l %d2,%d0
+	muls.l %d5,%d0
+	asr.l %d3,%d0
+	move.w %d0,(%a0)+
+	cmp.l %a1,%a0
+	jeq .L75
+	moveq #24,%d2
+	move.l %d1,%d0
+	lsr.l %d2,%d0
+	moveq #9,%d2
+	move.l %d1,%d3
+	lsr.l %d2,%d3
+	add.l %d4,%d1
+	lsl.l #2,%d0
+	and.l #32767,%d3
+	mvs.w (%a4,%d0.l),%d2
+	mvs.w (%a2,%d0.l),%d0
+	sub.l %d2,%d0
+	muls.l %d3,%d0
+	moveq #15,%d3
+	asr.l %d3,%d0
+	add.l %d2,%d0
+	muls.l %d5,%d0
+	asr.l %d3,%d0
+	move.w %d0,(%a0)+
+	cmp.l %a1,%a0
+	jne .L51
+	jra .L75
+.L61:
 	cmp.l #32767,%d0
-	jle .L101
+	jle .L62
 	move.l #32767,%d0
-	jra .L101
-.L107:
-	move.l %a4,%d2
-	jra .L98
-.L105:
-	move.l %d3,%d0
-	jra .L89
+	jra .L62
+.L66:
+	move.l %d7,%d2
+	jra .L59
 	.size	osc_block, .-osc_block
+	.align	2
+	.type	svf_block, @function
+svf_block:
+	lea (-64,%sp),%sp
+	move.l 76(%sp),%d0
+	move.l #4096,%d1
+	movem.l #31996,(%sp)
+	move.l 72(%sp),%a0
+	move.l #29484,%d2
+	move.l 92(%sp),%a4
+	lea lx_ff,%a1
+	cmp.l (%a1,%d0.l*4),%d2
+	jlt .L88
+	move.l 80(%sp),%d3
+	lea lx_fq,%a1
+	move.l (%a1,%d3.l*4),%d1
+.L88:
+	moveq #8,%d4
+	cmp.l %a0,%d4
+	jeq .L87
+	lea lx_fg,%a1
+	moveq #7,%d6
+	move.l (%a1,%d0.l*4),%d5
+	move.l 84(%sp),%d3
+	lea lx_fdrv,%a1
+	move.l (%a1,%d3.l*4),%d3
+	move.l %d3,48(%sp)
+	cmp.l %a0,%d6
+	jeq .L189
+	move.l %d1,%d7
+	moveq #12,%d2
+	muls.l %d5,%d7
+	move.l %d5,%d3
+	move.l %d5,%d0
+	muls.l %d5,%d3
+	add.l %d0,%d0
+	add.l %d1,%d1
+	move.l 68(%sp),%a1
+	add.l %d7,%d7
+	asr.l %d2,%d3
+	move.l %d0,44(%sp)
+	move.l %d1,60(%sp)
+	move.l (%a1),%d0
+	move.l 4(%a1),%d1
+	asr.l %d2,%d7
+	move.l %d5,%d2
+	move.l %d7,%d4
+	move.l #16777216,%d7
+	add.l #4096,%d4
+	divs.l %d4,%d7
+	moveq #12,%d4
+	move.l #16777216,%d6
+	muls.l %d7,%d3
+	muls.l %d7,%d2
+	lsr.l %d4,%d3
+	asr.l %d4,%d2
+	move.l %d3,%a1
+	move.l %d2,52(%sp)
+	lea (4096,%a1),%a1
+	move.l %a1,%d2
+	divs.l %d2,%d6
+	move.l %d6,%a2
+	moveq #3,%d6
+	cmp.l %a0,%d6
+	jeq .L96
+	jge .L190
+	moveq #4,%d4
+	cmp.l %a0,%d4
+	jeq .L100
+	moveq #5,%d6
+	cmp.l %a0,%d6
+	jne .L101
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d7,%a4
+	add.l %d2,%d2
+	move.l 88(%sp),%a3
+	move.l %d0,%a5
+	move.l %d5,56(%sp)
+	move.l 44(%sp),%d5
+	move.l %d3,%a0
+	move.l 48(%sp),%d7
+	lea lx_soft,%a1
+	lea (%a3,%d2.l),%a6
+.L155:
+	mvs.w (%a3)+,%d0
+	move.l 52(%sp),%d2
+	move.l %a5,%d4
+	moveq #12,%d6
+	move.l %a5,%d3
+	add.l #65536,%d3
+	muls.l %d7,%d0
+	muls.l %d2,%d4
+	moveq #15,%d2
+	asr.l %d2,%d0
+	asr.l %d6,%d4
+	moveq #63,%d6
+	add.l #65536,%d0
+	and.l %d0,%d6
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%d2
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %d2,%d0
+	muls.l %d6,%d0
+	moveq #12,%d6
+	asr.l #6,%d0
+	add.l %d0,%d2
+	move.l %a0,%d0
+	muls.l %d2,%d0
+	asr.l %d6,%d0
+	add.l %d1,%d0
+	add.l %d0,%d4
+	move.l %a2,%d0
+	muls.l %d0,%d4
+	move.l %d2,%d0
+	asr.l %d6,%d4
+	sub.l %d4,%d0
+	cmp.l #131072,%d3
+	jcc .L191
+	moveq #63,%d4
+	and.l %d3,%d4
+	asr.l #6,%d3
+	move.l (%a1,%d3.l*4),%a5
+	move.l 4(%a1,%d3.l*4),%d3
+	sub.l %a5,%d3
+	muls.l %d4,%d3
+	asr.l #6,%d3
+	add.l %d3,%a5
+.L148:
+	move.l 56(%sp),%d3
+	moveq #12,%d4
+	move.l %a4,%d6
+	muls.l %d0,%d3
+	asr.l %d4,%d3
+	move.l %d3,%d4
+	add.l %a5,%d4
+	muls.l %d6,%d4
+	moveq #12,%d3
+	moveq #12,%d6
+	asr.l %d3,%d4
+	move.l 60(%sp),%d3
+	muls.l %d4,%d3
+	asr.l %d6,%d3
+	sub.l %d3,%d0
+	muls.l %d5,%d0
+	asr.l %d6,%d0
+	add.l %d0,%a5
+	cmp.l #-32767,%a5
+	jge .L149
+	move.w #-32767,%a5
+.L150:
+	muls.l %d5,%d4
+	moveq #12,%d0
+	asr.l %d0,%d4
+	add.l %d4,%d1
+	cmp.l #-32767,%d1
+	jge .L151
+	move.l #-32767,%d1
+.L152:
+	sub.l %d3,%d2
+	lsl.l #3,%d2
+	cmp.l #-32768,%d2
+	jge .L153
+	move.l #-32768,%d2
+.L154:
+	move.w %d2,-2(%a3)
+	cmp.l %a6,%a3
+	jne .L155
+	move.l %a5,%d0
+.L103:
+	move.l 68(%sp),%a0
+	move.l %d0,(%a0)
+	move.l %d1,4(%a0)
+.L87:
+	movem.l (%sp),#31996
+	lea (64,%sp),%sp
+	rts
+.L190:
+	moveq #1,%d2
+	cmp.l %a0,%d2
+	jeq .L192
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d7,%a5
+	add.l %d2,%d2
+	move.l 48(%sp),%a3
+	move.l %d3,%a4
+	move.l 44(%sp),%d6
+	move.l 88(%sp),%a0
+	move.l %d5,48(%sp)
+	move.l %a2,56(%sp)
+	lea lx_soft,%a1
+	move.l %d0,%d5
+	add.l %a0,%d2
+	move.l %d2,%a2
+.L128:
+	mvs.w (%a0)+,%d3
+	move.l 52(%sp),%d2
+	move.l %a3,%d4
+	move.l %d5,%d0
+	moveq #12,%d7
+	add.l #65536,%d0
+	muls.l %d5,%d2
+	muls.l %d4,%d3
+	moveq #63,%d4
+	move.l %d2,%d5
+	moveq #15,%d2
+	asr.l %d2,%d3
+	asr.l %d7,%d5
+	add.l #65536,%d3
+	and.l %d3,%d4
+	asr.l #6,%d3
+	move.l (%a1,%d3.l*4),%d2
+	move.l 4(%a1,%d3.l*4),%d3
+	sub.l %d2,%d3
+	muls.l %d4,%d3
+	asr.l #6,%d3
+	add.l %d3,%d2
+	move.l %a4,%d3
+	muls.l %d2,%d3
+	asr.l %d7,%d3
+	move.l %d3,%d4
+	add.l %d1,%d4
+	move.l 56(%sp),%d3
+	add.l %d5,%d4
+	move.l %d2,%d5
+	muls.l %d3,%d4
+	asr.l %d7,%d4
+	sub.l %d4,%d5
+	cmp.l #131072,%d0
+	jcc .L193
+	moveq #63,%d3
+	and.l %d0,%d3
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%a6
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %a6,%d0
+	muls.l %d3,%d0
+	asr.l #6,%d0
+	add.l %d0,%a6
+.L121:
+	move.l 48(%sp),%d0
+	moveq #12,%d7
+	muls.l %d5,%d0
+	asr.l %d7,%d0
+	move.l %d0,%d3
+	move.l %a5,%d0
+	add.l %a6,%d3
+	muls.l %d0,%d3
+	move.l 60(%sp),%d0
+	asr.l %d7,%d3
+	muls.l %d3,%d0
+	asr.l %d7,%d0
+	sub.l %d0,%d5
+	muls.l %d6,%d5
+	asr.l %d7,%d5
+	add.l %a6,%d5
+	cmp.l #-32767,%d5
+	jge .L122
+	move.l #-32767,%d5
+.L123:
+	muls.l %d6,%d3
+	moveq #12,%d7
+	asr.l %d7,%d3
+	add.l %d3,%d1
+	cmp.l #-32767,%d1
+	jge .L124
+	move.l #-32767,%d1
+.L125:
+	sub.l %d0,%d2
+	sub.l %d4,%d2
+	lsl.l #3,%d2
+	cmp.l #-32768,%d2
+	jge .L126
+	move.l #-32768,%d2
+.L127:
+	move.w %d2,-2(%a0)
+	cmp.l %a0,%a2
+	jne .L128
+.L184:
+	move.l 68(%sp),%a0
+	move.l %d5,%d0
+	move.l %d0,(%a0)
+	move.l %d1,4(%a0)
+	jra .L87
+.L100:
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d7,%a5
+	add.l %d2,%d2
+	move.l 88(%sp),%a0
+	move.l %d5,%d7
+	move.l %a2,56(%sp)
+	move.w #32767,%a6
+	move.l 44(%sp),%d5
+	move.l %d3,%a3
+	move.l 48(%sp),%a2
+	lea lx_soft,%a1
+	lea (%a0,%d2.l),%a4
+	move.l %d0,%d2
+.L146:
+	move.l 52(%sp),%d4
+	move.l %d2,%d3
+	mvs.w (%a0)+,%d0
+	moveq #12,%d6
+	add.l #65536,%d3
+	muls.l %d2,%d4
+	move.l %a2,%d2
+	muls.l %d2,%d0
+	moveq #15,%d2
+	asr.l %d6,%d4
+	moveq #63,%d6
+	asr.l %d2,%d0
+	add.l #65536,%d0
+	and.l %d0,%d6
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%d2
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %d2,%d0
+	muls.l %d6,%d0
+	moveq #12,%d6
+	asr.l #6,%d0
+	add.l %d0,%d2
+	move.l %a3,%d0
+	muls.l %d2,%d0
+	asr.l %d6,%d0
+	add.l %d1,%d0
+	add.l %d4,%d0
+	move.l 56(%sp),%d4
+	muls.l %d4,%d0
+	asr.l %d6,%d0
+	sub.l %d0,%d2
+	cmp.l #131072,%d3
+	jcc .L194
+	moveq #63,%d4
+	and.l %d3,%d4
+	asr.l #6,%d3
+	move.l (%a1,%d3.l*4),%d0
+	move.l 4(%a1,%d3.l*4),%d3
+	sub.l %d0,%d3
+	muls.l %d4,%d3
+	asr.l #6,%d3
+	add.l %d3,%d0
+.L139:
+	move.l %d7,%d3
+	moveq #12,%d6
+	muls.l %d2,%d3
+	move.l %a5,%d4
+	asr.l %d6,%d3
+	add.l %d0,%d3
+	muls.l %d4,%d3
+	move.l 60(%sp),%d4
+	asr.l %d6,%d3
+	muls.l %d3,%d4
+	asr.l %d6,%d4
+	sub.l %d4,%d2
+	muls.l %d5,%d2
+	asr.l %d6,%d2
+	add.l %d0,%d2
+	cmp.l #-32767,%d2
+	jge .L140
+	move.l #-32767,%d2
+.L141:
+	muls.l %d5,%d3
+	moveq #12,%d6
+	asr.l %d6,%d3
+	add.l %d3,%d1
+	cmp.l #-32767,%d1
+	jge .L142
+	move.l #-32767,%d1
+.L143:
+	lsl.l #3,%d4
+	cmp.l #-32768,%d4
+	jge .L144
+	move.l #-32768,%d4
+.L145:
+	move.w %d4,-2(%a0)
+	cmp.l %a4,%a0
+	jne .L146
+	move.l 68(%sp),%a0
+	move.l %d2,%d0
+	move.l %d0,(%a0)
+	move.l %d1,4(%a0)
+	jra .L87
+.L192:
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d0,%d4
+	add.l %d2,%d2
+	move.l 44(%sp),%d6
+	move.l %d3,%a4
+	move.l 88(%sp),%a0
+	move.l %d7,%a6
+	move.l 48(%sp),%a3
+	move.l %a2,56(%sp)
+	lea lx_soft,%a1
+	lea lx_tanh,%a5
+	move.l %d5,48(%sp)
+	add.l %a0,%d2
+	move.l %d2,%a2
+.L119:
+	mvs.w (%a0)+,%d0
+	move.l %a3,%d7
+	moveq #15,%d3
+	move.l 52(%sp),%d5
+	moveq #12,%d2
+	muls.l %d7,%d0
+	muls.l %d4,%d5
+	moveq #12,%d7
+	add.l #65536,%d4
+	asr.l %d3,%d0
+	moveq #63,%d3
+	asr.l %d2,%d5
+	add.l #65536,%d0
+	and.l %d0,%d3
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%d2
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %d2,%d0
+	muls.l %d3,%d0
+	asr.l #6,%d0
+	add.l %d0,%d2
+	move.l %a4,%d0
+	muls.l %d2,%d0
+	asr.l %d7,%d0
+	move.l %d0,%d3
+	add.l %d1,%d3
+	move.l 56(%sp),%d0
+	add.l %d5,%d3
+	muls.l %d0,%d3
+	asr.l %d7,%d3
+	sub.l %d3,%d2
+	cmp.l #131072,%d4
+	jcc .L195
+	moveq #63,%d5
+	and.l %d4,%d5
+	asr.l #6,%d4
+	move.l (%a1,%d4.l*4),%d0
+	move.l 4(%a1,%d4.l*4),%d4
+	sub.l %d0,%d4
+	muls.l %d5,%d4
+	asr.l #6,%d4
+	add.l %d4,%d0
+.L110:
+	move.l 48(%sp),%d4
+	moveq #12,%d5
+	move.l %a6,%d7
+	muls.l %d2,%d4
+	asr.l %d5,%d4
+	move.l %d4,%d5
+	add.l %d0,%d5
+	muls.l %d7,%d5
+	moveq #12,%d4
+	moveq #12,%d7
+	asr.l %d4,%d5
+	move.l 60(%sp),%d4
+	muls.l %d5,%d4
+	asr.l %d7,%d4
+	sub.l %d4,%d2
+	muls.l %d6,%d2
+	asr.l %d7,%d2
+	move.l %d2,%d4
+	add.l %d0,%d4
+	cmp.l #-32767,%d4
+	jge .L111
+	move.l #-32767,%d4
+.L112:
+	muls.l %d6,%d5
+	moveq #12,%d0
+	asr.l %d0,%d5
+	add.l %d5,%d1
+	cmp.l #-32767,%d1
+	jge .L113
+	move.l #-32767,%d1
+.L114:
+	add.l #8192,%d3
+	cmp.l #16383,%d3
+	jhi .L196
+.L115:
+	moveq #31,%d2
+	and.l %d3,%d2
+	asr.l #5,%d3
+	move.l (%a5,%d3.l*4),%d0
+	move.l 4(%a5,%d3.l*4),%d3
+	sub.l %d0,%d3
+	muls.l %d2,%d3
+	asr.l #5,%d3
+	add.l %d3,%d0
+	cmp.l #-32768,%d0
+	jge .L117
+	move.l #-32768,%d0
+.L116:
+	move.w %d0,-2(%a0)
+	cmp.l %a0,%a2
+	jne .L119
+	move.l 68(%sp),%a0
+	move.l %d4,%d0
+	move.l %d0,(%a0)
+	move.l %d1,4(%a0)
+	jra .L87
+.L113:
+	cmp.l #32767,%d1
+	jle .L114
+	move.l #32767,%d1
+	add.l #8192,%d3
+	cmp.l #16383,%d3
+	jls .L115
+.L196:
+	move.w #-32767,%d0
+	tst.l %d3
+	jlt .L116
+	move.w #32767,%d0
+	jra .L116
+.L111:
+	cmp.l #32767,%d4
+	jle .L112
+	move.l #32767,%d4
+	jra .L112
+.L153:
+	cmp.l #32767,%d2
+	jle .L154
+	move.l #32767,%d2
+	jra .L154
+.L144:
+	cmp.l #32767,%d4
+	jle .L145
+	move.l %a6,%d4
+	jra .L145
+.L142:
+	cmp.l #32767,%d1
+	jle .L143
+	move.l #32767,%d1
+	jra .L143
+.L140:
+	cmp.l #32767,%d2
+	jle .L141
+	move.l %a6,%d2
+	jra .L141
+.L126:
+	cmp.l #32767,%d2
+	jle .L127
+	move.l #32767,%d2
+	move.w %d2,-2(%a0)
+	cmp.l %a0,%a2
+	jne .L128
+	jra .L184
+.L124:
+	cmp.l #32767,%d1
+	jle .L125
+	move.l #32767,%d1
+	jra .L125
+.L122:
+	cmp.l #32767,%d5
+	jle .L123
+	move.l #32767,%d5
+	jra .L123
+.L151:
+	cmp.l #32767,%d1
+	jle .L152
+	move.l #32767,%d1
+	jra .L152
+.L149:
+	cmp.l #32767,%a5
+	jle .L150
+	move.w #32767,%a5
+	jra .L150
+.L117:
+	cmp.l #32767,%d0
+	jle .L116
+	move.l #32767,%d0
+	jra .L116
+.L193:
+	move.w #-8635,%a6
+	tst.l %d0
+	jlt .L121
+	move.w #8635,%a6
+	jra .L121
+.L195:
+	move.l #-8635,%d0
+	tst.l %d4
+	jlt .L110
+	move.l #8635,%d0
+	jra .L110
+.L191:
+	move.w #-8635,%a5
+	tst.l %d3
+	jlt .L148
+	move.w #8635,%a5
+	jra .L148
+.L194:
+	move.l #-8635,%d0
+	tst.l %d3
+	jlt .L139
+	move.l #8635,%d0
+	jra .L139
+.L189:
+	move.l 80(%sp),%d7
+	move.l #4096,%d1
+	lea lx_fq,%a0
+	moveq #12,%d5
+	move.l #5734,%d2
+	sub.l (%a0,%d7.l*4),%d1
+	lea lx_flp2,%a0
+	move.l (%a0,%d0.l*4),%d3
+	move.l %d1,%d4
+	moveq #12,%d0
+	lsl.l %d0,%d4
+	muls.l %d2,%d1
+	move.l #4096,%d0
+	sub.l %d3,%d0
+	asr.l %d5,%d1
+	divs.l %d0,%d4
+	add.l %d1,%d4
+	tst.l %a4
+	jle .L87
+	move.l %a4,%d0
+	move.l %d4,%a3
+	add.l %d0,%d0
+	move.l 68(%sp),%a1
+	move.l 48(%sp),%d6
+	move.l 88(%sp),%a2
+	move.l %a2,%d5
+	move.l 8(%a1),%a0
+	move.l 12(%a1),%d1
+	lea lx_soft,%a1
+	add.l %d0,%d5
+.L95:
+	mvs.w (%a2)+,%d2
+	move.l %a0,%d7
+	move.l %a3,%d0
+	sub.l %d1,%d7
+	muls.l %d0,%d7
+	muls.l %d6,%d2
+	moveq #15,%d0
+	moveq #12,%d4
+	asr.l %d4,%d7
+	asr.l %d0,%d2
+	moveq #63,%d4
+	add.l #65536,%d2
+	and.l %d2,%d4
+	asr.l #6,%d2
+	move.l (%a1,%d2.l*4),%d0
+	move.l 4(%a1,%d2.l*4),%d2
+	sub.l %d0,%d2
+	muls.l %d4,%d2
+	asr.l #6,%d2
+	add.l %d2,%d0
+	sub.l %a0,%d0
+	add.l %d7,%d0
+	muls.l %d3,%d0
+	moveq #12,%d2
+	asr.l %d2,%d0
+	add.l %d0,%a0
+	cmp.l #-4096,%a0
+	jge .L91
+	move.w #-4096,%a0
+.L92:
+	move.l %a0,%d0
+	sub.l %d1,%d0
+	muls.l %d3,%d0
+	moveq #12,%d4
+	asr.l %d4,%d0
+	add.l %d0,%d1
+	cmp.l #-4096,%d1
+	jge .L93
+	move.l #-4096,%d1
+.L94:
+	move.l %d1,%d0
+	moveq #15,%d7
+	lsl.l %d7,%d0
+	moveq #12,%d2
+	sub.l %d1,%d0
+	asr.l %d2,%d0
+	move.w %d0,-2(%a2)
+	cmp.l %a2,%d5
+	jne .L95
+	move.l 68(%sp),%a1
+	move.l %a0,8(%a1)
+	move.l 88(%sp),%a0
+	move.l %d1,12(%a1)
+	move.w %d0,-2(%a0,%a4.l*2)
+	movem.l (%sp),#31996
+	lea (64,%sp),%sp
+	rts
+.L93:
+	cmp.l #4096,%d1
+	jle .L94
+	move.l #4096,%d1
+	jra .L94
+.L91:
+	cmp.l #4096,%a0
+	jle .L92
+	move.w #4096,%a0
+	jra .L92
+.L101:
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d3,%a4
+	add.l %d2,%d2
+	move.l 88(%sp),%a0
+	move.l %d7,%a5
+	move.l %a2,56(%sp)
+	moveq #15,%d7
+	move.l 48(%sp),%a3
+	move.l %a3,%d3
+	move.l 52(%sp),%d4
+	move.l %d5,48(%sp)
+	move.l %d0,%d5
+	move.l %d5,%d0
+	muls.l %d5,%d4
+	moveq #12,%d5
+	add.l #65536,%d0
+	lea lx_soft,%a1
+	add.l %a0,%d2
+	move.l %d2,%a2
+	mvs.w (%a0)+,%d2
+	move.l 44(%sp),%d6
+	asr.l %d5,%d4
+	moveq #63,%d5
+	muls.l %d3,%d2
+	asr.l %d7,%d2
+	move.l 56(%sp),%d7
+	add.l #65536,%d2
+	and.l %d2,%d5
+	asr.l #6,%d2
+	move.l (%a1,%d2.l*4),%d3
+	move.l 4(%a1,%d2.l*4),%d2
+	sub.l %d3,%d2
+	muls.l %d5,%d2
+	moveq #12,%d5
+	asr.l #6,%d2
+	add.l %d2,%d3
+	move.l %a4,%d2
+	muls.l %d3,%d2
+	asr.l %d5,%d2
+	add.l %d1,%d2
+	add.l %d4,%d2
+	muls.l %d7,%d2
+	asr.l %d5,%d2
+	move.l %d3,%d5
+	sub.l %d2,%d5
+	cmp.l #131072,%d0
+	jcc .L197
+.L156:
+	moveq #63,%d4
+	and.l %d0,%d4
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%a6
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %a6,%d0
+	muls.l %d4,%d0
+	asr.l #6,%d0
+	add.l %d0,%a6
+.L157:
+	move.l 48(%sp),%d0
+	moveq #12,%d4
+	move.l %a5,%d7
+	muls.l %d5,%d0
+	asr.l %d4,%d0
+	move.l %d0,%d4
+	add.l %a6,%d4
+	muls.l %d7,%d4
+	moveq #12,%d0
+	moveq #12,%d7
+	asr.l %d0,%d4
+	move.l 60(%sp),%d0
+	muls.l %d4,%d0
+	asr.l %d7,%d0
+	sub.l %d0,%d5
+	muls.l %d6,%d5
+	asr.l %d7,%d5
+	add.l %a6,%d5
+	cmp.l #-32767,%d5
+	jge .L158
+.L198:
+	move.l #-32767,%d5
+.L159:
+	muls.l %d6,%d4
+	moveq #12,%d7
+	asr.l %d7,%d4
+	add.l %d4,%d1
+	cmp.l #-32767,%d1
+	jge .L160
+.L199:
+	move.l #-32767,%d1
+.L161:
+	sub.l %d0,%d3
+	sub.l %d2,%d3
+	sub.l %d3,%d2
+	lsl.l #3,%d2
+	cmp.l #-32768,%d2
+	jge .L162
+.L200:
+	move.l #-32768,%d2
+.L163:
+	move.w %d2,-2(%a0)
+	cmp.l %a0,%a2
+	jeq .L184
+.L187:
+	mvs.w (%a0)+,%d2
+	move.l %a3,%d3
+	moveq #15,%d7
+	move.l 52(%sp),%d4
+	move.l %d5,%d0
+	add.l #65536,%d0
+	muls.l %d3,%d2
+	muls.l %d5,%d4
+	moveq #12,%d5
+	asr.l %d7,%d2
+	asr.l %d5,%d4
+	moveq #63,%d5
+	move.l 56(%sp),%d7
+	add.l #65536,%d2
+	and.l %d2,%d5
+	asr.l #6,%d2
+	move.l (%a1,%d2.l*4),%d3
+	move.l 4(%a1,%d2.l*4),%d2
+	sub.l %d3,%d2
+	muls.l %d5,%d2
+	moveq #12,%d5
+	asr.l #6,%d2
+	add.l %d2,%d3
+	move.l %a4,%d2
+	muls.l %d3,%d2
+	asr.l %d5,%d2
+	add.l %d1,%d2
+	add.l %d4,%d2
+	muls.l %d7,%d2
+	asr.l %d5,%d2
+	move.l %d3,%d5
+	sub.l %d2,%d5
+	cmp.l #131072,%d0
+	jcs .L156
+.L197:
+	move.w #-8635,%a6
+	tst.l %d0
+	jlt .L157
+	move.l 48(%sp),%d0
+	moveq #12,%d4
+	move.w #8635,%a6
+	move.l %a5,%d7
+	muls.l %d5,%d0
+	asr.l %d4,%d0
+	move.l %d0,%d4
+	add.l %a6,%d4
+	muls.l %d7,%d4
+	moveq #12,%d0
+	moveq #12,%d7
+	asr.l %d0,%d4
+	move.l 60(%sp),%d0
+	muls.l %d4,%d0
+	asr.l %d7,%d0
+	sub.l %d0,%d5
+	muls.l %d6,%d5
+	asr.l %d7,%d5
+	add.l %a6,%d5
+	cmp.l #-32767,%d5
+	jlt .L198
+.L158:
+	cmp.l #32767,%d5
+	jle .L159
+	muls.l %d6,%d4
+	moveq #12,%d7
+	move.l #32767,%d5
+	asr.l %d7,%d4
+	add.l %d4,%d1
+	cmp.l #-32767,%d1
+	jlt .L199
+.L160:
+	cmp.l #32767,%d1
+	jle .L161
+	sub.l %d0,%d3
+	sub.l %d2,%d3
+	sub.l %d3,%d2
+	lsl.l #3,%d2
+	move.l #32767,%d1
+	cmp.l #-32768,%d2
+	jlt .L200
+.L162:
+	cmp.l #32767,%d2
+	jle .L163
+	move.l #32767,%d2
+	move.w %d2,-2(%a0)
+	cmp.l %a0,%a2
+	jne .L187
+	jra .L184
+.L96:
+	tst.l %a4
+	jle .L103
+	move.l %a4,%d2
+	move.l %d3,%a5
+	add.l %d2,%d2
+	move.l 88(%sp),%a0
+	move.l %d0,%d3
+	move.l 52(%sp),%d4
+	moveq #15,%d6
+	move.l 48(%sp),%a3
+	move.l %d7,%a6
+	lea lx_soft,%a1
+	add.l #65536,%d3
+	muls.l %d0,%d4
+	move.l %a3,%d0
+	move.l %d5,%d7
+	move.l 44(%sp),%d5
+	lea (%a0,%d2.l),%a4
+	mvs.w (%a0)+,%d2
+	muls.l %d2,%d0
+	moveq #12,%d2
+	asr.l %d2,%d4
+	asr.l %d6,%d0
+	moveq #63,%d6
+	add.l #65536,%d0
+	and.l %d0,%d6
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%d2
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %d2,%d0
+	muls.l %d6,%d0
+	moveq #12,%d6
+	asr.l #6,%d0
+	add.l %d0,%d2
+	move.l %a5,%d0
+	muls.l %d2,%d0
+	asr.l %d6,%d0
+	add.l %d1,%d0
+	add.l %d4,%d0
+	move.l %a2,%d4
+	muls.l %d4,%d0
+	asr.l %d6,%d0
+	sub.l %d0,%d2
+	cmp.l #131072,%d3
+	jcc .L201
+.L129:
+	moveq #63,%d4
+	and.l %d3,%d4
+	asr.l #6,%d3
+	move.l (%a1,%d3.l*4),%d0
+	move.l 4(%a1,%d3.l*4),%d3
+	sub.l %d0,%d3
+	muls.l %d4,%d3
+	asr.l #6,%d3
+	add.l %d3,%d0
+.L130:
+	move.l %d7,%d3
+	moveq #12,%d6
+	muls.l %d2,%d3
+	move.l %a6,%d4
+	asr.l %d6,%d3
+	add.l %d0,%d3
+	muls.l %d4,%d3
+	move.l 60(%sp),%d4
+	asr.l %d6,%d3
+	muls.l %d3,%d4
+	asr.l %d6,%d4
+	sub.l %d4,%d2
+	muls.l %d5,%d2
+	asr.l %d6,%d2
+	add.l %d2,%d0
+	cmp.l #-32767,%d0
+	jge .L131
+.L202:
+	move.l #-32767,%d0
+.L132:
+	move.l %d5,%d2
+	moveq #12,%d6
+	muls.l %d3,%d2
+	asr.l %d6,%d2
+	add.l %d2,%d1
+	cmp.l #-32767,%d1
+	jge .L133
+.L203:
+	move.l #-32767,%d1
+.L134:
+	lsl.l #3,%d3
+	cmp.l #-32768,%d3
+	jge .L135
+.L204:
+	move.l #-32768,%d3
+.L136:
+	move.w %d3,-2(%a0)
+	cmp.l %a0,%a4
+	jeq .L103
+.L188:
+	move.l 52(%sp),%d4
+	move.l %d0,%d3
+	mvs.w (%a0)+,%d2
+	moveq #15,%d6
+	add.l #65536,%d3
+	muls.l %d0,%d4
+	move.l %a3,%d0
+	muls.l %d2,%d0
+	moveq #12,%d2
+	asr.l %d2,%d4
+	asr.l %d6,%d0
+	moveq #63,%d6
+	add.l #65536,%d0
+	and.l %d0,%d6
+	asr.l #6,%d0
+	move.l (%a1,%d0.l*4),%d2
+	move.l 4(%a1,%d0.l*4),%d0
+	sub.l %d2,%d0
+	muls.l %d6,%d0
+	moveq #12,%d6
+	asr.l #6,%d0
+	add.l %d0,%d2
+	move.l %a5,%d0
+	muls.l %d2,%d0
+	asr.l %d6,%d0
+	add.l %d1,%d0
+	add.l %d4,%d0
+	move.l %a2,%d4
+	muls.l %d4,%d0
+	asr.l %d6,%d0
+	sub.l %d0,%d2
+	cmp.l #131072,%d3
+	jcs .L129
+.L201:
+	move.l #-8635,%d0
+	tst.l %d3
+	jlt .L130
+	move.l %d7,%d3
+	moveq #12,%d6
+	muls.l %d2,%d3
+	move.l #8635,%d0
+	move.l %a6,%d4
+	asr.l %d6,%d3
+	add.l %d0,%d3
+	muls.l %d4,%d3
+	move.l 60(%sp),%d4
+	asr.l %d6,%d3
+	muls.l %d3,%d4
+	asr.l %d6,%d4
+	sub.l %d4,%d2
+	muls.l %d5,%d2
+	asr.l %d6,%d2
+	add.l %d2,%d0
+	cmp.l #-32767,%d0
+	jlt .L202
+.L131:
+	cmp.l #32767,%d0
+	jle .L132
+	move.l %d5,%d2
+	moveq #12,%d6
+	muls.l %d3,%d2
+	move.l #32767,%d0
+	asr.l %d6,%d2
+	add.l %d2,%d1
+	cmp.l #-32767,%d1
+	jlt .L203
+.L133:
+	cmp.l #32767,%d1
+	jle .L134
+	lsl.l #3,%d3
+	move.l #32767,%d1
+	cmp.l #-32768,%d3
+	jlt .L204
+.L135:
+	cmp.l #32767,%d3
+	jle .L136
+	move.l #32767,%d3
+	move.w %d3,-2(%a0)
+	cmp.l %a0,%a4
+	jne .L188
+	jra .L103
+	.size	svf_block, .-svf_block
 	.align	2
 	.globl	lxr_params
 	.type	lxr_params, @function
 lxr_params:
 	lea (-12,%sp),%sp
 	move.l 16(%sp),%d0
-	move.l #366,%d1
+	move.l #564,%d1
 	movem.l #28,(%sp)
 	move.l 20(%sp),%d3
 	move.l %d3,%a1
@@ -896,381 +1751,392 @@ lxr_params:
 	lea (22,%a1),%a1
 	move.l %d0,%a0
 	add.l #v_+32,%a0
-.L125:
+.L208:
 	move.w (%a1)+,%d2
 	move.l %d4,%d0
 	mvs.w %d2,%d1
 	move.l %d1,(%a0)
 	cmp.l #32512,%d1
-	jgt .L124
+	jgt .L207
 	move.l %d1,%d0
 	tst.l %d1
-	jlt .L129
-.L124:
+	jlt .L212
+.L207:
 	move.l %d0,(%a0)+
 	cmp.l %a1,%d3
-	jne .L125
-.L130:
+	jne .L208
+.L213:
 	movem.l (%sp),#28
 	lea (12,%sp),%sp
 	rts
-.L129:
+.L212:
 	clr.l %d0
 	move.l %d0,(%a0)+
 	cmp.l %a1,%d3
-	jne .L125
-	jra .L130
+	jne .L208
+	jra .L213
 	.size	lxr_params, .-lxr_params
 	.align	2
 	.globl	lxr_fill
 	.type	lxr_fill, @function
 lxr_fill:
-	lea (-432,%sp),%sp
-	movem.l #31996,(%sp)
-	move.l 436(%sp),%a5
-	move.l #366,%d2
-	move.l %a5,%d1
+	link.w %fp,#-444
+	movem.l #15612,(%sp)
+	move.l 8(%fp),%a3
+	move.l #564,%d2
+	move.l %a3,%d1
 	muls.l %d2,%d1
-	lea v_,%a0
-	move.l %d1,56(%sp)
-	move.l 44(%a0,%d1.l),%d1
+	move.l %d1,%a0
+	add.l #v_,%a0
+	move.l %d1,-380(%fp)
+	move.l 44(%a0),%d1
 	move.l %d1,%d0
+	move.l %a0,-368(%fp)
 	asr.l #8,%d0
 	tst.l %d1
-	jlt .L347
-.L132:
+	jlt .L430
+.L215:
 	move.l %d0,%d1
 	asr.l #4,%d1
 	moveq #127,%d2
-	move.l %d1,%a4
+	move.l %d1,%a2
 	cmp.l %d0,%d2
-	jge .L133
-	move.w #7,%a4
-.L133:
+	jge .L216
+	move.w #7,%a2
+.L216:
 	lea lx_kind,%a0
-	move.b (%a0,%a4.l),%d2
-	mvz.b %d2,%d3
-	move.l %d3,44(%sp)
-	tst.l 440(%sp)
-	jne .L134
-	moveq #1,%d4
-	swap %d4
-	move.l %d4,440(%sp)
-.L134:
-	move.l 56(%sp),%a0
+	move.b (%a0,%a2.l),%d4
+	mvz.b %d4,%d3
+	move.l %d3,-388(%fp)
+	tst.l 12(%fp)
+	jne .L217
+	moveq #1,%d5
+	swap %d5
+	move.l %d5,12(%fp)
+.L217:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
-	move.l %a4,%d0
+	move.l %a2,%d0
 	addq.l #1,%d0
 	lea (48,%a0),%a1
 	cmp.l (%a1),%d0
-	jeq .L348
-	moveq #1,%d5
-	swap %d5
-	move.l %d0,(%a1)
-	move.l #625341585,%d6
-	move.l %a5,%d1
+	jeq .L218
+	moveq #1,%d6
+	swap %d6
+	move.l %a3,%d1
+	move.l #625341585,%d7
 	addq.l #1,%d1
-	muls.l %d1,%d6
-	clr.l 196(%a0)
-	moveq #-1,%d7
-	clr.l 200(%a0)
-	moveq #11,%d4
-	move.l 56(%sp),%a1
-	add.l #v_,%a1
-	move.l 36(%a1),%d1
-	move.l %d7,232(%a0)
-	move.l %d7,228(%a0)
-	move.l %d5,192(%a0)
-	move.l %d1,%d5
-	asr.l #8,%d5
-	move.l %d6,52(%a0)
-	move.w #-1,%a2
-	clr.l 140(%a0)
-	move.l 32(%a1),%d0
-	asr.l #8,%d0
-	move.l %d5,%d7
-	lsl.l %d4,%d7
-	moveq #18,%d4
-	move.l %d0,%d3
-	lsl.l #4,%d3
-	move.l 40(%a1),%d1
-	asr.l #8,%d1
-	clr.l 152(%a0)
-	clr.l 136(%a0)
-	clr.l 144(%a0)
-	move.l %d1,%d6
-	clr.l 160(%a0)
-	clr.l 156(%a0)
-	clr.l 184(%a0)
-	lsl.l %d4,%d6
-	clr.l 188(%a0)
+	muls.l %d1,%d7
+	move.l %d0,(%a1)
+	moveq #-1,%d0
 	clr.l 204(%a0)
-	or.l %d7,%d3
-	or.l %d6,%d3
-	move.l %a4,%d6
-	or.l %d6,%d3
-	cmp.l %d3,%a2
-	jne .L349
-.L137:
-	move.l 56(%sp),%a1
-	add.l #v_,%a1
-	mvz.b 24(%a1),%d0
-	lea (232,%a1),%a1
-	cmp.l (%a1),%d0
-	jne .L163
-.L171:
-	lea dr_trig,%a0
-	tst.b (%a0,%a5.l)
-	jne .L350
-.L165:
-	move.l 56(%sp),%a0
+	clr.l 216(%a0)
+	clr.l 200(%a0)
+	clr.l 208(%a0)
+	clr.l 224(%a0)
+	move.l %d6,256(%a0)
+	move.l %d7,52(%a0)
+	clr.l 220(%a0)
+	clr.l 248(%a0)
+	clr.l 252(%a0)
+	clr.l 260(%a0)
+	clr.l 264(%a0)
+	clr.l 268(%a0)
+	move.l %d0,300(%a0)
+	move.l %d0,296(%a0)
+	move.l %d0,160(%a0)
+	move.l %d0,124(%a0)
+	move.l %d0,88(%a0)
+.L218:
+	moveq #11,%d2
+	moveq #18,%d7
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
-	tst.l 140(%a0)
-	jne .L182
-	tst.l 160(%a0)
-	jeq .L351
-.L182:
-	move.l 56(%sp),%a3
+	move.l 36(%a0),%d1
+	move.l %d1,%d5
+	move.l 32(%a0),%d0
+	asr.l #8,%d5
+	asr.l #8,%d0
+	move.l 40(%a0),%d1
+	move.l %d1,%d3
+	asr.l #8,%d3
+	move.l %d5,%d6
+	move.l %d0,%d1
+	lsl.l %d2,%d6
+	lsl.l #4,%d1
+	move.l %d3,%d2
+	lsl.l %d7,%d2
+	or.l %d6,%d1
+	or.l %d2,%d1
+	move.l %a2,%d2
+	or.l %d2,%d1
+	cmp.l 296(%a0),%d1
+	jne .L431
+	move.l -380(%fp),%a4
+	add.l #v_,%a4
+	mvz.b 24(%a4),%d0
+	lea (300,%a4),%a4
+	cmp.l (%a4),%d0
+	jne .L245
+.L257:
+	lea dr_trig,%a0
+	tst.b (%a0,%a3.l)
+	jne .L432
+.L247:
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	tst.l 204(%a0)
+	jne .L269
+	tst.l 224(%a0)
+	jeq .L433
+.L269:
+	move.l -380(%fp),%a3
 	add.l #v_,%a3
-	move.l 192(%a3),%d4
-	move.l %d4,52(%sp)
+	move.l 256(%a3),%d4
+	move.l %d4,-384(%fp)
 	add.l #1928511,%d4
-	move.l %d4,92(%sp)
+	move.l %d4,-340(%fp)
 	clr.w %d4
 	swap %d4
-	move.l %d4,60(%sp)
+	move.l %d4,-376(%fp)
 	tst.l %d4
-	jeq .L185
-	move.l 56(%sp),%a0
-	add.l #v_+76,%a0
-	move.l %a0,76(%sp)
-	lea (184,%a3),%a0
-	sub.l %a5,%a5
-	move.l 56(%sp),%a1
-	add.l #v_+96,%a1
-	move.l %a1,84(%sp)
-	move.l %a0,68(%sp)
-	move.l 204(%a3),%d5
-	move.l 56(%sp),%d6
-	add.l #v_+56,%d6
-	lea (212,%a3),%a1
-	lea (216,%a3),%a0
-	move.l 56(%sp),%d7
-	add.l #v_+52,%d7
-	move.l 56(%sp),%d1
-	add.l #v_+168,%d1
-	move.l 56(%sp),%d2
-	add.l #v_+116,%d2
-	move.l 56(%sp),%a4
-	add.l #v_+236,%a4
-	move.l %d6,64(%sp)
-	move.l %d7,48(%sp)
-	move.l %d1,72(%sp)
-	move.l %d2,96(%sp)
-	lea (188,%a3),%a6
-	move.l %a1,80(%sp)
-	move.l %a0,88(%sp)
-.L267:
+	jeq .L272
+	move.l -380(%fp),%a0
+	add.l #v_+128,%a0
+	move.l -380(%fp),%a1
+	add.l #v_+232,%a1
+	move.l %a0,-348(%fp)
+	move.l -380(%fp),%a2
+	add.l #v_+304,%a2
+	move.l %a1,-356(%fp)
+	move.l %a2,-396(%fp)
+	lea (252,%a3),%a5
+	move.l 268(%a3),%d3
+	move.l %a5,%a4
+	lea (248,%a3),%a0
+	lea (276,%a3),%a1
+	move.l -380(%fp),%d5
+	add.l #v_+56,%d5
+	move.l -380(%fp),%d6
+	add.l #v_+52,%d6
+	move.l -380(%fp),%d7
+	add.l #v_+92,%d7
+	move.l -380(%fp),%d1
+	add.l #v_+164,%d1
+	lea (280,%a3),%a2
+	move.l %d5,-372(%fp)
+	move.l %d6,-384(%fp)
+	move.l %d7,-360(%fp)
+	move.l %d1,-336(%fp)
+	clr.l -392(%fp)
+	move.l %a0,-364(%fp)
+	move.l %a1,-352(%fp)
+	move.l %a2,-344(%fp)
+.L345:
 	moveq #64,%d0
-	move.l 60(%sp),%d2
-	sub.l %d5,%d0
-	sub.l %a5,%d2
+	sub.l %d3,%d0
+	move.l -376(%fp),%d2
+	sub.l -392(%fp),%d2
 	cmp.l %d2,%d0
-	jge .L186
+	jge .L273
 	move.l %d0,%d2
-.L186:
-	move.l %a5,%d0
+.L273:
+	move.l -392(%fp),%d0
+	lea (-324,%fp),%a0
 	add.l %d0,%d0
-	lea 108(%sp,%d0.l),%a2
-	tst.l %d5
-	jeq .L352
-	mvz.b 30(%a3),%d3
+	lea (%a0,%d0.l),%a5
+	tst.l %d3
+	jeq .L434
+	mvz.b 30(%a3),%d5
 	moveq #15,%d4
 	moveq #127,%d6
-	lsl.l %d4,%d3
-	add.l #63,%d3
-	divs.l %d6,%d3
-	tst.l 44(%sp)
-	jeq .L222
-	moveq #1,%d4
-	cmp.l 44(%sp),%d4
-	jeq .L224
+	lsl.l %d4,%d5
+	add.l #63,%d5
+	divs.l %d6,%d5
+	tst.l -388(%fp)
+	jeq .L309
+	moveq #1,%d3
+	cmp.l -388(%fp),%d3
+	jeq .L311
 	mvz.b 7(%a3),%d0
-	moveq #15,%d7
+	moveq #15,%d3
 	moveq #127,%d4
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
-	lsl.l %d7,%d0
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
+	moveq #127,%d6
+	lsl.l %d3,%d0
 	clr.l -(%sp)
 	clr.l -(%sp)
 	add.l #63,%d0
 	divs.l %d4,%d0
+	move.l %fp,%d4
+	add.l #-128,%d4
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	pea 200(%sp)
-	move.l 104(%sp),-(%sp)
+	pea -256(%fp)
+	move.l -360(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 8(%a3),%d0
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	clr.l -(%sp)
-	lsl.l %d7,%d0
+	lsl.l %d3,%d0
 	clr.l -(%sp)
-	move.l %sp,%d5
-	add.l #320,%d5
 	add.l #63,%d0
-	divs.l %d4,%d0
+	divs.l %d6,%d0
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %d5,-(%sp)
-	move.l 112(%sp),-(%sp)
+	move.l %d4,-(%sp)
+	move.l -348(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	tst.l %d2
-	jle .L249
-.L392:
-	move.l %d2,%d4
-	move.l %d5,%a1
-	add.l %d4,%d4
-	lea (176,%sp),%a0
-	move.l %a0,%d5
+	jle .L332
+.L466:
+	move.l %d2,%d3
+	move.l %d4,%a1
+	add.l %d3,%d3
+	lea (-256,%fp),%a0
+	move.l %a0,%d4
 	move.l #32767,%d7
 	move.l #-32768,%d6
-	add.l %d4,%d5
-.L252:
+	add.l %d3,%d4
+.L335:
 	mvs.w (%a0)+,%d0
 	mvs.w (%a1)+,%d1
 	add.l %d1,%d0
 	cmp.l #-32768,%d0
-	jge .L250
+	jge .L333
 	move.l %d6,%d0
-.L251:
+.L334:
 	move.w %d0,-2(%a0)
-	cmp.l %a0,%d5
-	jne .L252
-.L366:
-	moveq #3,%d5
-	cmp.l 44(%sp),%d5
-	jeq .L353
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	cmp.l %a0,%d4
+	jne .L335
+.L442:
+	moveq #3,%d7
+	cmp.l -388(%fp),%d7
+	jeq .L435
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	move.l #32768,-(%sp)
-	pea 188(%sp)
+	pea -256(%fp)
 	move.l #32768,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	add.l %a2,%d4
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 23(%a3),%d5
-	mvz.b 22(%a3),%d3
+	mvz.b 22(%a3),%d4
 	move.l %d2,-(%sp)
 	mvz.b 21(%a3),%d1
 	mvz.b 20(%a3),%d0
-	move.l %a2,-(%sp)
+	move.l %a5,-(%sp)
 	move.l %d5,-(%sp)
-	move.l %d3,-(%sp)
+	move.l %d4,-(%sp)
 	move.l %d1,-(%sp)
-	move.l %d0,%a0
-	pea 1(%a0)
-	move.l 96(%sp),-(%sp)
+	move.l %d0,%a1
+	pea 1(%a1)
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	lea (28,%sp),%sp
-	move.l 80(%sp),%a0
-	move.l (%a0),%d6
-	move.l %a2,%a0
-.L259:
-	mvs.w (%a0)+,%d0
+	move.l %d2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (40,%sp),%sp
+	move.l -352(%fp),%a0
+	lea (%a5,%d3.l),%a1
+	move.l (%a0),%d5
+	move.l %a5,%a0
+.L338:
+	mvs.w (%a0),%d0
 	moveq #15,%d1
-	muls.l %d6,%d0
+	moveq #9,%d4
+	move.l -396(%fp),%a2
+	muls.l %d5,%d0
 	asr.l %d1,%d0
+	add.l #32768,%d0
 	move.l %d0,%d1
-	tst.l %d0
-	jlt .L354
-	moveq #9,%d3
-	move.l %d1,%d5
-	asr.l %d3,%d1
-	and.l #511,%d5
-	moveq #63,%d3
-	move.l %d1,%d7
-	add.l %d7,%d7
-	cmp.l %d1,%d3
-	jge .L256
-.L356:
-	mvs.w 128(%a4),%d1
-	tst.l %d0
-	jlt .L355
-.L258:
-	move.w %d1,-2(%a0)
-	cmp.l %a0,%d4
-	jne .L259
-.L240:
+	asr.l %d4,%d1
+	and.l #511,%d0
+	add.l %d1,%d1
+	mvs.w (%a2,%d1.l),%d4
+	mvs.w 2(%a2,%d1.l),%d1
+	sub.l %d4,%d1
+	muls.l %d1,%d0
+	moveq #9,%d1
+	asr.l %d1,%d0
+	add.l %d4,%d0
+	move.w %d0,(%a0)+
+	cmp.l %a0,%a1
+	jne .L338
+.L323:
 	mvz.b 26(%a3),%d0
-	lea lx_decim,%a0
-	move.l (%a0,%d0.l*4),%a1
-	cmp.l #65536,%a1
-	jcc .L260
-	move.l 68(%sp),%a0
-	clr.l %d1
+	lea lx_decim,%a2
+	move.l (%a2,%d0.l*4),%d1
+	cmp.l #65536,%d1
+	jcc .L327
+.L340:
+	move.l -364(%fp),%a0
+	add.l %a5,%d3
 	move.l (%a0),%d0
-.L266:
-	add.l %a1,%d0
+.L344:
+	add.l %d1,%d0
 	cmp.l #65536,%d0
-	jcc .L264
-	move.w 2(%a6),%a0
-	addq.l #1,%d1
-	move.w %a0,(%a2)+
-	cmp.l %d2,%d1
-	jlt .L266
-.L367:
-	move.l 68(%sp),%a0
+	jcc .L342
+	move.w 2(%a4),%a0
+	move.w %a0,(%a5)+
+	cmp.l %d3,%a5
+	jne .L344
+.L443:
+	move.l -364(%fp),%a0
 	move.l %d0,(%a0)
-.L262:
-	move.l %d2,%d5
+.L341:
+	move.l %d2,%d3
 	moveq #63,%d0
-	add.l 204(%a3),%d5
-	lea (204,%a3),%a0
-	add.l %d2,%a5
-	and.l %d0,%d5
-	move.l %d5,(%a0)
-	cmp.l 60(%sp),%a5
-	jlt .L267
-.L368:
-	move.l 192(%a3),%a3
-	move.l %a3,52(%sp)
-.L185:
-	move.w #4095,%a4
-	move.l 56(%sp),%a0
-	add.l #v_,%a0
-	move.l 52(%sp),%d5
-	lea sampler_buf+288,%a5
-	move.l 60(%sp),%d1
-	subq.l #2,%d1
-	move.l 196(%a0),100(%sp)
-	move.l 200(%a0),104(%sp)
-	move.l 60(%sp),%a6
-	subq.l #1,%a6
-	lea sampler_buf+32,%a0
-	move.l %d1,48(%sp)
+	add.l 268(%a3),%d3
+	add.l %d2,-392(%fp)
+	lea (268,%a3),%a0
+	move.l -392(%fp),%d1
+	and.l %d0,%d3
+	move.l %d3,(%a0)
+	cmp.l -376(%fp),%d1
+	jlt .L345
+.L440:
+	move.l 256(%a3),%a3
+	move.l %a3,-384(%fp)
 .L272:
+	move.w #4095,%a4
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	move.l -384(%fp),%d5
+	lea sampler_buf+288,%a5
+	move.l -376(%fp),%d2
+	subq.l #1,%d2
+	move.l -376(%fp),%d3
+	subq.l #2,%d3
+	move.l 260(%a0),-332(%fp)
+	move.l 264(%a0),-328(%fp)
+	move.l %d2,-392(%fp)
+	lea sampler_buf+32,%a0
+	move.l %d3,-388(%fp)
+.L350:
 	move.l %d5,%d0
 	move.l %d5,%d1
+	move.l %a4,%d4
+	asr.l #4,%d1
 	clr.w %d0
 	swap %d0
-	asr.l #4,%d1
-	move.l %a4,%d4
 	subq.l #2,%d0
-	cmp.l %d0,%a6
-	jle .L268
+	cmp.l -392(%fp),%d0
+	jge .L346
 	move.l %d1,%d4
 	and.l #4095,%d4
-.L269:
+.L347:
 	add.l #2147483647,%d0
 	add.l %d0,%d0
-	lea (432,%sp),%a1
-	add.l %d0,%a1
+	lea (%fp,%d0.l),%a1
 	mvs.w -322(%a1),%d1
 	mvs.w -326(%a1),%d0
 	move.w -324(%a1),%d2
@@ -1281,7 +2147,7 @@ lxr_fill:
 	sub.l %d0,%d7
 	asr.l #1,%d7
 	asr.l #1,%d3
-	move.l %d7,44(%sp)
+	move.l %d7,-372(%fp)
 	mvs.w %d2,%d7
 	muls.w #5,%d2
 	move.l %d6,%a3
@@ -1299,7 +2165,7 @@ lxr_fill:
 	sub.l %d3,%d0
 	add.l %a2,%d1
 	asr.l #1,%d1
-	add.l 44(%sp),%d1
+	add.l -372(%fp),%d1
 	muls.l %d4,%d1
 	asr.l %d2,%d1
 	add.l %d1,%d0
@@ -1310,9 +2176,9 @@ lxr_fill:
 	asr.l %d2,%d0
 	add.l %d7,%d0
 	cmp.l #-32768,%d0
-	jge .L270
+	jge .L348
 	move.l #-32768,%d0
-.L271:
+.L349:
 	moveq #15,%d3
 	addq.l #8,%a0
 	lsl.l %d3,%d0
@@ -1320,296 +2186,300 @@ lxr_fill:
 	move.l %d0,-4(%a0)
 	move.l %d0,-8(%a0)
 	cmp.l %a5,%a0
-	jne .L272
-.L365:
-	move.l 92(%sp),%d1
+	jne .L350
+.L441:
+	move.l -340(%fp),%d1
 	move.l #1928512,%a1
-	move.l 60(%sp),%d0
+	move.l -376(%fp),%d0
 	add.l #2147483645,%d0
 	add.l %d0,%d0
 	and.l #-65536,%d1
-	move.l 56(%sp),%a0
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	sub.l %d1,%a1
-	add.l 52(%sp),%a1
-	move.l %a1,192(%a0)
-	lea (432,%sp),%a1
-	add.l %d0,%a1
-	move.w -326(%a1),196(%a0)
-	move.w -324(%a1),198(%a0)
-	move.w -322(%a1),200(%a0)
-	move.w -320(%a1),202(%a0)
-.L131:
-	movem.l (%sp),#31996
-	lea (432,%sp),%sp
+	add.l -384(%fp),%a1
+	move.l %a1,256(%a0)
+	lea (%fp,%d0.l),%a1
+	move.w -326(%a1),260(%a0)
+	move.w -324(%a1),262(%a0)
+	move.w -322(%a1),264(%a0)
+	move.w -320(%a1),266(%a0)
+.L214:
+	movem.l -444(%fp),#15612
+	unlk %fp
 	rts
-.L355:
-	neg.l %d1
-	move.w %d1,-2(%a0)
-	cmp.l %a0,%d4
-	jne .L259
-	jra .L240
-.L354:
-	neg.l %d1
-	moveq #9,%d3
-	move.l %d1,%d5
-	asr.l %d3,%d1
-	and.l #511,%d5
-	moveq #63,%d3
-	move.l %d1,%d7
-	add.l %d7,%d7
-	cmp.l %d1,%d3
-	jlt .L356
-.L256:
-	mvs.w (%a4,%d7.l),%d3
-	mvs.w 2(%a4,%d7.l),%d1
-	sub.l %d3,%d1
-	muls.l %d5,%d1
-	moveq #9,%d5
-	asr.l %d5,%d1
-	add.l %d3,%d1
-	tst.l %d0
-	jge .L258
-	jra .L355
-.L310:
+.L388:
 	clr.l %d7
-	move.l %d7,224(%a3)
-	tst.l 164(%a3)
-	jeq .L189
-.L373:
-	mvz.b 15(%a3),%d3
+	move.l %d7,288(%a3)
+	tst.l 228(%a3)
+	jeq .L276
+.L445:
+	mvz.b 15(%a3),%d4
 	lea lx_dec,%a1
-	moveq #2,%d4
+	moveq #2,%d5
 	mvz.b 16(%a3),%d0
-	move.l (%a1,%d3.l*4),%d3
+	move.l (%a1,%d4.l*4),%d4
 	lea lx_vsl,%a1
 	move.l (%a1,%d0.l*4),%d0
-	move.l 140(%a3),%a0
-	lea (140,%a3),%a1
-	cmp.l %a0,%d4
-	jeq .L191
-.L374:
+	move.l 204(%a3),%a0
+	lea (204,%a3),%a1
+	cmp.l %a0,%d5
+	jeq .L278
+.L446:
 	moveq #3,%d6
 	cmp.l %a0,%d6
-	jeq .L192
-	moveq #1,%d3
-	cmp.l %a0,%d3
-	jne .L194
-	add.l 144(%a3),%d1
-	lea (144,%a3),%a0
+	jeq .L279
+	moveq #1,%d4
+	cmp.l %a0,%d4
+	jne .L281
+	add.l 208(%a3),%d1
+	lea (208,%a3),%a0
 	cmp.l #16777215,%d1
-	jle .L357
-	moveq #2,%d3
-	move.l #16777216,%d1
-	move.l %d3,(%a1)
-	moveq #9,%d3
-	asr.l %d3,%d1
-	move.l #16777216,(%a0)
+	jgt .L290
+	moveq #9,%d6
+	move.l %d1,(%a0)
+	asr.l %d6,%d1
 	move.l %d1,%d6
 	tst.l %d1
-	jlt .L358
-.L205:
-	move.l %d0,%d3
-	neg.l %d3
-	muls.l %d6,%d3
+	jlt .L436
+.L292:
+	move.l %d0,%d5
+	neg.l %d5
+	muls.l %d6,%d5
 	move.l #32768,%d4
 	sub.l %d0,%d4
-	muls.l %d6,%d4
-	moveq #14,%d6
 	move.l %d0,%a0
+	moveq #14,%d0
 	add.l #32768,%a0
-	asr.l %d6,%d3
-	add.l %d3,%a0
+	muls.l %d6,%d4
+	asr.l %d0,%d5
+	add.l %d5,%a0
 	tst.l %a0
-	jle .L359
-.L206:
-	move.l %a0,%d3
-	divu.l %d3,%d4
+	jle .L437
+.L293:
+	move.l %a0,%d6
+	divu.l %d6,%d4
 	tst.l %d1
-	jge .L202
-.L334:
+	jge .L289
+.L415:
 	neg.l %d4
-.L202:
-	clr.l 220(%a3)
+.L289:
+	clr.l 284(%a3)
 	move.l #4096,%d0
-	moveq #1,%d3
-	cmp.l 44(%sp),%d3
-	jcc .L360
-.L212:
-	tst.b 27(%a3)
-	jeq .L361
-.L218:
+	moveq #1,%d5
+	cmp.l -388(%fp),%d5
+	jcc .L438
+.L299:
+	move.b 27(%a3),%d1
+	moveq #12,%d5
+	subq.l #1,%d1
+	mvz.b %d1,%d1
+	cmp.l %d1,%d5
+	jcc .L305
+	move.l 216(%a3),%d1
+	lea (216,%a3),%a0
+	tst.l %d1
+	jle .L306
+	move.l %d1,%d3
+	asr.l %d5,%d3
+	mvz.b 29(%a3),%d5
+	lea lx_snap,%a1
+	moveq #12,%d6
+	muls.l %d3,%d3
+	sub.l (%a1,%d5.l*4),%d1
+	move.l %d1,(%a0)
+	moveq #24,%d1
+	asr.l %d6,%d3
+	muls.l %d1,%d3
+.L306:
+	mvz.b 28(%a3),%d1
+	moveq #15,%d5
+	moveq #127,%d6
+	lsl.l %d5,%d1
+	add.l #63,%d1
+	divs.l %d6,%d1
+	muls.l %d3,%d1
+	moveq #15,%d3
+	asr.l %d3,%d1
+	add.l %d1,%d0
+.L305:
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	moveq #15,%d6
-	move.l 56(%sp),%a1
 	mvz.b 4(%a3),%d5
-	mvz.b 3(%a3),%d3
 	mvz.b (%a0,%a1.l),%d1
+	mvz.b 3(%a3),%d3
 	move.l %d0,-(%sp)
-	move.l 444(%sp),-(%sp)
+	move.l 12(%fp),-(%sp)
 	move.l %d5,-(%sp)
-	move.l #osc_tune,%d5
+	moveq #15,%d5
 	move.l %d3,-(%sp)
 	moveq #127,%d3
-	move.l %d5,%a0
-	move.l 80(%sp),-(%sp)
+	lea osc_tune,%a2
+	move.l -372(%fp),-(%sp)
 	move.l %d1,64(%a3)
-	jsr (%a0)
+	jsr (%a2)
 	mvz.b 25(%a3),%d0
 	lea (20,%sp),%sp
 	moveq #15,%d1
 	lsl.l %d1,%d0
-	move.l 80(%sp),%a0
+	move.l -352(%fp),%a0
 	add.l #63,%d0
 	divs.l %d3,%d0
 	move.l %d0,%d1
 	muls.l %d4,%d1
-	move.l %d0,208(%a3)
-	asr.l %d6,%d1
+	move.l %d0,272(%a3)
+	asr.l %d5,%d1
 	move.l %d1,(%a0)
-	tst.l 44(%sp)
-	jeq .L362
-	moveq #1,%d6
-	cmp.l 44(%sp),%d6
-	jne .L223
-	move.l #5632000,%d1
-	moveq #127,%d3
+	tst.l -388(%fp)
+	jeq .L439
+	moveq #1,%d3
+	cmp.l -388(%fp),%d3
+	jne .L310
+	move.l #5632000,%d6
+	moveq #127,%d7
 	mvz.b 18(%a3),%d0
 	pea 16.w
-	moveq #4,%d7
+	moveq #4,%d5
 	move.l #24909643,-(%sp)
-	moveq #127,%d5
-	move.l %d7,124(%a3)
-	muls.l %d1,%d0
-	divu.l %d3,%d0
+	move.l %d5,172(%a3)
+	muls.l %d6,%d0
+	divu.l %d7,%d0
 	move.l %d0,-(%sp)
 	jsr mulshr
-	mvz.b 30(%a3),%d3
+	mvz.b 30(%a3),%d5
 	lea (12,%sp),%sp
-	move.l %d4,160(%a3)
-	moveq #15,%d4
-	lsl.l %d4,%d3
-	move.l %d0,120(%a3)
-	add.l #63,%d3
-	divs.l %d5,%d3
-.L224:
+	move.l %d4,224(%a3)
+	move.l %d0,168(%a3)
+	moveq #15,%d0
+	lsl.l %d0,%d5
+	add.l #63,%d5
+	divs.l %d7,%d5
+.L311:
 	mvz.b 19(%a3),%d4
-	moveq #15,%d5
-	moveq #127,%d6
-	move.l 48(%sp),-(%sp)
+	moveq #15,%d6
+	moveq #127,%d7
+	move.l -384(%fp),-(%sp)
 	clr.l -(%sp)
-	lsl.l %d5,%d4
+	lsl.l %d6,%d4
 	clr.l -(%sp)
 	clr.l -(%sp)
 	pea 29491.w
 	move.l %d2,-(%sp)
-	pea 200(%sp)
+	pea -256(%fp)
 	add.l #63,%d4
-	divs.l %d6,%d4
-	move.l 124(%sp),-(%sp)
+	divs.l %d7,%d4
+	move.l -336(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 23(%a3),%d6
-	mvz.b 22(%a3),%d5
+	mvz.b 22(%a3),%d3
 	move.l %d2,-(%sp)
 	mvz.b 21(%a3),%d1
 	mvz.b 20(%a3),%d0
-	pea 180(%sp)
+	pea -256(%fp)
 	move.l %d6,-(%sp)
-	move.l %d5,-(%sp)
+	move.l %d3,-(%sp)
 	move.l %d1,-(%sp)
 	move.l %d0,%a0
 	pea 1(%a0)
-	move.l 96(%sp),-(%sp)
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	move.l 76(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	clr.l -(%sp)
 	move.l #32768,%d0
 	clr.l -(%sp)
 	sub.l %d4,%d0
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	move.l 120(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (60,%sp),%sp
 	tst.l %d2
-	jle .L234
-	lea (176,%sp),%a1
-	moveq #15,%d3
-	mvs.w (%a1)+,%d0
-	move.l 80(%sp),%a0
-	move.l %d2,%d5
-	add.l %d5,%d5
-	muls.l %d4,%d0
-	move.l (%a0),%d7
+	jle .L324
+	move.l %d2,%d3
+	add.l %d3,%d3
+	lea (-128,%fp),%a2
+	move.l %a2,%d0
 	move.l %a2,%a0
-	mvs.w (%a0)+,%d1
-	asr.l %d3,%d0
-	add.l %a2,%d5
-	add.l %d1,%d0
-	muls.l %d7,%d0
-	asr.l %d3,%d0
-	move.l %d0,%d1
-	cmp.l #-32768,%d0
-	jge .L242
-.L364:
-	move.l #-32768,%d1
-	move.l %d1,%d6
-	neg.l %d6
-.L244:
-	moveq #9,%d3
-	move.l %d6,%d1
-	asr.l %d3,%d1
-	moveq #64,%d3
-	cmp.l %d1,%d3
-	jne .L245
-	mvs.w 128(%a4),%d1
-	tst.l %d0
-	jlt .L363
-.L247:
-	move.w %d1,-2(%a0)
-	cmp.l %d5,%a0
-	jeq .L240
-.L341:
+	add.l %d3,%d0
+.L325:
+	clr.w (%a0)+
+	cmp.l %a0,%d0
+	jne .L325
+	move.l %d2,-(%sp)
+	pea -128(%fp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (12,%sp),%sp
+	move.l %a5,%d6
+	add.l %d3,%d6
+	move.l %d2,-400(%fp)
+	move.l -352(%fp),%a0
+	lea (-256,%fp),%a1
+	move.l %a3,-404(%fp)
+	move.l (%a0),%d7
+	move.l %a5,%a0
+.L331:
 	mvs.w (%a1)+,%d0
-	moveq #15,%d3
-	mvs.w (%a0)+,%d1
+	moveq #15,%d2
+	mvs.w (%a0)+,%d5
+	mvs.w (%a2)+,%d1
 	muls.l %d4,%d0
-	asr.l %d3,%d0
+	asr.l %d2,%d0
+	add.l %d5,%d0
 	add.l %d1,%d0
 	muls.l %d7,%d0
-	asr.l %d3,%d0
-	move.l %d0,%d1
-	cmp.l #-32768,%d0
-	jlt .L364
-.L242:
+	move.l %d0,%d5
+	asr.l %d2,%d5
+	cmp.l #-1073741824,%d0
+	jge .L329
+	move.l #-32768,%d5
+.L330:
+	add.l #32768,%d5
+	moveq #9,%d1
+	moveq #9,%d2
+	move.l %d5,%d0
+	asr.l %d1,%d0
+	move.l -396(%fp),%a3
+	and.l #511,%d5
+	add.l %d0,%d0
+	mvs.w (%a3,%d0.l),%d1
+	mvs.w 2(%a3,%d0.l),%d0
+	sub.l %d1,%d0
+	muls.l %d5,%d0
+	asr.l %d2,%d0
+	add.l %d1,%d0
+	move.w %d0,-2(%a0)
+	cmp.l %a0,%d6
+	jne .L331
+.L444:
+	move.l -404(%fp),%a3
+	lea lx_decim,%a2
+	move.l -400(%fp),%d2
+	mvz.b 26(%a3),%d0
+	move.l (%a2,%d0.l*4),%d1
+	cmp.l #65536,%d1
+	jcs .L340
+.L327:
+	mvs.w -2(%a5,%d2.l*2),%d0
+	move.l %d0,(%a4)
+.L473:
+	move.l %d2,%d3
+	moveq #63,%d0
+	add.l 268(%a3),%d3
+	add.l %d2,-392(%fp)
+	lea (268,%a3),%a0
+	move.l -392(%fp),%d1
+	and.l %d0,%d3
+	move.l %d3,(%a0)
+	cmp.l -376(%fp),%d1
+	jlt .L345
+	jra .L440
+.L348:
 	cmp.l #32767,%d0
-	jle .L243
-	move.l #32767,%d6
-	moveq #63,%d1
-.L245:
-	add.l %d1,%d1
-	and.l #511,%d6
-	mvs.w (%a4,%d1.l),%d3
-	mvs.w 2(%a4,%d1.l),%d1
-	sub.l %d3,%d1
-	muls.l %d6,%d1
-	moveq #9,%d6
-	asr.l %d6,%d1
-	add.l %d3,%d1
-	tst.l %d0
-	jge .L247
-.L363:
-	neg.l %d1
-	move.w %d1,-2(%a0)
-	cmp.l %d5,%a0
-	jne .L341
-	jra .L240
-.L270:
-	cmp.l #32767,%d0
-	jle .L271
+	jle .L349
 	move.l #32767,%d0
 	moveq #15,%d3
 	lsl.l %d3,%d0
@@ -1618,573 +2488,592 @@ lxr_fill:
 	move.l %d0,-4(%a0)
 	move.l %d0,-8(%a0)
 	cmp.l %a5,%a0
-	jne .L272
-	jra .L365
-.L250:
+	jne .L350
+	jra .L441
+.L333:
 	cmp.l #32767,%d0
-	jle .L251
+	jle .L334
 	move.l %d7,%d0
 	move.w %d0,-2(%a0)
-	cmp.l %a0,%d5
-	jne .L252
-	jra .L366
-.L264:
-	move.w (%a2),%a0
+	cmp.l %a0,%d4
+	jne .L335
+	jra .L442
+.L342:
+	move.w (%a5),%a0
 	add.l #-65536,%d0
-	addq.l #1,%d1
-	mvs.w %a0,%d3
-	move.w %a0,(%a2)+
-	move.l %d3,(%a6)
-	cmp.l %d2,%d1
-	jlt .L266
-	jra .L367
-.L268:
-	move.l 48(%sp),%d0
-	jra .L269
-.L243:
-	move.l %d0,%d6
-	tst.l %d0
-	jge .L244
-	move.l %d1,%d6
-	neg.l %d6
-	jra .L244
-.L234:
-	mvz.b 26(%a3),%d0
-	move.l #65536,%a1
-	lea lx_decim,%a0
-	cmp.l (%a0,%d0.l*4),%a1
-	jhi .L262
-.L260:
-	mvs.w -2(%a2,%d2.l*2),%d0
-	move.l %d2,%d5
-	add.l %d2,%a5
-	add.l 204(%a3),%d5
-	lea (204,%a3),%a0
-	move.l %d0,(%a6)
-	moveq #63,%d0
-	and.l %d0,%d5
-	move.l %d5,(%a0)
-	cmp.l 60(%sp),%a5
-	jlt .L267
-	jra .L368
-.L362:
+	move.w %a0,(%a5)+
+	mvs.w %a0,%d4
+	move.l %d4,(%a4)
+	cmp.l %d3,%a5
+	jne .L344
+	jra .L443
+.L346:
+	move.l -388(%fp),%d0
+	jra .L347
+.L329:
+	cmp.l #32767,%d5
+	jle .L330
+	move.l #32767,%d5
+	moveq #9,%d1
+	add.l #32768,%d5
+	move.l %d5,%d0
+	asr.l %d1,%d0
+	move.l -396(%fp),%a3
+	moveq #9,%d2
+	and.l #511,%d5
+	add.l %d0,%d0
+	mvs.w (%a3,%d0.l),%d1
+	mvs.w 2(%a3,%d0.l),%d0
+	sub.l %d1,%d0
+	muls.l %d5,%d0
+	asr.l %d2,%d0
+	add.l %d1,%d0
+	move.w %d0,-2(%a0)
+	cmp.l %a0,%d6
+	jne .L331
+	jra .L444
+.L434:
+	mvz.b 13(%a3),%d0
+	lea lx_att,%a0
+	move.l (%a0,%d0.l*4),%d1
+	cmp.l #16777215,%d1
+	jls .L388
+	moveq #-3,%d0
+	moveq #1,%d4
+	and.l 204(%a3),%d0
+	cmp.l %d0,%d4
+	seq %d0
+	mvs.b %d0,%d7
+	neg.l %d7
+	move.l %d7,288(%a3)
+	tst.l 228(%a3)
+	jne .L445
+.L276:
+	mvz.b 14(%a3),%d4
+	lea lx_dec,%a1
+	moveq #2,%d5
+	mvz.b 16(%a3),%d0
+	move.l (%a1,%d4.l*4),%d4
+	lea lx_vsl,%a1
+	move.l (%a1,%d0.l*4),%d0
+	move.l 204(%a3),%a0
+	lea (204,%a3),%a1
+	cmp.l %a0,%d5
+	jne .L446
+.L278:
+	move.l 208(%a3),%d1
+	lea (208,%a3),%a0
+	tst.l %d1
+	jgt .L447
+	clr.l (%a0)
+	clr.l (%a1)
+.L281:
+	clr.l %d4
+	clr.l 284(%a3)
+	move.l #4096,%d0
+	moveq #1,%d5
+	cmp.l -388(%fp),%d5
+	jcs .L299
+	jra .L438
+.L439:
 	mvz.b 7(%a3),%d0
 	mvz.b 5(%a3),%d3
 	pea 4096.w
 	mvz.b 1(%a3),%d1
-	lsl.l %d6,%d0
-	move.l 444(%sp),-(%sp)
+	lsl.l %d5,%d0
+	move.l 12(%fp),-(%sp)
 	pea 64.w
 	move.l %d3,-(%sp)
 	moveq #127,%d3
-	move.l %d1,84(%a3)
-	move.l %d5,%a0
-	move.l 92(%sp),-(%sp)
+	move.l %d1,100(%a3)
+	move.l -360(%fp),-(%sp)
 	add.l #63,%d0
 	divs.l %d3,%d0
-	move.l %d0,216(%a3)
-	jsr (%a0)
-	mvz.b 30(%a3),%d0
+	move.l %d0,280(%a3)
+	jsr (%a2)
 	lea (20,%sp),%sp
 	tst.l %d7
-	jeq .L221
-	lsl.l %d6,%d0
-	moveq #127,%d1
-	move.l 204(%a3),%d5
-	move.l %d4,156(%a3)
-	move.l %d4,160(%a3)
-	move.l %d0,%d3
-	add.l #63,%d3
-	divs.l %d1,%d3
-.L222:
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
-	move.l 96(%sp),%a0
+	jeq .L308
+	move.l %d4,220(%a3)
+	moveq #127,%d6
+	mvz.b 30(%a3),%d5
+	move.l %d4,224(%a3)
+	moveq #15,%d4
+	move.l 268(%a3),%d3
+	lsl.l %d4,%d5
+	add.l #63,%d5
+	divs.l %d6,%d5
+.L309:
+	move.l -344(%fp),%a0
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	move.l (%a0),%d4
 	clr.l -(%sp)
 	clr.l -(%sp)
 	move.l %d4,-(%sp)
 	move.l %d2,-(%sp)
-	pea 200(%sp)
-	move.l 104(%sp),-(%sp)
+	pea -256(%fp)
+	move.l -360(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	tst.b 9(%a3)
-	jeq .L227
+	jeq .L314
 	move.l #32768,%d0
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	clr.l -(%sp)
 	clr.l -(%sp)
 	sub.l %d4,%d0
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	tst.l %d2
-	jle .L229
-	move.l %d2,%d3
-	move.l %a2,%a0
-	add.l %d3,%d3
-	lea (176,%sp),%a1
+	jle .L316
+	move.l %d2,%d4
+	move.l %a5,%a0
+	add.l %d4,%d4
+	lea (-256,%fp),%a1
 	move.l #32767,%d6
-	move.l #-32768,%d4
-	add.l %a2,%d3
-.L232:
+	move.l #-32768,%d5
+	add.l %a5,%d4
+.L319:
 	mvs.w (%a0)+,%d0
 	mvs.w (%a1)+,%d1
 	add.l %d1,%d0
 	cmp.l #-32768,%d0
-	jge .L230
-	move.l %d4,%d0
-.L231:
+	jge .L317
+	move.l %d5,%d0
+.L318:
 	move.w %d0,-2(%a0)
-	cmp.l %a0,%d3
-	jne .L232
-.L229:
+	cmp.l %d4,%a0
+	jne .L319
+.L316:
 	move.l %d2,-(%sp)
-	mvz.b 23(%a3),%d4
-	mvz.b 22(%a3),%d3
-	mvz.b 20(%a3),%d0
-	move.l %a2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	mvz.b 22(%a3),%d4
+	mvz.b 23(%a3),%d5
+	move.l %d2,-(%sp)
 	mvz.b 21(%a3),%d1
+	mvz.b 20(%a3),%d0
+	move.l %a5,-(%sp)
+	move.l %d5,-(%sp)
 	move.l %d4,-(%sp)
-	move.l %d3,-(%sp)
-	moveq #63,%d3
-	move.l %d0,%a0
 	move.l %d1,-(%sp)
+	move.l %d0,%a0
 	pea 1(%a0)
-	move.l 96(%sp),-(%sp)
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	lea (28,%sp),%sp
-	move.l 160(%a3),%d1
-	move.l 156(%a3),%d4
-	sub.l %d1,%d4
+	move.l 224(%a3),%d4
+	move.l 220(%a3),%d6
+	sub.l %d4,%d6
+	lea (40,%sp),%sp
+	lsl.l #7,%d6
+	moveq #63,%d1
 	lsl.l #7,%d4
-	lsl.l #7,%d1
-	divs.l %d3,%d4
-	muls.l %d4,%d5
-	add.l %d5,%d1
+	divs.l %d1,%d6
+	muls.l %d6,%d3
+	add.l %d3,%d4
 	tst.l %d2
-	jle .L234
-	move.l %d2,%d5
-	move.l %a2,%a0
-	add.l %d5,%d5
-	move.l 208(%a3),%d7
-	move.l %d2,52(%sp)
-	move.l %d5,%a1
-	add.l %a2,%a1
-.L239:
-	mvs.w (%a0)+,%d0
-	move.l %d1,%d5
-	asr.l #7,%d5
-	moveq #15,%d6
-	muls.l %d0,%d5
-	asr.l %d6,%d5
-	move.w %d5,%d3
-	move.w %d5,%d0
-	jmi .L369
-	mvz.w %d0,%d5
-	move.l %d0,%d6
+	jle .L321
+.L448:
+	move.l %d2,%d3
+	move.l %a5,%a0
+	add.l %d3,%d3
+	move.l 272(%a3),%d7
+	lea (%a5,%d3.l),%a1
+.L322:
+	mvs.w (%a0),%d1
+	move.l %d4,%d0
+	asr.l #7,%d0
+	moveq #15,%d5
+	add.l %d6,%d4
+	move.l -396(%fp),%a2
+	muls.l %d1,%d0
+	asr.l %d5,%d0
+	mvs.w %d0,%d0
+	move.l %d0,%d5
 	moveq #9,%d0
-	asr.l %d0,%d5
-	and.l #511,%d6
-	moveq #64,%d2
-	move.l %d5,%d0
+	add.l #32768,%d5
+	move.l %d5,%d1
+	asr.l %d0,%d1
+	and.l #511,%d5
+	move.l %d1,%d0
 	add.l %d0,%d0
-	cmp.l %d5,%d2
-	jne .L236
-.L372:
-	mvs.w 128(%a4),%d0
-	add.l %d4,%d1
-	tst.w %d3
-	jlt .L370
-.L238:
+	mvs.w (%a2,%d0.l),%d1
+	mvs.w 2(%a2,%d0.l),%d0
+	sub.l %d1,%d0
+	muls.l %d5,%d0
+	moveq #9,%d5
+	asr.l %d5,%d0
+	add.l %d1,%d0
 	muls.l %d7,%d0
-	moveq #15,%d2
-	asr.l %d2,%d0
-	move.w %d0,-2(%a0)
+	moveq #15,%d1
+	asr.l %d1,%d0
+	move.w %d0,(%a0)+
 	cmp.l %a1,%a0
-	jne .L239
-.L371:
-	move.l 52(%sp),%d2
-	jra .L240
-.L370:
-	neg.l %d0
-	muls.l %d7,%d0
-	moveq #15,%d2
-	asr.l %d2,%d0
-	move.w %d0,-2(%a0)
-	cmp.l %a1,%a0
-	jne .L239
-	jra .L371
-.L369:
-	move.l %d5,%d0
-	neg.l %d0
-	mvz.w %d0,%d5
-	move.l %d0,%d6
+	jeq .L323
+	mvs.w (%a0),%d1
+	move.l %d4,%d0
+	asr.l #7,%d0
+	moveq #15,%d5
+	add.l %d6,%d4
+	move.l -396(%fp),%a2
+	muls.l %d1,%d0
+	asr.l %d5,%d0
+	mvs.w %d0,%d0
+	move.l %d0,%d5
 	moveq #9,%d0
-	asr.l %d0,%d5
-	and.l #511,%d6
-	moveq #64,%d2
-	move.l %d5,%d0
+	add.l #32768,%d5
+	move.l %d5,%d1
+	asr.l %d0,%d1
+	and.l #511,%d5
+	move.l %d1,%d0
 	add.l %d0,%d0
-	cmp.l %d5,%d2
-	jeq .L372
-.L236:
-	mvs.w (%a4,%d0.l),%d5
-	mvs.w 2(%a4,%d0.l),%d0
-	add.l %d4,%d1
-	sub.l %d5,%d0
-	muls.l %d6,%d0
-	moveq #9,%d6
-	asr.l %d6,%d0
-	add.l %d5,%d0
-	tst.w %d3
-	jge .L238
-	jra .L370
-.L230:
+	mvs.w (%a2,%d0.l),%d1
+	mvs.w 2(%a2,%d0.l),%d0
+	sub.l %d1,%d0
+	muls.l %d5,%d0
+	moveq #9,%d5
+	asr.l %d5,%d0
+	add.l %d1,%d0
+	muls.l %d7,%d0
+	moveq #15,%d1
+	asr.l %d1,%d0
+	move.w %d0,(%a0)+
+	cmp.l %a1,%a0
+	jne .L322
+	jra .L323
+.L317:
 	cmp.l #32767,%d0
-	jle .L231
+	jle .L318
 	move.l %d6,%d0
 	move.w %d0,-2(%a0)
-	cmp.l %a0,%d3
-	jne .L232
-	jra .L229
-.L352:
-	mvz.b 13(%a3),%d0
-	lea lx_att,%a0
-	move.l (%a0,%d0.l*4),%d1
-	cmp.l #16777215,%d1
-	jls .L310
-	moveq #-3,%d0
-	moveq #1,%d3
-	and.l 140(%a3),%d0
-	cmp.l %d0,%d3
-	seq %d0
-	mvs.b %d0,%d7
-	neg.l %d7
-	move.l %d7,224(%a3)
-	tst.l 164(%a3)
-	jne .L373
-.L189:
-	mvz.b 14(%a3),%d3
-	lea lx_dec,%a1
-	moveq #2,%d4
-	mvz.b 16(%a3),%d0
-	move.l (%a1,%d3.l*4),%d3
-	lea lx_vsl,%a1
-	move.l (%a1,%d0.l*4),%d0
-	move.l 140(%a3),%a0
-	lea (140,%a3),%a1
-	cmp.l %a0,%d4
-	jne .L374
-.L191:
-	move.l 144(%a3),%d1
-	lea (144,%a3),%a0
-	tst.l %d1
-	jgt .L375
-	clr.l (%a0)
-	clr.l (%a1)
-.L194:
-	clr.l %d4
-	clr.l 220(%a3)
-	move.l #4096,%d0
-	moveq #1,%d3
-	cmp.l 44(%sp),%d3
-	jcs .L212
-	jra .L360
-.L227:
-	lea (220,%a3),%a0
+	cmp.l %d4,%a0
+	jne .L319
+	jra .L316
+.L314:
+	lea (284,%a3),%a0
 	moveq #15,%d0
 	muls.l (%a0),%d4
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	asr.l %d0,%d4
 	move.l %d4,-(%sp)
-	pea 188(%sp)
+	pea -256(%fp)
 	move.l #32768,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
-	jra .L229
-.L353:
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l %d2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	mvz.b 22(%a3),%d4
+	mvz.b 23(%a3),%d5
+	move.l %d2,-(%sp)
+	mvz.b 21(%a3),%d1
+	mvz.b 20(%a3),%d0
+	move.l %a5,-(%sp)
+	move.l %d5,-(%sp)
+	move.l %d4,-(%sp)
+	move.l %d1,-(%sp)
+	move.l %d0,%a0
+	pea 1(%a0)
+	move.l -356(%fp),-(%sp)
+	jsr svf_block
+	move.l 224(%a3),%d4
+	move.l 220(%a3),%d6
+	sub.l %d4,%d6
+	lea (40,%sp),%sp
+	lsl.l #7,%d6
+	moveq #63,%d1
+	lsl.l #7,%d4
+	divs.l %d1,%d6
+	muls.l %d6,%d3
+	add.l %d3,%d4
+	tst.l %d2
+	jgt .L448
+.L321:
+	mvz.b 26(%a3),%d0
+	move.l #65536,%a1
+	lea lx_decim,%a0
+	cmp.l (%a0,%d0.l*4),%a1
+	jls .L327
+	move.l %d2,%d3
+	moveq #63,%d0
+	add.l 268(%a3),%d3
+	add.l %d2,-392(%fp)
+	move.l -392(%fp),%d1
+	lea (268,%a3),%a0
+	and.l %d0,%d3
+	move.l %d3,(%a0)
+	cmp.l -376(%fp),%d1
+	jlt .L345
+	jra .L440
+.L435:
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	move.l #32768,-(%sp)
-	pea 188(%sp)
+	pea -256(%fp)
 	pea 16384.w
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	add.l %a2,%d4
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 23(%a3),%d5
-	mvz.b 22(%a3),%d3
+	mvz.b 22(%a3),%d4
 	move.l %d2,-(%sp)
 	mvz.b 21(%a3),%d1
 	mvz.b 20(%a3),%d0
-	move.l %a2,-(%sp)
+	move.l %a5,-(%sp)
 	move.l %d5,-(%sp)
-	move.l %d3,-(%sp)
+	move.l %d4,-(%sp)
 	move.l %d1,-(%sp)
 	move.l %d0,%a0
 	pea 1(%a0)
-	move.l 96(%sp),-(%sp)
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	lea (28,%sp),%sp
-	move.l 80(%sp),%a0
-	move.l (%a0),%d6
-	move.l %a2,%a0
-	jra .L259
-.L192:
-	move.l 144(%a3),%d3
-	tst.l %d3
-	jle .L195
-	sub.l %d1,%d3
-	moveq #9,%d4
-	move.l %d3,%d6
-	asr.l %d4,%d6
+	move.l %d2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (40,%sp),%sp
+	move.l -352(%fp),%a0
+	lea (%a5,%d3.l),%a1
+	move.l (%a0),%d5
+	move.l %a5,%a0
+	jra .L338
+.L279:
+	move.l 208(%a3),%d5
+	tst.l %d5
+	jle .L282
+	sub.l %d1,%d5
+	moveq #9,%d1
+	move.l %d5,%d6
+	asr.l %d1,%d6
 	move.l %d6,%d1
 	tst.l %d6
-	jlt .L376
-	move.l %d1,52(%sp)
-.L197:
+	jlt .L449
+	move.l %d1,%a2
+.L284:
 	muls.l %d0,%d1
+	move.l -380(%fp),%a1
+	add.l #v_+208,%a1
+	move.l %d5,(%a1)
+	moveq #14,%d5
 	move.l #32768,%a0
 	sub.l %d0,%a0
 	move.l %d0,%d4
-	moveq #14,%d0
-	move.l 56(%sp),%a1
-	add.l #v_+144,%a1
-	move.l %d3,(%a1)
-	move.l 52(%sp),%d3
+	move.l %a2,%d0
 	add.l #32768,%d4
-	asr.l %d0,%d1
-	muls.l %d3,%d4
+	asr.l %d5,%d1
+	muls.l %d0,%d4
 	add.l %d1,%a0
 	tst.l %a0
-	jle .L377
-.L200:
-	move.l %a0,%d1
-	divu.l %d1,%d4
-	tst.l %d6
-	jlt .L334
-.L342:
-	clr.l 220(%a3)
-	move.l #4096,%d0
-	moveq #1,%d3
-	cmp.l 44(%sp),%d3
-	jcs .L212
-	jra .L360
-.L163:
-	lea lx_dist,%a2
-	clr.l %d3
-	move.l (%a2,%d0.l*4),%d4
-	move.l #32768,%d6
-	moveq #14,%d7
-	move.l %d0,(%a1)
-	moveq #9,%d0
-	sub.l %d4,%d6
-	lsl.l %d0,%d4
-	move.l %d3,%d2
-	asr.l %d7,%d2
-	clr.l %d1
-	move.l 56(%sp),%a0
-	add.l #v_+236,%a0
+	jle .L450
+.L287:
 	move.l %a0,%d5
-	add.l #130,%d5
-	tst.l %d1
-	sne %d0
-	move.w #32767,%a3
-	move.w #-32768,%a2
-	add.l %d6,%d2
-	move.l %d4,%a1
-	add.l #16777216,%a1
-	tst.l %d2
-	jle .L378
-.L166:
+	divu.l %d5,%d4
+	tst.l %d6
+	jlt .L415
+.L424:
+	clr.l 284(%a3)
+	move.l #4096,%d0
+	moveq #1,%d5
+	cmp.l -388(%fp),%d5
+	jcs .L299
+	jra .L438
+.L245:
+	lea lx_dist,%a1
+	move.l (%a1,%d0.l*4),%d3
+	move.l #-32768,%d1
+	move.l #32768,%a1
+	move.l %d0,(%a4)
+	move.l #32767,%d7
+	move.l -380(%fp),%a0
+	move.l %d3,%d4
+	add.l #v_+304,%a0
+	sub.l %d3,%a1
+	add.l #32768,%d4
+	move.l %d1,%d6
 	move.l %d1,%d0
-	divu.l %d2,%d0
-	cmp.l #-32768,%d0
-	jge .L168
-.L379:
-	move.l %a2,%d0
-.L169:
-	move.w %d0,(%a0)+
-	add.l %d4,%d3
-	add.l %a1,%d1
-	cmp.l %d5,%a0
-	jeq .L171
-.L343:
-	moveq #14,%d7
-	move.l %d3,%d2
-	asr.l %d7,%d2
 	tst.l %d1
-	sne %d0
-	add.l %d6,%d2
+	jlt .L451
+.L248:
+	move.l %d3,%d2
+	moveq #14,%d5
+	muls.l %d0,%d2
+	muls.l %d4,%d0
+	asr.l %d5,%d2
+	add.l %a1,%d2
 	tst.l %d2
-	jgt .L166
-.L378:
-	mvs.b %d0,%d0
+	jle .L452
+.L249:
+	divu.l %d2,%d0
+	tst.l %d1
+	jlt .L453
+.L251:
+	cmp.l #-32768,%d0
+	jge .L255
+	move.l %d6,%d0
+.L256:
+	move.w %d0,(%a0)+
+	add.l #512,%d1
+	cmp.l #33280,%d1
+	jeq .L257
+.L425:
+	move.l %d1,%d0
+	tst.l %d1
+	jge .L248
+.L451:
+	neg.l %d0
+	move.l %d3,%d2
+	moveq #14,%d5
+	muls.l %d0,%d2
+	muls.l %d4,%d0
+	asr.l %d5,%d2
+	add.l %a1,%d2
+	tst.l %d2
+	jgt .L249
+.L452:
+	tst.l %d0
+	sne %d0
 	moveq #15,%d2
+	mvs.b %d0,%d0
 	neg.l %d0
 	lsl.l %d2,%d0
+	tst.l %d1
+	jge .L251
+.L453:
+	neg.l %d0
 	cmp.l #-32768,%d0
-	jlt .L379
-.L168:
-	cmp.l #32767,%d0
-	jle .L169
-	move.l %a3,%d0
-	add.l %d4,%d3
+	jge .L252
+	move.l %d6,%d0
+.L253:
 	move.w %d0,(%a0)+
-	add.l %a1,%d1
-	cmp.l %d5,%a0
-	jne .L343
-	jra .L171
-.L349:
+	add.l #512,%d1
+.L465:
+	move.l %d1,%d0
+	tst.l %d1
+	jge .L248
+	jra .L451
+.L431:
+	move.l %a2,%d6
+	move.l %d0,%d2
 	lsl.l #5,%d6
-	move.l %d0,%d4
+	move.l -368(%fp),%a1
+	add.l #-64,%d2
 	add.l #-64,%d5
-	add.l #-64,%d4
-	add.l #-64,%d1
-	move.l %d6,%a2
-	sub.l %a4,%a2
-	add.l #lx_presets,%a2
-	move.l %a2,%d0
-	move.l %a2,%a0
+	add.l #-64,%d3
+	move.l %d6,%a4
+	sub.l %a2,%a4
+	add.l #lx_presets,%a4
+	move.l %a4,%d0
+	move.l %a4,%a0
 	add.l #31,%d0
-.L138:
+.L220:
 	move.b (%a0)+,(%a1)+
 	cmp.l %d0,%a0
-	jne .L138
+	jne .L220
 	moveq #1,%d7
-	cmp.l 44(%sp),%d7
-	jeq .L139
+	cmp.l -388(%fp),%d7
+	jeq .L221
 	moveq #2,%d0
-	cmp.l 44(%sp),%d0
-	jeq .L140
-	tst.b %d2
-	jeq .L380
-	move.l %d4,%d0
-	jpl .L403
-	addq.l #1,%d0
-.L403:
-	mvz.b 3(%a2),%d2
-	asr.l #1,%d0
+	cmp.l -388(%fp),%d0
+	jeq .L222
+	tst.b %d4
+	jeq .L454
+	move.l %d2,%d2
+	jpl .L478
+	addq.l #1,%d2
+.L478:
+	mvz.b 3(%a4),%d0
+	asr.l #1,%d2
 	add.l %d0,%d2
 	tst.l %d2
-	jlt .L299
+	jlt .L377
 	cmp.l #128,%d2
-	jge .L300
-.L159:
+	jge .L378
+.L241:
 	add.l %d5,%d5
-	mvz.b 7(%a2),%d0
-	move.l 56(%sp),%a1
+	mvz.b 7(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,3(%a0,%a1.l)
 	add.l %d5,%d0
 	tst.l %d0
-	jlt .L301
+	jlt .L379
 	cmp.l #128,%d0
-	jge .L302
+	jge .L380
 	move.b %d0,%d2
-.L160:
-	mvz.b 8(%a2),%d0
-	move.l 56(%sp),%a1
+.L242:
+	mvz.b 8(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,7(%a0,%a1.l)
 	add.l %d5,%d0
 	tst.l %d0
-	jlt .L303
+	jlt .L381
 	cmp.l #128,%d0
-	jge .L304
+	jge .L382
 	move.b %d0,%d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,8(%a0,%a1.l)
-	add.l %d1,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jlt .L305
-.L338:
+	jlt .L383
+.L419:
 	cmp.l #128,%d0
-	jge .L306
-	move.l 56(%sp),%a1
+	jge .L384
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,21(%a0,%a1.l)
-.L145:
-	move.l 56(%sp),%a0
-	add.l #v_+228,%a0
-	move.l %d3,(%a0)
-.L394:
-	move.l 56(%sp),%a1
-	add.l #v_,%a1
-	mvz.b 24(%a1),%d0
-	lea (232,%a1),%a1
-	cmp.l (%a1),%d0
-	jeq .L171
-	jra .L163
-.L347:
-	add.l #15,%d0
-	jra .L132
-.L361:
-	move.l 152(%a3),%d1
-	lea (152,%a3),%a0
-	tst.l %d1
-	jle .L219
-	moveq #12,%d3
-	moveq #12,%d6
-	move.l %d1,%d5
-	asr.l %d3,%d5
-	mvz.b 29(%a3),%d3
-	lea lx_snap,%a1
-	muls.l %d5,%d5
-	sub.l (%a1,%d3.l*4),%d1
+.L227:
+	move.l -380(%fp),%a0
+	add.l #v_+296,%a0
 	move.l %d1,(%a0)
-	moveq #24,%d1
-	asr.l %d6,%d5
-	muls.l %d1,%d5
-.L219:
-	move.l 56(%sp),%a1
-	moveq #15,%d3
-	lea v_,%a0
-	moveq #127,%d6
-	mvz.b 28(%a0,%a1.l),%d1
-	lsl.l %d3,%d1
-	add.l #63,%d1
-	divs.l %d6,%d1
-	moveq #15,%d3
-	muls.l %d5,%d1
-	asr.l %d3,%d1
-	add.l %d1,%d0
-	jra .L218
-.L360:
+.L468:
+	move.l -380(%fp),%a4
+	add.l #v_,%a4
+	mvz.b 24(%a4),%d0
+	lea (300,%a4),%a4
+	cmp.l (%a4),%d0
+	jeq .L257
+	jra .L245
+.L430:
+	add.l #15,%d0
+	jra .L215
+.L438:
 	mvz.b 10(%a3),%d0
 	lea lx_pdec,%a0
-	move.l 136(%a3),%d1
+	move.l 200(%a3),%d1
 	move.l (%a0,%d0.l*4),%d0
 	tst.l %d1
-	jle .L312
+	jle .L390
 	sub.l %d0,%d1
 	moveq #9,%d6
-	move.l %d1,%d3
-	asr.l %d6,%d3
-	move.l %d3,%d0
-	tst.l %d3
-	jlt .L381
-	move.l %d0,%a1
-.L213:
-	move.l 56(%sp),%a0
+	move.l %d1,%d5
+	asr.l %d6,%d5
+	move.l %d5,%d0
+	tst.l %d5
+	jlt .L455
+	move.l %d0,%a2
+.L300:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	mvz.b 12(%a0),%d6
-	move.l %d1,136(%a0)
+	move.l %d1,200(%a0)
 	lea lx_psl,%a0
 	move.l (%a0,%d6.l*4),%d1
 	moveq #14,%d6
@@ -2193,20 +3082,21 @@ lxr_fill:
 	sub.l %d1,%a0
 	add.l #32768,%d1
 	asr.l %d6,%d0
-	move.l %a1,%d6
+	move.l %a2,%d6
 	muls.l %d6,%d1
 	add.l %d0,%a0
 	tst.l %a0
-	jle .L382
+	jle .L456
+.L302:
 	move.l %a0,%d6
 	divu.l %d6,%d1
-	tst.l %d3
-	jlt .L383
-.L217:
-	move.l 56(%sp),%a0
+	tst.l %d5
+	jlt .L457
+.L304:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	mvz.b 11(%a0),%d0
-	move.l %d1,220(%a0)
+	move.l %d1,284(%a0)
 	lea lx_pamt,%a0
 	move.l (%a0,%d0.l*4),%d0
 	asr.l #3,%d0
@@ -2214,93 +3104,94 @@ lxr_fill:
 	moveq #12,%d1
 	asr.l %d1,%d0
 	add.l #4096,%d0
-.L391:
-	tst.b 27(%a3)
-	jne .L218
-	jra .L361
-.L350:
+	jra .L299
+.L432:
 	clr.b %d3
 	lea lx_open,%a1
-	mvz.b (%a1,%a4.l),%d1
-	move.l 56(%sp),%a1
+	mvz.b (%a1,%a2.l),%d1
+	move.l -380(%fp),%a1
 	add.l #v_,%a1
 	mvz.b 27(%a1),%d0
-	move.l %d1,164(%a1)
+	move.l %d1,228(%a1)
 	move.l #32768,%d1
 	subq.l #1,%d0
-	move.b %d3,(%a0,%a5.l)
+	move.b %d3,(%a0,%a3.l)
 	tst.l %d0
-	jeq .L384
-	move.l 56(%sp),%a1
+	jeq .L458
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	mvz.b (%a0,%a1.l),%d0
 	move.l %d0,64(%a0,%a1.l)
 	tst.l %d0
-	jeq .L385
-.L173:
+	jeq .L459
+.L260:
 	subq.l #1,%d0
 	moveq #2,%d2
 	cmp.l %d0,%d2
-	jcc .L386
+	jcc .L460
 	clr.l %d0
-.L174:
-	move.l 56(%sp),%a0
+.L261:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	move.l %d0,56(%a0)
-	tst.l 44(%sp)
-	jne .L175
-.L395:
+	tst.l -388(%fp)
+	jne .L262
+.L470:
 	mvz.b 1(%a0),%d0
-	move.l %d0,84(%a0)
+	move.l %d0,100(%a0)
 	tst.l %d0
-	jeq .L387
+	jeq .L461
 	subq.l #1,%d0
 	moveq #2,%d3
 	cmp.l %d0,%d3
-	jcc .L388
-	move.l 56(%sp),%a0
+	jcc .L462
+	move.l -380(%fp),%a0
 	clr.l %d0
 	add.l #v_,%a0
 	move.l #16777216,%d4
-	move.l %d0,76(%a0)
-	move.l %d4,136(%a0)
-	clr.l 180(%a0)
-	clr.l 176(%a0)
-	clr.l 172(%a0)
-	clr.l 168(%a0)
-.L178:
-	move.l 56(%sp),%a0
+	move.l %d0,92(%a0)
+	move.l %d4,200(%a0)
+	clr.l 244(%a0)
+	clr.l 240(%a0)
+	clr.l 236(%a0)
+	clr.l 232(%a0)
+.L265:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	move.b 17(%a0),%d0
-	jne .L180
-.L397:
+	jne .L267
+.L472:
 	mvz.b %d0,%d0
 	moveq #1,%d7
-	move.l %d7,140(%a0)
+	move.l %d7,204(%a0)
 	move.l #16777216,%d3
-	move.l 56(%sp),%a0
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
-	move.l %d3,152(%a0)
-	clr.l 204(%a0)
-	move.l %d0,148(%a0)
-	jra .L165
-.L357:
-	move.l %d1,(%a0)
-	moveq #9,%d3
-	asr.l %d3,%d1
+	move.l %d3,216(%a0)
+	clr.l 292(%a0)
+	move.l %d0,212(%a0)
+	clr.l 268(%a0)
+	jra .L247
+.L290:
+	moveq #9,%d6
+	moveq #2,%d4
+	move.l #16777216,%d1
+	asr.l %d6,%d1
+	move.l #16777216,(%a0)
+	move.l %d4,(%a1)
 	move.l %d1,%d6
 	tst.l %d1
-	jge .L205
-	jra .L358
-.L375:
-	sub.l %d3,%d1
+	jge .L292
+	jra .L436
+.L447:
+	sub.l %d4,%d1
 	moveq #9,%d4
-	move.l %d1,%d3
-	asr.l %d4,%d3
+	move.l %d1,%d5
+	asr.l %d4,%d5
 	move.l %d1,(%a0)
-	move.l %d3,%a0
-	tst.l %d3
-	jlt .L389
+	move.l %d5,%a0
+	tst.l %d5
+	jlt .L463
 	move.l %a0,%d6
 	move.l #32768,%d1
 	muls.l %d0,%d6
@@ -2313,107 +3204,106 @@ lxr_fill:
 	muls.l %d0,%d4
 	add.l %d6,%d1
 	tst.l %d1
-	jle .L390
-.L210:
+	jle .L464
+.L297:
 	divu.l %d1,%d4
-	tst.l %d3
-	jlt .L334
-.L344:
-	clr.l 220(%a3)
+	tst.l %d5
+	jlt .L415
+.L426:
+	clr.l 284(%a3)
 	move.l #4096,%d0
-	moveq #1,%d3
-	cmp.l 44(%sp),%d3
-	jcs .L212
-	jra .L360
-.L195:
-	move.l 148(%a3),%d1
-	subq.l #1,%d1
-	lea (148,%a3),%a0
-	move.l %d1,(%a0)
-	tst.l %d1
-	jle .L198
-	move.l #32768,%d6
-	move.l %d6,52(%sp)
-	move.l #16777216,%d3
-	move.l %d6,%d1
-.L398:
-	muls.l %d0,%d1
-	move.l #32768,%a0
-	sub.l %d0,%a0
-	move.l %d0,%d4
+	moveq #1,%d5
+	cmp.l -388(%fp),%d5
+	jcs .L299
+	jra .L438
+.L436:
+	neg.l %d6
+	move.l %d0,%d5
+	neg.l %d5
+	muls.l %d6,%d5
+	move.l #32768,%d4
+	sub.l %d0,%d4
+	move.l %d0,%a0
 	moveq #14,%d0
-	move.l 56(%sp),%a1
-	add.l #v_+144,%a1
-	move.l %d3,(%a1)
-	move.l 52(%sp),%d3
-	add.l #32768,%d4
-	asr.l %d0,%d1
-	muls.l %d3,%d4
-	add.l %d1,%a0
+	add.l #32768,%a0
+	muls.l %d6,%d4
+	asr.l %d0,%d5
+	add.l %d5,%a0
 	tst.l %a0
-	jgt .L200
-.L377:
+	jgt .L293
+.L437:
 	tst.l %d4
 	sne %d4
-	moveq #15,%d0
+	moveq #15,%d5
 	mvs.b %d4,%d4
 	neg.l %d4
-	lsl.l %d0,%d4
-	tst.l %d6
-	jge .L342
-	jra .L334
-.L351:
-	move.w 196(%a0),%d0
-	move.w 198(%a0),%d3
-	move.w 200(%a0),%d2
-	move.w 202(%a0),%d1
-	clr.l 188(%a0)
+	lsl.l %d5,%d4
+	tst.l %d1
+	jge .L289
+	jra .L415
+.L433:
+	move.w 260(%a0),%d0
+	move.w 262(%a0),%d3
+	move.w 264(%a0),%d2
+	move.w 266(%a0),%d1
+	clr.l 252(%a0)
 	or.l %d3,%d0
 	or.l %d2,%d0
 	or.l %d1,%d0
 	tst.w %d0
-	jne .L182
+	jne .L269
 	lea sampler_buf+32,%a0
-	move.l #sampler_buf+288,%d0
-.L183:
+.L270:
 	clr.l (%a0)+
-	cmp.l %d0,%a0
-	jeq .L131
+	cmp.l #sampler_buf+288,%a0
+	jeq .L214
 	clr.l (%a0)+
-	cmp.l %d0,%a0
-	jne .L183
-	jra .L131
-.L358:
-	neg.l %d6
-	move.l %d0,%d3
-	neg.l %d3
-	muls.l %d6,%d3
-	move.l #32768,%d4
-	sub.l %d0,%d4
-	muls.l %d6,%d4
-	moveq #14,%d6
-	move.l %d0,%a0
-	add.l #32768,%a0
-	asr.l %d6,%d3
-	add.l %d3,%a0
+	cmp.l #sampler_buf+288,%a0
+	jne .L270
+	jra .L214
+.L282:
+	move.l 212(%a3),%d1
+	subq.l #1,%d1
+	lea (212,%a3),%a0
+	move.l %d1,(%a0)
+	tst.l %d1
+	jle .L285
+	move.l #32768,%a2
+	move.l #16777216,%d5
+	move.l %a2,%d1
+	move.l %a2,%d6
+.L469:
+	muls.l %d0,%d1
+	move.l -380(%fp),%a1
+	add.l #v_+208,%a1
+	move.l %d5,(%a1)
+	moveq #14,%d5
+	move.l #32768,%a0
+	sub.l %d0,%a0
+	move.l %d0,%d4
+	move.l %a2,%d0
+	add.l #32768,%d4
+	asr.l %d5,%d1
+	muls.l %d0,%d4
+	add.l %d1,%a0
 	tst.l %a0
-	jgt .L206
-.L359:
+	jgt .L287
+.L450:
 	tst.l %d4
 	sne %d4
-	moveq #15,%d0
+	moveq #15,%d1
 	mvs.b %d4,%d4
 	neg.l %d4
-	lsl.l %d0,%d4
-	tst.l %d1
-	jge .L202
-	jra .L334
-.L383:
-	move.l 56(%sp),%a0
+	lsl.l %d1,%d4
+	tst.l %d6
+	jge .L424
+	jra .L415
+.L457:
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
 	mvz.b 11(%a0),%d0
 	neg.l %d1
-	move.l %d1,220(%a0)
+	move.l %d1,284(%a0)
 	lea lx_pamt,%a0
 	move.l (%a0,%d0.l*4),%d0
 	asr.l #3,%d0
@@ -2421,269 +3311,241 @@ lxr_fill:
 	moveq #12,%d1
 	asr.l %d1,%d0
 	add.l #4096,%d0
-	jra .L391
-.L223:
+	jra .L299
+.L255:
+	cmp.l #32767,%d0
+	jle .L256
+	move.l %d7,%d0
+	add.l #512,%d1
+	move.w %d0,(%a0)+
+	cmp.l #33280,%d1
+	jne .L425
+	jra .L257
+.L252:
+	cmp.l #32767,%d0
+	jle .L253
+	move.l %d7,%d0
+	add.l #512,%d1
+	move.w %d0,(%a0)+
+	jra .L465
+.L310:
 	mvz.b 5(%a3),%d3
 	pea 4096.w
-	moveq #15,%d7
+	moveq #127,%d6
 	mvz.b 1(%a3),%d1
 	mvz.b 2(%a3),%d0
-	move.l 444(%sp),-(%sp)
+	move.l 12(%fp),-(%sp)
 	pea 64.w
 	move.l %d3,-(%sp)
-	move.l 92(%sp),-(%sp)
-	move.l %d5,%a0
-	move.l %d1,84(%a3)
-	move.l %d0,104(%a3)
-	jsr (%a0)
+	moveq #127,%d3
+	move.l -360(%fp),-(%sp)
+	move.l %d1,100(%a3)
+	move.l %d0,136(%a3)
+	jsr (%a2)
 	mvz.b 6(%a3),%d0
 	pea 4096.w
-	move.l 464(%sp),-(%sp)
+	move.l 12(%fp),-(%sp)
 	pea 64.w
 	move.l %d0,-(%sp)
-	move.l %d5,%a1
-	move.l 120(%sp),-(%sp)
-	jsr (%a1)
-	mvz.b 30(%a3),%d3
-	move.l %d4,160(%a3)
+	move.l -348(%fp),-(%sp)
+	jsr (%a2)
+	mvz.b 30(%a3),%d5
+	move.l %d4,224(%a3)
 	moveq #127,%d4
 	lea (40,%sp),%sp
-	moveq #15,%d0
-	moveq #127,%d1
-	lsl.l %d0,%d3
-	add.l #63,%d3
-	divs.l %d1,%d3
+	moveq #15,%d1
+	lsl.l %d1,%d5
+	add.l #63,%d5
+	divs.l %d3,%d5
+	moveq #15,%d3
 	mvz.b 7(%a3),%d0
-	move.l 48(%sp),-(%sp)
-	lsl.l %d7,%d0
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	lsl.l %d3,%d0
+	move.l %d5,-(%sp)
 	clr.l -(%sp)
 	clr.l -(%sp)
 	add.l #63,%d0
 	divs.l %d4,%d0
+	move.l %fp,%d4
+	add.l #-128,%d4
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	pea 200(%sp)
-	move.l 104(%sp),-(%sp)
+	pea -256(%fp)
+	move.l -360(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 8(%a3),%d0
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	clr.l -(%sp)
-	lsl.l %d7,%d0
+	lsl.l %d3,%d0
 	clr.l -(%sp)
-	move.l %sp,%d5
-	add.l #320,%d5
 	add.l #63,%d0
-	divs.l %d4,%d0
+	divs.l %d6,%d0
 	move.l %d0,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %d5,-(%sp)
-	move.l 112(%sp),-(%sp)
+	move.l %d4,-(%sp)
+	move.l -348(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	tst.l %d2
-	jgt .L392
-.L249:
+	jgt .L466
+.L332:
 	moveq #3,%d0
-	cmp.l 44(%sp),%d0
-	jeq .L393
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	cmp.l -388(%fp),%d0
+	jeq .L467
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	move.l #32768,-(%sp)
-	pea 188(%sp)
+	pea -256(%fp)
 	move.l #32768,-(%sp)
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 23(%a3),%d4
 	mvz.b 22(%a3),%d3
 	move.l %d2,-(%sp)
-	mvz.b 20(%a3),%d0
 	mvz.b 21(%a3),%d1
-	move.l %a2,-(%sp)
+	mvz.b 20(%a3),%d0
+	move.l %a5,-(%sp)
 	move.l %d4,-(%sp)
 	move.l %d3,-(%sp)
 	move.l %d1,-(%sp)
-	move.l %d0,%a1
-	pea 1(%a1)
-	move.l 96(%sp),-(%sp)
+	move.l %d0,%a2
+	pea 1(%a2)
+	lea lx_decim,%a2
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	lea (28,%sp),%sp
+	move.l %d2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (40,%sp),%sp
+	moveq #1,%d1
+	swap %d1
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.l 56(%sp),%a1
 	mvz.b 26(%a0,%a1.l),%d0
-	move.l #65536,%a1
-	lea lx_decim,%a0
-	cmp.l (%a0,%d0.l*4),%a1
-	jls .L260
-.L346:
-	move.l %d2,%d5
+	cmp.l (%a2,%d0.l*4),%d1
+	jls .L327
+.L428:
+	move.l %d2,%d3
 	moveq #63,%d0
-	add.l 204(%a3),%d5
-	lea (204,%a3),%a0
-	add.l %d2,%a5
-	and.l %d0,%d5
-	move.l %d5,(%a0)
-	cmp.l 60(%sp),%a5
-	jlt .L267
-	jra .L368
-.L221:
-	moveq #15,%d3
-	lsl.l %d3,%d0
-	move.l 156(%a3),160(%a3)
-	move.l %d4,156(%a3)
-	moveq #127,%d4
-	lea (156,%a3),%a0
-	move.l 204(%a3),%d5
-	move.l %d0,%d3
-	add.l #63,%d3
-	divs.l %d4,%d3
-	jra .L222
-.L348:
-	move.l 56(%sp),%a1
-	add.l #v_,%a1
-	move.l 36(%a1),%d1
-	move.l %d1,%d5
-	move.l 32(%a1),%d0
-	asr.l #8,%d5
-	asr.l #8,%d0
-	moveq #11,%d4
-	move.l 40(%a1),%d1
-	asr.l #8,%d1
-	move.l %d5,%d7
-	move.l %d0,%d3
-	lsl.l %d4,%d7
-	lsl.l #4,%d3
-	move.l %d1,%d6
-	moveq #18,%d4
-	lsl.l %d4,%d6
-	move.l 228(%a0),%a2
-	or.l %d7,%d3
-	or.l %d6,%d3
-	move.l %a4,%d6
-	or.l %d6,%d3
-	cmp.l %d3,%a2
-	jeq .L137
-	jra .L349
-.L382:
+	add.l 268(%a3),%d3
+	add.l %d2,-392(%fp)
+	move.l -392(%fp),%d1
+	lea (268,%a3),%a0
+	and.l %d0,%d3
+	move.l %d3,(%a0)
+	cmp.l -376(%fp),%d1
+	jlt .L345
+	jra .L440
+.L308:
+	mvz.b 30(%a3),%d0
+	moveq #15,%d7
+	moveq #127,%d1
+	move.l 220(%a3),224(%a3)
+	lea (220,%a3),%a0
+	lsl.l %d7,%d0
+	move.l 268(%a3),%d3
+	move.l %d4,(%a0)
+	move.l %d0,%d5
+	add.l #63,%d5
+	divs.l %d1,%d5
+	jra .L309
+.L390:
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	mvz.b 12(%a0),%d6
+	clr.l %d1
+	move.l %d1,200(%a0)
+	lea lx_psl,%a0
+	clr.l %d0
+	move.l (%a0,%d6.l*4),%d1
+	moveq #14,%d6
+	sub.l %a2,%a2
+	move.l #32768,%a0
+	clr.l %d5
+	muls.l %d1,%d0
+	sub.l %d1,%a0
+	add.l #32768,%d1
+	asr.l %d6,%d0
+	move.l %a2,%d6
+	muls.l %d6,%d1
+	add.l %d0,%a0
+	tst.l %a0
+	jgt .L302
+.L456:
 	tst.l %d1
 	sne %d1
 	moveq #15,%d0
 	mvs.b %d1,%d1
 	neg.l %d1
 	lsl.l %d0,%d1
-	tst.l %d3
-	jge .L217
-	jra .L383
-.L312:
-	clr.l %d0
-	clr.l %d3
-	clr.l %d1
-	sub.l %a1,%a1
-	jra .L213
-.L381:
+	tst.l %d5
+	jge .L304
+	jra .L457
+.L455:
 	neg.l %d0
-	move.l %d0,%a1
-	jra .L213
-.L376:
+	move.l %d0,%a2
+	jra .L300
+.L449:
 	neg.l %d1
-	move.l %d1,52(%sp)
-	jra .L197
-.L380:
-	add.l %d4,%d4
-	mvz.b 11(%a2),%d2
-	add.l %d4,%d2
+	move.l %d1,%a2
+	jra .L284
+.L454:
+	add.l %d2,%d2
+	mvz.b 11(%a4),%d0
+	add.l %d0,%d2
 	tst.l %d2
-	jlt .L278
+	jlt .L356
 	cmp.l #128,%d2
-	jge .L279
-.L142:
+	jge .L357
+.L224:
 	add.l %d5,%d5
-	mvz.b 10(%a2),%d0
-	move.l 56(%sp),%a1
+	mvz.b 10(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,11(%a0,%a1.l)
 	add.l %d5,%d0
 	tst.l %d0
-	jlt .L280
+	jlt .L358
 	cmp.l #128,%d0
-	jge .L281
+	jge .L359
 	move.b %d0,%d2
-.L143:
-	add.l %d1,%d1
-	mvz.b 7(%a2),%d0
-	move.l 56(%sp),%a1
+.L225:
+	add.l %d3,%d3
+	mvz.b 7(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,10(%a0,%a1.l)
-	add.l %d1,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jlt .L282
+	jlt .L360
 	cmp.l #128,%d0
-	jge .L283
-	move.l 56(%sp),%a1
+	jge .L361
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,7(%a0,%a1.l)
-.L401:
-	move.l 56(%sp),%a0
-	add.l #v_+228,%a0
-	move.l %d3,(%a0)
-	jra .L394
-.L384:
-	mvz.b 28(%a1),%d0
-	moveq #15,%d5
-	moveq #127,%d6
-	move.l 56(%sp),%a1
-	lea v_,%a0
-	lsl.l %d5,%d0
-	add.l #63,%d0
-	divs.l %d6,%d0
-	move.l #32768,%d1
-	sub.l %d0,%d1
-	mvz.b (%a0,%a1.l),%d0
-	move.l %d0,64(%a0,%a1.l)
-	tst.l %d0
-	jne .L173
-.L385:
-	pea 15.w
-	move.l %d1,-(%sp)
-	move.l #1072692224,-(%sp)
-	jsr mulshr
-	lea (12,%sp),%sp
-	add.l #1024,%d0
-	move.l 56(%sp),%a0
-	add.l #v_,%a0
-	move.l %d0,56(%a0)
-	tst.l 44(%sp)
-	jeq .L395
-.L175:
-	moveq #1,%d5
-	cmp.l 44(%sp),%d5
-	jeq .L396
-	clr.l 96(%a0)
-	clr.l 76(%a0)
-	move.l 56(%sp),%a0
-	add.l #v_,%a0
-	move.b 17(%a0),%d0
-	jeq .L397
-.L180:
-	mvz.b %d0,%d0
-	moveq #3,%d1
-	move.l #16777216,%d2
-	move.l %d1,140(%a0)
-	move.l #16777216,%d3
-	move.l %d2,144(%a0)
-	move.l 56(%sp),%a0
-	add.l #v_,%a0
-	move.l %d3,152(%a0)
-	clr.l 204(%a0)
-	move.l %d0,148(%a0)
-	jra .L165
-.L389:
-	move.l %d3,%d6
+.L476:
+	move.l -380(%fp),%a0
+	add.l #v_+296,%a0
+	move.l %d1,(%a0)
+	jra .L468
+.L464:
+	tst.l %d4
+	sne %d4
+	moveq #15,%d1
+	mvs.b %d4,%d4
+	neg.l %d4
+	lsl.l %d1,%d4
+	tst.l %d5
+	jge .L426
+	jra .L415
+.L463:
+	move.l %d5,%d6
 	neg.l %d6
 	move.l %d6,%a0
 	move.l %a0,%d6
@@ -2698,380 +3560,4904 @@ lxr_fill:
 	muls.l %d0,%d4
 	add.l %d6,%d1
 	tst.l %d1
-	jgt .L210
-.L390:
-	tst.l %d4
-	sne %d4
-	moveq #15,%d1
-	mvs.b %d4,%d4
-	neg.l %d4
-	lsl.l %d1,%d4
-	tst.l %d3
-	jge .L344
-	jra .L334
-.L198:
-	move.l #32768,%d6
-	moveq #2,%d4
-	move.l %d4,(%a1)
-	move.l #16777216,%d3
-	move.l %d6,52(%sp)
-	move.l %d6,%d1
-	jra .L398
-.L386:
+	jgt .L297
+	jra .L464
+.L285:
+	moveq #2,%d5
+	move.l #32768,%a2
+	move.l %d5,(%a1)
+	move.l #16777216,%d5
+	move.l %a2,%d1
+	move.l %a2,%d6
+	jra .L469
+.L460:
 	pea 15.w
 	move.l %d1,-(%sp)
 	move.l #1069547520,-(%sp)
 	jsr mulshr
 	lea (12,%sp),%sp
-	jra .L174
-.L140:
-	move.l %d4,%d0
-	jpl .L404
-	addq.l #1,%d0
-.L404:
-	mvz.b 3(%a2),%d2
-	asr.l #1,%d0
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	move.l %d0,56(%a0)
+	tst.l -388(%fp)
+	jeq .L470
+.L262:
+	moveq #1,%d5
+	cmp.l -388(%fp),%d5
+	jeq .L471
+	clr.l 128(%a0)
+	clr.l 92(%a0)
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	move.b 17(%a0),%d0
+	jeq .L472
+.L267:
+	mvz.b %d0,%d0
+	moveq #3,%d1
+	move.l #16777216,%d2
+	move.l %d1,204(%a0)
+	move.l #16777216,%d3
+	move.l %d2,208(%a0)
+	move.l -380(%fp),%a0
+	add.l #v_,%a0
+	move.l %d3,216(%a0)
+	clr.l 292(%a0)
+	move.l %d0,212(%a0)
+	clr.l 268(%a0)
+	jra .L247
+.L458:
+	mvz.b 28(%a1),%d0
+	moveq #15,%d5
+	moveq #127,%d6
+	move.l -380(%fp),%a1
+	lea v_,%a0
+	lsl.l %d5,%d0
+	add.l #63,%d0
+	divs.l %d6,%d0
+	move.l #32768,%d1
+	sub.l %d0,%d1
+	mvz.b (%a0,%a1.l),%d0
+	move.l %d0,64(%a0,%a1.l)
+	tst.l %d0
+	jne .L260
+.L459:
+	pea 15.w
+	move.l %d1,-(%sp)
+	move.l #1072692224,-(%sp)
+	jsr mulshr
+	lea (12,%sp),%sp
+	add.l #1024,%d0
+	jra .L261
+.L324:
+	move.l %d2,-(%sp)
+	pea -128(%fp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (12,%sp),%sp
+	mvz.b 26(%a3),%d0
+	move.l #65536,%a1
+	lea lx_decim,%a0
+	cmp.l (%a0,%d0.l*4),%a1
+	jhi .L341
+	mvs.w -2(%a5,%d2.l*2),%d0
+	move.l %d0,(%a4)
+	jra .L473
+.L222:
+	move.l %d2,%d2
+	jpl .L479
+	addq.l #1,%d2
+.L479:
+	mvz.b 3(%a4),%d0
+	asr.l #1,%d2
 	add.l %d0,%d2
 	tst.l %d2
-	jlt .L293
+	jlt .L371
 	cmp.l #128,%d2
-	jge .L294
-.L156:
+	jge .L372
+.L238:
 	add.l %d5,%d5
-	mvz.b 22(%a2),%d0
-	move.l 56(%sp),%a1
+	mvz.b 22(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,3(%a0,%a1.l)
 	add.l %d5,%d0
 	tst.l %d0
-	jlt .L295
+	jlt .L373
 	cmp.l #128,%d0
-	jge .L296
+	jge .L374
 	move.b %d0,%d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,22(%a0,%a1.l)
-	add.l %d1,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jge .L338
-.L305:
+	jge .L419
+.L383:
 	clr.b %d0
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,21(%a0,%a1.l)
-	jra .L145
-.L139:
-	move.b 17(%a2),%d2
-	move.l %d4,%d0
-	add.l %d0,%d0
-	tst.b %d2
-	jeq .L146
-	mvz.b 13(%a2),%d4
-	add.l %d0,%d4
+	jra .L227
+.L221:
+	move.b 17(%a4),%d0
+	add.l %d2,%d2
+	tst.b %d0
+	jeq .L228
+	mvz.b 13(%a4),%d4
+	add.l %d2,%d4
 	tst.l %d4
-	jlt .L284
+	jlt .L362
 	cmp.l #128,%d4
-	jge .L285
-.L147:
+	jge .L363
+.L229:
 	add.l %d5,%d5
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	mvz.b 21(%a4),%d2
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d4,13(%a0,%a1.l)
-	add.l %d5,%d0
+	add.l %d5,%d2
+	tst.l %d2
+	jlt .L364
+	cmp.l #128,%d2
+	jge .L365
+	move.l -380(%fp),%a1
+	lea v_,%a0
+	move.b %d2,21(%a0,%a1.l)
+	tst.l %d3
+	jlt .L474
+.L231:
+	asr.l #3,%d3
+	mvz.b %d0,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jlt .L286
+	jlt .L234
 	cmp.l #128,%d0
-	jge .L287
-	move.l 56(%sp),%a1
-	lea v_,%a0
-	move.b %d0,21(%a0,%a1.l)
-	tst.l %d1
-	jlt .L399
-.L149:
-	asr.l #3,%d1
-	mvz.b %d2,%d2
-	add.l %d2,%d1
-	tst.l %d1
-	jlt .L152
-	cmp.l #128,%d1
-	jge .L400
-	move.l 56(%sp),%a1
-	lea v_,%a0
-	move.b %d1,17(%a0,%a1.l)
-	jne .L145
-.L152:
-	moveq #1,%d0
-	move.l 56(%sp),%a1
+	jge .L475
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,17(%a0,%a1.l)
-	move.l 56(%sp),%a0
-	add.l #v_+228,%a0
-	move.l %d3,(%a0)
-	jra .L394
-.L393:
-	move.l 48(%sp),-(%sp)
-	move.l %d3,-(%sp)
+	jne .L227
+.L234:
+	moveq #1,%d0
+	move.l -380(%fp),%a1
+	lea v_,%a0
+	move.b %d0,17(%a0,%a1.l)
+	move.l -380(%fp),%a0
+	add.l #v_+296,%a0
+	move.l %d1,(%a0)
+	jra .L468
+.L467:
+	move.l -384(%fp),-(%sp)
+	move.l %d5,-(%sp)
 	move.l #32768,-(%sp)
-	pea 188(%sp)
+	pea -256(%fp)
 	pea 16384.w
 	move.l %d2,-(%sp)
-	move.l %a2,-(%sp)
-	move.l 92(%sp),-(%sp)
+	move.l %a5,-(%sp)
+	lea lx_decim,%a2
+	move.l -372(%fp),-(%sp)
 	jsr osc_block
 	lea (32,%sp),%sp
 	mvz.b 23(%a3),%d4
 	mvz.b 22(%a3),%d3
 	move.l %d2,-(%sp)
-	mvz.b 20(%a3),%d0
 	mvz.b 21(%a3),%d1
-	move.l %a2,-(%sp)
+	mvz.b 20(%a3),%d0
+	move.l %a5,-(%sp)
 	move.l %d4,-(%sp)
 	move.l %d3,-(%sp)
 	move.l %d1,-(%sp)
 	move.l %d0,%a0
 	pea 1(%a0)
-	move.l 96(%sp),-(%sp)
+	move.l -356(%fp),-(%sp)
 	jsr svf_block
-	lea (28,%sp),%sp
+	move.l %d2,-(%sp)
+	move.l %a5,-(%sp)
+	move.l -368(%fp),-(%sp)
+	jsr trans_add
+	lea (40,%sp),%sp
+	moveq #1,%d1
+	swap %d1
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.l 56(%sp),%a1
 	mvz.b 26(%a0,%a1.l),%d0
-	move.l #65536,%a1
-	lea lx_decim,%a0
-	cmp.l (%a0,%d0.l*4),%a1
-	jhi .L346
-	jra .L260
-.L146:
-	mvz.b 19(%a2),%d4
-	add.l %d0,%d4
+	cmp.l (%a2,%d0.l*4),%d1
+	jhi .L428
+	jra .L327
+.L228:
+	mvz.b 19(%a4),%d4
+	add.l %d2,%d4
 	tst.l %d4
-	jlt .L288
+	jlt .L366
 	cmp.l #128,%d4
-	jge .L289
-.L153:
+	jge .L367
+.L235:
 	add.l %d5,%d5
-	mvz.b 18(%a2),%d0
-	move.l 56(%sp),%a1
+	mvz.b 18(%a4),%d2
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d4,19(%a0,%a1.l)
-	add.l %d5,%d0
-	tst.l %d0
-	jlt .L290
-	cmp.l #128,%d0
-	jge .L291
-.L154:
-	add.l %d1,%d1
-	mvz.b 11(%a2),%d4
-	move.l 56(%sp),%a1
+	add.l %d5,%d2
+	tst.l %d2
+	jlt .L368
+	cmp.l #128,%d2
+	jge .L369
+.L236:
+	add.l %d3,%d3
+	mvz.b 11(%a4),%d4
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d0,18(%a0,%a1.l)
-	add.l %d4,%d1
-	tst.l %d1
-	jlt .L155
-	cmp.l #128,%d1
-	jge .L292
-	move.b %d1,%d2
-.L155:
-	move.l 56(%sp),%a1
+	move.b %d2,18(%a0,%a1.l)
+	add.l %d4,%d3
+	tst.l %d3
+	jlt .L237
+	cmp.l #128,%d3
+	jge .L370
+	move.b %d3,%d0
+.L237:
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d2,11(%a0,%a1.l)
-.L402:
-	move.l 56(%sp),%a0
-	add.l #v_+228,%a0
-	move.l %d3,(%a0)
-	jra .L394
-.L396:
+	move.b %d0,11(%a0,%a1.l)
+.L477:
+	move.l -380(%fp),%a0
+	add.l #v_+296,%a0
+	move.l %d1,(%a0)
+	jra .L468
+.L471:
 	move.l #16777216,%d6
-	move.l %d6,136(%a0)
-	jra .L178
-.L387:
+	move.l %d6,200(%a0)
+	jra .L265
+.L461:
 	pea 15.w
 	move.l #16777216,%d4
 	move.l #32768,-(%sp)
 	move.l #1072692224,-(%sp)
 	jsr mulshr
 	lea (12,%sp),%sp
-	add.l #1024,%d0
-	move.l 56(%sp),%a0
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
-	move.l %d0,76(%a0)
-	move.l %d4,136(%a0)
-	clr.l 180(%a0)
-	clr.l 176(%a0)
-	clr.l 172(%a0)
-	clr.l 168(%a0)
-	jra .L178
-.L278:
+	add.l #1024,%d0
+	move.l %d0,92(%a0)
+	move.l %d4,200(%a0)
+	clr.l 244(%a0)
+	clr.l 240(%a0)
+	clr.l 236(%a0)
+	clr.l 232(%a0)
+	jra .L265
+.L379:
 	clr.b %d2
-	jra .L142
-.L301:
+	jra .L242
+.L356:
 	clr.b %d2
-	jra .L160
-.L295:
+	jra .L224
+.L381:
 	clr.b %d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d2,22(%a0,%a1.l)
-	add.l %d1,%d0
+	move.b %d2,8(%a0,%a1.l)
+	add.l %d3,%d0
 	tst.l %d0
-	jge .L338
-	jra .L305
-.L306:
+	jge .L419
+	jra .L383
+.L384:
 	moveq #127,%d0
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,21(%a0,%a1.l)
-	jra .L145
-.L299:
+	jra .L227
+.L371:
 	clr.b %d2
-	jra .L159
-.L280:
+	jra .L238
+.L373:
 	clr.b %d2
-	jra .L143
-.L282:
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
+	lea v_,%a0
+	move.b %d2,22(%a0,%a1.l)
+	add.l %d3,%d0
+	tst.l %d0
+	jge .L419
+	jra .L383
+.L377:
+	clr.b %d2
+	jra .L241
+.L358:
+	clr.b %d2
+	jra .L225
+.L360:
 	clr.b %d0
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,7(%a0,%a1.l)
-	jra .L401
-.L293:
-	clr.b %d2
-	jra .L156
-.L303:
-	clr.b %d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
-	lea v_,%a0
-	move.b %d2,8(%a0,%a1.l)
-	add.l %d1,%d0
-	tst.l %d0
-	jge .L338
-	jra .L305
-.L284:
-	clr.b %d4
-	jra .L147
-.L279:
+	jra .L476
+.L474:
+	addq.l #7,%d3
+	jra .L231
+.L372:
 	moveq #127,%d2
-	jra .L142
-.L288:
-	clr.b %d4
-	jra .L153
-.L294:
+	jra .L238
+.L380:
 	moveq #127,%d2
-	jra .L156
-.L296:
+	jra .L242
+.L374:
 	moveq #127,%d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,22(%a0,%a1.l)
-	add.l %d1,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jge .L338
-	jra .L305
-.L302:
+	jge .L419
+	jra .L383
+.L359:
 	moveq #127,%d2
-	jra .L160
-.L300:
+	jra .L225
+.L357:
 	moveq #127,%d2
-	jra .L159
-.L283:
+	jra .L224
+.L361:
 	moveq #127,%d0
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,7(%a0,%a1.l)
-	jra .L401
-.L304:
+	jra .L476
+.L382:
 	moveq #127,%d2
-	add.l %d1,%d1
-	mvz.b 21(%a2),%d0
-	move.l 56(%sp),%a1
+	add.l %d3,%d3
+	mvz.b 21(%a4),%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d2,8(%a0,%a1.l)
-	add.l %d1,%d0
+	add.l %d3,%d0
 	tst.l %d0
-	jge .L338
-	jra .L305
-.L281:
+	jge .L419
+	jra .L383
+.L362:
+	clr.b %d4
+	jra .L229
+.L378:
 	moveq #127,%d2
-	jra .L143
-.L399:
-	addq.l #7,%d1
-	jra .L149
-.L285:
+	jra .L241
+.L366:
+	clr.b %d4
+	jra .L235
+.L367:
 	moveq #127,%d4
-	jra .L147
-.L287:
-	moveq #127,%d0
-	move.l 56(%sp),%a1
+	jra .L235
+.L369:
+	moveq #127,%d2
+	jra .L236
+.L363:
+	moveq #127,%d4
+	jra .L229
+.L365:
+	moveq #127,%d2
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d0,21(%a0,%a1.l)
-	tst.l %d1
-	jge .L149
-	jra .L399
-.L291:
-	moveq #127,%d0
-	jra .L154
-.L289:
-	moveq #127,%d4
-	jra .L153
-.L388:
+	move.b %d2,21(%a0,%a1.l)
+	tst.l %d3
+	jge .L231
+	jra .L474
+.L462:
 	pea 15.w
 	move.l #16777216,%d4
 	move.l #32768,-(%sp)
 	move.l #1069547520,-(%sp)
 	jsr mulshr
 	lea (12,%sp),%sp
-	move.l 56(%sp),%a0
+	move.l -380(%fp),%a0
 	add.l #v_,%a0
-	move.l %d0,76(%a0)
-	move.l %d4,136(%a0)
-	clr.l 180(%a0)
-	clr.l 176(%a0)
-	clr.l 172(%a0)
-	clr.l 168(%a0)
-	jra .L178
-.L290:
-	clr.b %d0
-	jra .L154
-.L286:
-	clr.b %d0
-	move.l 56(%sp),%a1
+	move.l %d0,92(%a0)
+	move.l %d4,200(%a0)
+	clr.l 244(%a0)
+	clr.l 240(%a0)
+	clr.l 236(%a0)
+	clr.l 232(%a0)
+	jra .L265
+.L364:
+	clr.b %d2
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d0,21(%a0,%a1.l)
-	tst.l %d1
-	jge .L149
-	jra .L399
-.L400:
+	move.b %d2,21(%a0,%a1.l)
+	tst.l %d3
+	jge .L231
+	jra .L474
+.L368:
+	clr.b %d2
+	jra .L236
+.L475:
 	moveq #127,%d0
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a1
 	lea v_,%a0
 	move.b %d0,17(%a0,%a1.l)
-	move.l 56(%sp),%a0
-	add.l #v_+228,%a0
-	move.l %d3,(%a0)
-	jra .L394
-.L292:
-	moveq #127,%d2
-	move.l 56(%sp),%a1
+	move.l -380(%fp),%a0
+	add.l #v_+296,%a0
+	move.l %d1,(%a0)
+	jra .L468
+.L370:
+	moveq #127,%d0
+	move.l -380(%fp),%a1
 	lea v_,%a0
-	move.b %d2,11(%a0,%a1.l)
-	jra .L402
+	move.b %d0,11(%a0,%a1.l)
+	jra .L477
 	.size	lxr_fill, .-lxr_fill
 	.section	.ovl,"ax"
 	.align	2
 	.type	v_, @object
-	.size	v_, 2196
+	.size	v_, 3384
 v_:
-	.zero	2196
+	.zero	3384
 	.section	.ovl,"ax"
+	.type	lx_trans, @object
+	.size	lx_trans, 26460
+lx_trans:
+	.string	"\177}zwtromjheca^\\ZXVTRPOMKIHFDCA@>=<:98654310/.-,+*)('&%%$#\"!! \037\036\036\035\034\034\033\032\032\031\031\030\027\027\026\026\025\025\024\024\023\023\023\022\022\021\021\020\020\020\017\017\017\016\016\016\r\r\r\f\f\f\f\013\013\013\013\n\n\n\n\t\t\t\t\b\b\b\b\b\007\007\007\007\007\007\006\006\006\006\006\006\006\005\005\005\005\005\005\005\005\004\004\004\004\004\004\004\004\004\004\003\003\003\003\003\003\003\003\003\003\003\003\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	"\377"
+	.string	""
+	.string	"\377"
+	.string	"*J`py~\177~{wqke^WQJD>94/+&#\037\034\031\026\024\022\020\016\f\013\n\t\007\006\006\005\004\004\003\003\002\002\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\374\374\374\374\374\374\374\374\374\374\374"
+	.ascii	"\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374"
+	.ascii	"\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374"
+	.ascii	"\374\374\374\374\374\374\374\374\374\374\374\374\374\374\373"
+	.ascii	"\374\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.ascii	"\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.ascii	"\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.ascii	"\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.ascii	"\373\373\373\373\373\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\370\371\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\370\370\370\370"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.string	"\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\373\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\001\001\001\001\001\001\001\001\001\001\002\002\002\002\002"
+	.ascii	"\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002"
+	.ascii	"\002\002\002\002\002\002\002\002\003\003\003\003\003\003\003"
+	.ascii	"\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003"
+	.ascii	"\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003"
+	.ascii	"\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003"
+	.ascii	"\003\003\003\003\003\003\003\003\003\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\005\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\004\004\004\004\004\004"
+	.string	"\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\004\003\004\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\003\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\375"
+	.ascii	"\376\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\377\377\376\376\376\376\376\376\376\376\376\376\376"
+	.string	"\376\375\375\375\374\374\374\374\374\374\373\373\373\373\373\372\372\372\372\372\373\374\374\374\375\375\374\373\373\372\370\366\365\364\362\360\356\353\351\347\344\342\342\342\343\344\347\351\354\357\361\364\367\372\376\002\007\f\021\027\035\"(,049=BGMSY^bfimqssrrpnkhd`]YTOIA:4-%\036\030\021\n\004\376\370\362\354\350\345\341\334\326\323\317\313\306\300\274\271\266\261\254\251\247\245\242\237\233\230\225\221\217\215\214\212\212\213\215\214\211\205\203\203\203\204\204\204\204\204\204\204\204\204\205\216\223\232\243\250\255\263\274\305\323\341\352\357\370\003\r\022\022\021\031)9??BHNQSUVZ__ZVXZZY[^YL>3,))*.2-&!\035\025\020\017\017\017\r\b\003\375\365\356\351\344\340\337\340\337\337\341\340\336\334\326\314\305\304\310\321\335\350\352\342\326\314\310\312\317\322\324\333\347\363\372\377\002"
+	.string	"\375"
+	.string	"\005\t\r\023\034)7BFB=<@IRZbjome[UUXZYSKGC<4)\031\013\003\372\357\352\352\355\361\364\365\362\357\354\353\354\352\343\331\323\324\334\346\360\371\373\371\367\373\004\f\021\021\016\013\007\001\372\366\366\366\365\363\362\362\366\371\373\371\370\367\367\365\362\357\355\353\352\352\354\356\362\367\373\372\363\355\352\353\360\366\371\366\354\341\332\331\333\340\350\355\355\355\360\362\360\351\337\326\326\340\355\366\371\373\375\374\371\367\370\374\375\372\363\356\355\361\371\003\f\023\030\032\027\020\n\006\005\007\b\003\377\376\001\003\003\377\370\362\355\350\341\330\317\311\305\304\307\312\313\312\305\301\274\270\261\252\246\250\260\272\300\301\300\300\302\304\303\300\273\272\277\310\320\330\337\347\356\362\363\361\356\355\361\373\n\031$+036:=@EKQUWZ^bb^YWY\\\\WOF@91)\"\034\027\020\n\n\021\027\025\016\006\001"
+	.string	"\376\367\354\342\336\340\350\362\371\375\376\370\355\342\333\331\333\335\333\333\335\337\335\330\323\317\316\316\320\324\332\336\333\321\304\270\263\266\303\325\347\366\375\375\366\353\343\337\337\344\354\370\006\026#)*+.01358;<=>BIPV[__YPF=71,'$&+3=DGC;0%\033\024\022\022\025\031\033\034\033\026\016\007\003\377\372\363\357\357\363\371\373\370\363\356\351\345\342\341\341\341\340\337\335\334\330\323\315\311\312\317\325\331\330\326\326\332\335\337\340\342\344\347\351\352\352\355\360\363\365\366\367\367\371\373\377\003\004\004\004\003\003\005\n\017\022\021\f\007\002"
+	.string	"\377\001\003\002"
+	.string	"\376\373\367\363\356\354\355\361\366\371\372\372\373\374\376"
+	.string	"\001\002\002\001\377\374\372\371\370\371\373"
+	.string	"\b\020\025\022\t\376\364\355\352\353\357\366\376\005\t\n\007\001\371\363\355\346\340\333\327\326\330\334\343\350\352\352\351\350\350\351\353\355\360\364\366\366\366\366\367\371\372\373\373\372\372\372\372\374\001\t\021\031 &*,-,*&##&.6=?>:4/*&$#\"\"! \035\033\027\025\022\021\021\021\021\020\r\n\003\372\360\350\343\342\344\345\346\347\351\354\361\365\370\371\370\365\361\356\354\352\351\351\354\360\365\370\372\372\372\371\371\370\370\370\372\375"
+	.string	"\002\004\006\007\t\n\f\f\n\b\005\004\005\007\t\f\016\020\023\027\034!#\"\037\033\030\032\035!#%%$$\"!\037\034\031\024\020\013\007\005\004\003\001\376\373\367\364\361\357\355\352\347\343\340\337\337\340\341\341\342\342\341\340\340\342\345\350\353\355\356\360\362\363\364\364\364\364\363\363\361\360\360\360\361\363\365\366\367\370\371\372\373\373\374\377\002\004\006\007\007\007\007\b\b\007\006\007\n\r\017\021\022\022\021\017\f\n\t\t\b\007\005\004\004\004\005\006\007\006\004\001\376\375\375\376\377\377\376\377"
+	.string	"\003\003\002\377\375\372\370\367\367\367\370\371\371\372\372\372\372\371\370\370\371\371\371\370\367\366\367\370\371\370\366\364\363\362\362\362\364\367\373\376"
+	.string	"\001\002\003\002\002\001\001\001\002\003\004\006\t\013\013\n\007\003"
+	.string	"\376\374\372\370\367\370\372\374\377\002\005\b\b\b\006\003\377\374\371\367\366\366\366\365\365\365\367\371\372\372\372\372\372\372\374\376"
+	.string	"\002\003\004\005\006\006\005\005\005\005\006\006\007\t\013\016\020\022\023\024\024\024\025\025\025\026\025\024\022\017\r\f\013\n\n\n\n\n\n\013\013\013\n\b\006\003\001\377\376\377\001\003\004\006\007\b\t\t\b\007\007\b\t\013\f\f\r\017\020\022\023\023\024\024\024\024\024\024\023\021\016\f\n\n\t\007\006\004\004\004\006\b\n\013\013\t\005\002"
+	.string	"\376\376\377"
+	.string	"\377\377\376\376\375\373\371\367\364\361\356\352\346\344\342\342\342\343\343\342\341\337\335\334\333\332\331\330\330\331\331\333\334\336\340\341\342\343\343\343\344\344\344\343\344\347\352\356\361\363\364\365\366\370\372\373\373\375\376"
+	.string	"\002\004\006\t\013\016\020\021\021\020\017\016\r\r\r\016\020\022\023\024\025\025\025\025\025\024\022\020\017\017\017\017\017\017\017\017\r\f\013\n\t\t\n\t\t\t\n\n\t\b\b\006\005\004\005\005\006\006\007\007\007\005\004\002\001\001\001"
+	.string	"\001\001\002\003\002\001"
+	.string	"\377\377\376\375\374\373\373\373\373\373\373\373\374\375\377"
+	.string	"\002\004\005\004\003\001\376\374\372\370\367\367\367\370\371\371\370\367\366\365\364\363\363\363\363\363\363\363\364\365\366\367\367\370\371\372\372\373\373\373\373\373\374\376"
+	.string	"\002\004\006\007\b\b\b\b\b\b\b\b\t\t\n\n\013\f\f\f\r\016\016\017\020\020\021\021\021\021\021\021\020\016\r\f\f\r\016\020\021\022\022\023\023\022\022\021\020\020\021\022\023\023\023\022\021\020\016\f\n\t\b\007\006\004\003\001"
+	.string	"\377\376\376\376\376\376\375\374\372\370\366\363\362\362\362\363\363\363\363\362\362\362\363\363\363\362\360\357\356\356\356\357\360\360\357\357\357\360\361\362\363\364\365\365\365\365\364\364\363\364\365\366\366\366\365\364\364\363\364\364\363\363\362\362\362\362\361\361\360\360\357\356\355\354\355\356\357\357\357\357\357\357\356\356\356\357\357\360\360\361\363\364\365\367\370\372\374\376"
+	.string	"\001\002\003\003\004\005\006\007\b\t\013\r\017\020\020\020\020\020\020\021\021\021\022\022\021\017\r\013\t\007\005\004\003\003\003\002\001\001\001\001"
+	.string	"\376\375\373\373\373\373\374\374\375\375\375\374\374\374\374\374\374\374\374\374\375\376\377"
+	.string	"\001\004\006\t\013\f\r\r\r\f\f\013\n\n\t\t\n\013\f\r\016\017\017\017\017\017\016\016\r\r\f\f\f\r\r\r\r\r\r\f\013\n\n\t\b\006\004\003\002\002\001"
+	.string	""
+	.string	"\377\376\376\375\374\373\372\371\370\367\366\364\363\363\363\363\363\363\364\364\365\365\366\365\365\365\364\364\364\364\365\365\366\366\366\367\370\371\372\373\374\375\376\376\377"
+	.string	"\001\001\002\003\004\006\007\007\007\007\007\007\006\006\006\006\005\005\005\005\004\003\003\003\003\003\003\003\002\001"
+	.string	"\377\375\374\373\371\371\370\367\367\367\366\366\365\363\362\361\360\356\355\355\354\354\354\354\355\356\357\360\361\362\363\363\363\362\362\361\361\361\362\364\365\370\372\373\375\376\377\377\377\376\376\376\376\377"
+	.string	"\002\003\004\005\006\007\007\b\b\t\t\t\t\b\b\b\b\b\b\b\b\b\b\007\006\005\003\001\377\375\373\372\371\371\370\367\367\366\366\365\365\364\363\363\363\363\363\364\365\365\366\366\366\366\366\366\366\366\367\367\370\370\371\372\374\375\375\375\374\374\374\374\374\374\374\375\376\377"
+	.string	"\002\003\004\005\006\007\007\b\b\b\t\n\013\f\016\017\020\021\021\021\021\021\022\022\023\023\022\022\022\022\021\020\017\016\r\f\013\n\t\b\006\005\005\004\004\004\004\004\005\005\005\005\005\005\005\006\006\007\007\b\t\n\013\013\f\013\013\013\n\t\t\t\t\t\t\t\t\t\b\007\006\004\003\001"
+	.ascii	"\377\376\375\374\374\373\372\371"
+	.string	"\370\367\366\365\364\363\362\362\362\362\363\363\363\362\362\361\360\360\357\357\357\357\357\357\357\357\356\356\355\355\355\355\355\355\355\355\355\356\356\357\357\360\361\361\362\362\362\362\362\362\363\363\365\366\367\371\372\374\375\376\376\377"
+	.string	""
+	.string	"\001\001\001\001\001\002\002\002\001"
+	.string	""
+	.string	"\377\377\377\377\377\377\377\377\377\376\376\376\376\377\377"
+	.string	""
+	.string	"\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001\002\003\004\005\005\006\006\006\007\007\007\007\007\007\007\007\b\b\t\t\t\t\n\n\n\n\013\013\n\n\t\t\b\b\t\b\b\b\b\b\b\b\b\007\007\006\005\005\004\004\003\003\003\003\004\003\003\003\002\001"
+	.ascii	"\376\375\374\373\372\372\371\370\370\367\366\365\365\364\364"
+	.ascii	"\364\364\363\363\363\363\364\364\364\365\366\366\367\370\371"
+	.ascii	"\371\371\372\371\371\371\371\372\372"
+	.ascii	"\364\347\332\307\300\304\315\333\345\353\354\350\341\331\324"
+	.ascii	"\321\322\323\324\323\317\314\313\317\325\333"
+	.string	"\335\331\316\301\265\256\253\255\261\267\276\301\300\272\263\256\254\256\264\274\303\304\276\262\247\242\243\250\253\251\242\232\224\225\236\254\271\277\276\267\257\247\240\233\227\230\233\237\241\241\237\233\226\222\222\225\232\236\237\234\230\222\215\211\211\214\221\226\232\234\235\236\234\227\223\217\215\215\220\224\227\232\234\236\240\237\232\222\213\205\200\200\200\200\200\203\212\221\225\226\223\220\215\215\216\220\221\222\223\224\224\223\222\222\223\226\227\226\224\220\213\210\205\204\205\207\212\215\220\222\224\224\224\224\224\224\225\225\225\224\222\217\215\215\220\224\231\234\235\234\230\224\217\215\215\220\225\233\240\243\243\241\236\234\232\232\235\242\246\247\245\237\231\225\222\217\214\211\211\216\230\244\262\276\306\312\310\303\273\263\255\253\252\254\260\264\270\271\270\267\267\272\276\303\307\311\311\305\276\267\262\260\262\272\306\323\336\343\346\347\344\337\326\317\312\311\311\314\321\326\334\342\350\354\354\353\352\352\352\351\350\347\347\347\351\353\356\362\366\370\370\370\370\371\374\376"
+	.string	""
+	.string	"\377\376\376"
+	.string	"\003\005\007\t\b\007\006\006\t\r\021\023\025\024\024\023\024\027\031\033\035\036\036\034\032\030\027\031\035\"(+,*'%#\"#$&(+/244310137:===;:99889:;<>?@?=<=>@CEGHIJJIHGGHIKLMNMLJHHHJKMNMLLLNPPPPQPOMKIHHIIIJKKKLLMLKIIIIHFDB@@ACGJKJGC>9632369<?@@>:630/--+*)()+-.-+'$!\037\036\037\037!#%&&$\"\037\034\030\024\021\017\016\016\017\020\021\022\022\022\021\017\013\007\003\001\002\004\005\006\006\004\002"
+	.ascii	"\376\374\373\371\370\365\363\361\357\355\353\353\354\357\362"
+	.ascii	"\365\367\370\370\366\362\357\354\351\345\342\337\335\333\332"
+	.ascii	"\330\327"
+	.string	"\327\327\330\332\333\333\332\331\330\326\325\324\324\324\325\326\327\327\326\323\320\314\310\306\304\304\305\307\311\313\314\314\312\310\306\304\302\301\301\300\277\276\276\277\300\302\303\303\301\277\274\272\271\271\270\267\265\263\262\260\260\261\264\267\271\273\273\274\273\271\267\264\262\260\257\257\256\256\256\256\256\256\256\256\256\256\256\256\257\257\257\257\255\254\253\253\253\252\252\253\253\254\255\256\260\260\260\260\257\256\255\254\254\253\253\253\253\253\253\253\252\252\253\255\257\260\261\261\260\261\261\263\264\265\264\263\262\261\260\260\260\260\260\261\261\262\262\262\262\261\261\261\262\263\263\263\264\264\265\267\270\272\273\275\276\277\277\277\277\276\276\276\276\277\300\301\302\304\305\306\306\306\306\305\305\306\307\310\310\310\311\311\313\315\317\321\323\324\325\326\326\326\325\324\324\324\325\325\326\327\331\332\333\334\336\337\337\340\341\343\345\347\350\350\351\351\351\352\353\354\355\355\354\354\354\355\357\360\362\364\366\366\367\367\367\367\370\370\371\371\372\372\372\373\374\375"
+	.ascii	"\002\005\007\n\013\f\r\r\f\f\013\013\013\013\n\n\013\f\017\021"
+	.ascii	"\024\026\030\033\035 \"$%%$#! \037  !!#$&())*,-.012234456789"
+	.ascii	":;<==>>?@BCDDEGHIJJJIIIJJKLMOPRTUWXXYYZ[[[ZZZZ[\\^_abbccdeff"
+	.ascii	"gghhiiiiiijjkkkjjiiijklmnpqrtuuutssrrrrsttttttsrrrsssttttuuv"
+	.ascii	"wwwwvuutttss"
+	.string	"ssstuvwwwvvvvvuuttssttuuvvwwwwvvvuuuuuuuvvvwwvutrqppqqrssttssrqqpoonnooppqqqqqponlkjiiiiiijjjiihggffeddcbbbbbbbbbbaaa``_^]\\[ZYXWVVUUUUUUUUTTSRPOMLKJJJJKKLLKKIHGECA@?>>>>>>>==<;:8754322111000/.-,+*))((((''&%$#! \036\035\034\033\033\033\033\033\032\032\031\030\027\027\026\026\025\025\024\024\023\022\021\021\020\017\016\r\f\013\n\t\b\007\006\006\005\005\004\004\003\003\002\002\001\001"
+	.ascii	"\377\376\375\374\373\373\372\371\370\367\365\364\364\363\363"
+	.ascii	"\362\361\361\360\357\356\354\353\353\352\351\351\350\350\347"
+	.ascii	"\347\346\346\345\345\345\344\343\343\342\341\340\337\336\335"
+	.ascii	"\335\334\334\333\332\331\330\327\327\326\325\324\323\322\322"
+	.ascii	"\322\321\321\321\320\320\317\316\316\315\314\313\312\312\311"
+	.ascii	"\310\307\306\305\304\303\303\302\301\301\300\300\300\277\277"
+	.ascii	"\277\276\276\275\274\273\272\271\271\271\271\271\270\270\267"
+	.ascii	"\265\264\263\261\260\257\256\255\254\254\255\255\255\256\256"
+	.ascii	"\256\256\256\255\255\254\253\252\251\250\247\246\245\245\245"
+	.ascii	"\245\245\245\245\244\244\244\244\243\242\242\241\240\236\235"
+	.ascii	"\234\234\233\233\233\233\233\233\234\234\234\233\233\233\232"
+	.ascii	"\232\232\232\231\230\227\226\225\224\223\223\223\224\225\225"
+	.ascii	"\226\226\226\226\226\225\225\225\224\223\223\222\222\222\222"
+	.ascii	"\222\223\223\224\224\224\224\224\224\225\225\225\225\225\225"
+	.ascii	"\225\225\226\226\227\227\227\230\231\231\230\230\227\227\227"
+	.ascii	"\230\230\230\230\230\231\231\231\232\232\233\234\234\235\235"
+	.ascii	"\235\235\234\234\233\233\234\234\235\235\235\236\236\237\237"
+	.ascii	"\240\240\241\241\241\241\241\241\241\242\242\242\241\241\241"
+	.ascii	"\242\242\242\243\243\244\244\245\246\247\247\250\251\251\251"
+	.ascii	"\251\251\251\251\251\251\251\251\251\251\251\252"
+	.string	"\252\253\253\254\255\255\255\255\255\255\255\256\256\257\260\261\261\262\263\263\263\264\264\265\265\265\265\265\265\265\265\265\266\266\267\270\270\271\271\271\272\272\272\272\273\273\273\273\273\273\273\274\274\274\275\276\277\300\301\302\302\303\303\304\304\305\305\305\305\305\305\305\305\306\306\307\310\310\311\311\311\311\311\312\312\312\313\313\314\315\315\315\316\316\317\320\320\321\321\321\321\321\321\321\321\322\322\323\323\324\325\326\326\327\327\327\330\330\331\331\332\333\333\333\333\333\333\333\334\335\335\336\336\337\337\337\340\340\341\341\341\342\342\342\342\342\342\343\343\344\344\345\345\346\346\347\347\347\347\347\350\350\351\351\351\351\352\353\353\354\354\355\355\356\356\357\357\357\356\356\356\356\357\357\357\357\357\357\360\360\361\361\362\362\363\363\363\363\363\363\363\363\363\363\363\364\364\364\365\365\366\366\367\367\367\367\367\367\367\367\367\370\370\370\371\371\371\371\371\371\371\371\371\372\372\372\372\372\372\372\372\372\372\372\372\372\372\373\373\374\374\375\376\376\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\376\376\376\376\376\376\376\377\377"
+	.string	""
+	.ascii	"\001\001\002\002\002\002\002\002\003\003\003\003\003\002\002"
+	.ascii	"\002\002\002\002\003\003\004\004\004\004\004\003\003\003\003"
+	.ascii	"\003\003\004\004\004\004\004\005\005\005\005\005\005\005\005"
+	.ascii	"\006\006\006\005\005\005\006\006\006\006\006\006\006\006\006"
+	.ascii	"\006\006\006\005\005\005\004\005\005\005\005\006\006\006\006"
+	.ascii	"\006\006\007\007\007\007\007\007\006\006\006\006\006\006\006"
+	.ascii	"\006\006\006\006\006\006\006\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\006\006\005\005\005\005\005\005\005\005\005\005"
+	.ascii	"\005\005\005\005\006\006\007\006\006\006\005\005\005\005\005"
+	.ascii	"\005\005\005\005\004\004\004\004\004\003\003\003\003\003\002"
+	.ascii	"\002\002\002\002\002\002\002\003\003\004\004\004\004\004\004"
+	.ascii	"\004\004\005\004\004\004\003\003\002\002\002\002\002\002\002"
+	.string	"\002\003\003\003\003\003\003\003\003\002\002\002\001\001\001\001\001\001\001\001\001"
+	.string	"\001\001\001\001\002\002\001\001\002\002\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	"\377\377\376\376\376\377\377\377"
+	.string	""
+	.string	"\001\001\001\002\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\001\001\001\001\001\001\001\001\001\001\001\001\001\001\001"
+	.ascii	"\001\001\001\001\001\001\001\001\002\002\002\003\003\004\004"
+	.ascii	"\005\005\005\005\004\004\004\004\004\004\004\004\004\004\004"
+	.ascii	"\004\004\005\005\005\005\005\005\005\005\005\006\007\b\b\b\b"
+	.ascii	"\b\b\b\b\b\b\t\t\n\n\n\n\t\t\t\n\n\n\n\t\t\t\t\n\n\013\f\f"
+	.byte	-64
+	.byte	-69
+	.byte	-72
+	.byte	-75
+	.byte	-76
+	.byte	-78
+	.byte	-79
+	.byte	-81
+	.byte	-82
+	.byte	-83
+	.byte	-84
+	.byte	-84
+	.byte	-85
+	.byte	-84
+	.byte	-83
+	.byte	-79
+	.byte	-76
+	.byte	-71
+	.byte	-60
+	.byte	-21
+	.byte	37
+	.byte	81
+	.byte	107
+	.byte	120
+	.byte	126
+	.byte	127
+	.byte	127
+	.byte	126
+	.byte	124
+	.byte	122
+	.byte	119
+	.byte	115
+	.byte	111
+	.byte	105
+	.byte	97
+	.byte	70
+	.byte	14
+	.byte	-39
+	.byte	-71
+	.byte	-88
+	.byte	-95
+	.byte	-98
+	.byte	-99
+	.byte	-99
+	.byte	-98
+	.byte	-97
+	.byte	-96
+	.byte	-94
+	.byte	-93
+	.byte	-91
+	.byte	-89
+	.byte	-87
+	.byte	-85
+	.byte	-82
+	.byte	-80
+	.byte	-77
+	.byte	-74
+	.byte	-71
+	.byte	-66
+	.byte	-58
+	.byte	-25
+	.byte	31
+	.byte	77
+	.byte	104
+	.byte	118
+	.byte	125
+	.byte	127
+	.byte	127
+	.byte	127
+	.byte	125
+	.byte	123
+	.byte	121
+	.byte	118
+	.byte	116
+	.byte	113
+	.byte	109
+	.byte	106
+	.byte	102
+	.byte	97
+	.byte	92
+	.byte	83
+	.byte	60
+	.byte	13
+	.byte	-35
+	.byte	-68
+	.byte	-86
+	.byte	-94
+	.byte	-98
+	.byte	-99
+	.byte	-98
+	.byte	-98
+	.byte	-96
+	.byte	-95
+	.byte	-93
+	.byte	-91
+	.byte	-89
+	.byte	-87
+	.byte	-85
+	.byte	-82
+	.byte	-80
+	.byte	-77
+	.byte	-74
+	.byte	-71
+	.byte	-67
+	.byte	-61
+	.byte	-49
+	.byte	-30
+	.byte	-6
+	.byte	19
+	.byte	40
+	.byte	57
+	.byte	66
+	.byte	69
+	.byte	64
+	.byte	53
+	.byte	36
+	.byte	13
+	.byte	-13
+	.byte	-35
+	.byte	-51
+	.byte	-60
+	.byte	-65
+	.byte	-67
+	.byte	-68
+	.byte	-69
+	.byte	-69
+	.byte	-68
+	.byte	-68
+	.byte	-67
+	.byte	-66
+	.byte	-65
+	.byte	-64
+	.byte	-63
+	.byte	-62
+	.byte	-60
+	.byte	-59
+	.byte	-57
+	.byte	-55
+	.byte	-53
+	.byte	-51
+	.byte	-49
+	.byte	-45
+	.byte	-40
+	.byte	-28
+	.byte	-1
+	.byte	39
+	.byte	77
+	.byte	102
+	.byte	116
+	.byte	123
+	.byte	126
+	.byte	127
+	.byte	126
+	.byte	125
+	.byte	124
+	.byte	122
+	.byte	120
+	.byte	118
+	.byte	115
+	.byte	113
+	.byte	111
+	.byte	108
+	.byte	105
+	.byte	103
+	.byte	100
+	.byte	97
+	.byte	94
+	.byte	91
+	.byte	88
+	.byte	84
+	.byte	81
+	.byte	78
+	.byte	74
+	.byte	71
+	.byte	68
+	.byte	65
+	.byte	62
+	.byte	60
+	.byte	58
+	.byte	58
+	.byte	57
+	.byte	57
+	.byte	57
+	.byte	57
+	.byte	58
+	.byte	58
+	.byte	58
+	.byte	58
+	.byte	58
+	.byte	57
+	.byte	57
+	.byte	56
+	.byte	55
+	.byte	54
+	.byte	53
+	.byte	52
+	.byte	50
+	.byte	49
+	.byte	47
+	.byte	45
+	.byte	43
+	.byte	40
+	.byte	37
+	.byte	32
+	.byte	24
+	.byte	11
+	.byte	-8
+	.byte	-31
+	.byte	-53
+	.byte	-74
+	.byte	-91
+	.byte	-102
+	.byte	-109
+	.byte	-112
+	.byte	-114
+	.byte	-113
+	.byte	-112
+	.byte	-111
+	.byte	-109
+	.byte	-107
+	.byte	-105
+	.byte	-102
+	.byte	-99
+	.byte	-96
+	.byte	-93
+	.byte	-89
+	.byte	-84
+	.byte	-77
+	.byte	-66
+	.byte	-52
+	.byte	-36
+	.byte	-20
+	.byte	-3
+	.byte	14
+	.byte	28
+	.byte	40
+	.byte	48
+	.byte	54
+	.byte	57
+	.byte	58
+	.byte	59
+	.byte	59
+	.byte	58
+	.byte	56
+	.byte	54
+	.byte	52
+	.byte	49
+	.byte	45
+	.byte	40
+	.byte	34
+	.byte	25
+	.byte	16
+	.byte	5
+	.byte	-5
+	.byte	-15
+	.byte	-24
+	.byte	-33
+	.byte	-40
+	.byte	-46
+	.byte	-52
+	.byte	-56
+	.byte	-58
+	.byte	-60
+	.byte	-61
+	.byte	-61
+	.byte	-60
+	.byte	-59
+	.byte	-57
+	.byte	-55
+	.byte	-53
+	.byte	-50
+	.byte	-48
+	.byte	-45
+	.byte	-43
+	.byte	-42
+	.byte	-41
+	.byte	-40
+	.byte	-41
+	.byte	-42
+	.byte	-44
+	.byte	-47
+	.byte	-51
+	.byte	-54
+	.byte	-58
+	.byte	-61
+	.byte	-63
+	.byte	-65
+	.byte	-66
+	.byte	-67
+	.byte	-67
+	.byte	-67
+	.byte	-67
+	.byte	-66
+	.byte	-66
+	.byte	-65
+	.byte	-64
+	.byte	-64
+	.byte	-63
+	.byte	-62
+	.byte	-61
+	.byte	-60
+	.byte	-59
+	.byte	-58
+	.byte	-57
+	.byte	-56
+	.byte	-54
+	.byte	-53
+	.byte	-52
+	.byte	-51
+	.byte	-49
+	.byte	-48
+	.byte	-46
+	.byte	-45
+	.byte	-43
+	.byte	-42
+	.byte	-40
+	.byte	-38
+	.byte	-36
+	.byte	-34
+	.byte	-31
+	.byte	-28
+	.byte	-23
+	.byte	-18
+	.byte	-12
+	.byte	-6
+	.byte	1
+	.byte	7
+	.byte	12
+	.byte	18
+	.byte	22
+	.byte	26
+	.byte	30
+	.byte	33
+	.byte	36
+	.byte	38
+	.byte	40
+	.byte	42
+	.byte	44
+	.byte	46
+	.byte	48
+	.byte	49
+	.byte	51
+	.byte	53
+	.byte	56
+	.byte	58
+	.byte	61
+	.byte	63
+	.byte	66
+	.byte	68
+	.byte	71
+	.byte	72
+	.byte	74
+	.byte	75
+	.byte	75
+	.byte	76
+	.byte	76
+	.byte	75
+	.byte	75
+	.byte	74
+	.byte	73
+	.byte	73
+	.byte	71
+	.byte	70
+	.byte	69
+	.byte	68
+	.byte	66
+	.byte	64
+	.byte	63
+	.byte	61
+	.byte	59
+	.byte	57
+	.byte	54
+	.byte	52
+	.byte	49
+	.byte	46
+	.byte	42
+	.byte	38
+	.byte	33
+	.byte	28
+	.byte	23
+	.byte	18
+	.byte	12
+	.byte	8
+	.byte	3
+	.byte	0
+	.byte	-4
+	.byte	-6
+	.byte	-9
+	.byte	-10
+	.byte	-11
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-11
+	.byte	-10
+	.byte	-8
+	.byte	-7
+	.byte	-5
+	.byte	-2
+	.byte	0
+	.byte	2
+	.byte	5
+	.byte	7
+	.byte	9
+	.byte	12
+	.byte	14
+	.byte	16
+	.byte	17
+	.byte	19
+	.byte	20
+	.byte	21
+	.byte	21
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	21
+	.byte	21
+	.byte	20
+	.byte	20
+	.byte	19
+	.byte	18
+	.byte	17
+	.byte	16
+	.byte	16
+	.byte	15
+	.byte	14
+	.byte	13
+	.byte	13
+	.byte	12
+	.byte	12
+	.byte	11
+	.byte	11
+	.byte	10
+	.byte	10
+	.byte	9
+	.byte	9
+	.byte	8
+	.byte	7
+	.byte	6
+	.byte	6
+	.byte	4
+	.byte	3
+	.byte	2
+	.byte	0
+	.byte	-2
+	.byte	-4
+	.byte	-6
+	.byte	-9
+	.byte	-12
+	.byte	-15
+	.byte	-18
+	.byte	-22
+	.byte	-25
+	.byte	-29
+	.byte	-33
+	.byte	-36
+	.byte	-40
+	.byte	-44
+	.byte	-48
+	.byte	-51
+	.byte	-55
+	.byte	-58
+	.byte	-61
+	.byte	-63
+	.byte	-66
+	.byte	-67
+	.byte	-69
+	.byte	-69
+	.byte	-70
+	.byte	-70
+	.byte	-70
+	.byte	-69
+	.byte	-69
+	.byte	-68
+	.byte	-67
+	.byte	-66
+	.byte	-65
+	.byte	-64
+	.byte	-63
+	.byte	-62
+	.byte	-61
+	.byte	-60
+	.byte	-59
+	.byte	-58
+	.byte	-57
+	.byte	-56
+	.byte	-54
+	.byte	-53
+	.byte	-52
+	.byte	-51
+	.byte	-50
+	.byte	-49
+	.byte	-47
+	.byte	-46
+	.byte	-45
+	.byte	-44
+	.byte	-43
+	.byte	-42
+	.byte	-40
+	.byte	-39
+	.byte	-38
+	.byte	-37
+	.byte	-35
+	.byte	-34
+	.byte	-32
+	.byte	-31
+	.byte	-29
+	.byte	-28
+	.byte	-26
+	.byte	-24
+	.byte	-22
+	.byte	-20
+	.byte	-18
+	.byte	-16
+	.byte	-13
+	.byte	-11
+	.byte	-8
+	.byte	-6
+	.byte	-4
+	.byte	-1
+	.byte	1
+	.byte	4
+	.byte	6
+	.byte	8
+	.byte	10
+	.byte	12
+	.byte	14
+	.byte	16
+	.byte	18
+	.byte	19
+	.byte	20
+	.byte	22
+	.byte	23
+	.byte	23
+	.byte	24
+	.byte	24
+	.byte	25
+	.byte	25
+	.byte	25
+	.byte	25
+	.byte	25
+	.byte	24
+	.byte	24
+	.byte	23
+	.byte	23
+	.byte	22
+	.byte	21
+	.byte	21
+	.byte	20
+	.byte	19
+	.byte	18
+	.byte	18
+	.byte	17
+	.byte	17
+	.byte	16
+	.byte	15
+	.byte	15
+	.byte	15
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	14
+	.byte	15
+	.byte	15
+	.byte	15
+	.byte	16
+	.byte	16
+	.byte	17
+	.byte	17
+	.byte	17
+	.byte	18
+	.byte	18
+	.byte	19
+	.byte	19
+	.byte	20
+	.byte	20
+	.byte	20
+	.byte	21
+	.byte	21
+	.byte	22
+	.byte	22
+	.byte	23
+	.byte	23
+	.byte	24
+	.byte	24
+	.byte	24
+	.byte	25
+	.byte	25
+	.byte	26
+	.byte	26
+	.byte	26
+	.byte	27
+	.byte	27
+	.byte	28
+	.byte	28
+	.byte	28
+	.byte	28
+	.byte	29
+	.byte	29
+	.byte	29
+	.byte	29
+	.byte	29
+	.byte	29
+	.byte	29
+	.byte	28
+	.byte	28
+	.byte	27
+	.byte	27
+	.byte	26
+	.byte	26
+	.byte	25
+	.byte	24
+	.byte	23
+	.byte	22
+	.byte	21
+	.byte	20
+	.byte	18
+	.byte	17
+	.byte	15
+	.byte	14
+	.byte	12
+	.byte	10
+	.byte	8
+	.byte	7
+	.byte	5
+	.byte	3
+	.byte	1
+	.byte	-1
+	.byte	-3
+	.byte	-5
+	.byte	-7
+	.byte	-9
+	.byte	-10
+	.byte	-12
+	.byte	-14
+	.byte	-16
+	.byte	-17
+	.byte	-19
+	.byte	-20
+	.byte	-22
+	.byte	-23
+	.byte	-24
+	.byte	-26
+	.byte	-27
+	.byte	-28
+	.byte	-29
+	.byte	-30
+	.byte	-31
+	.byte	-31
+	.byte	-32
+	.byte	-33
+	.byte	-33
+	.byte	-34
+	.byte	-34
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-36
+	.byte	-36
+	.byte	-36
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-35
+	.byte	-34
+	.byte	-34
+	.byte	-33
+	.byte	-33
+	.byte	-32
+	.byte	-32
+	.byte	-31
+	.byte	-30
+	.byte	-30
+	.byte	-29
+	.byte	-28
+	.byte	-27
+	.byte	-27
+	.byte	-26
+	.byte	-25
+	.byte	-24
+	.byte	-23
+	.byte	-22
+	.byte	-21
+	.byte	-20
+	.byte	-20
+	.byte	-19
+	.byte	-18
+	.byte	-17
+	.byte	-16
+	.byte	-15
+	.byte	-14
+	.byte	-13
+	.byte	-13
+	.byte	-12
+	.byte	-11
+	.byte	-10
+	.byte	-10
+	.byte	-9
+	.byte	-8
+	.byte	-8
+	.byte	-7
+	.byte	-7
+	.byte	-6
+	.byte	-6
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	5
+	.byte	5
+	.byte	6
+	.byte	6
+	.byte	6
+	.byte	7
+	.byte	7
+	.byte	8
+	.byte	8
+	.byte	9
+	.byte	9
+	.byte	10
+	.byte	10
+	.byte	11
+	.byte	11
+	.byte	12
+	.byte	13
+	.byte	13
+	.byte	14
+	.byte	14
+	.byte	15
+	.byte	15
+	.byte	16
+	.byte	16
+	.byte	17
+	.byte	17
+	.byte	18
+	.byte	18
+	.byte	19
+	.byte	19
+	.byte	20
+	.byte	20
+	.byte	21
+	.byte	21
+	.byte	21
+	.byte	21
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	22
+	.byte	21
+	.byte	21
+	.byte	21
+	.byte	21
+	.byte	20
+	.byte	20
+	.byte	19
+	.byte	19
+	.byte	18
+	.byte	18
+	.byte	17
+	.byte	16
+	.byte	16
+	.byte	15
+	.byte	14
+	.byte	14
+	.byte	13
+	.byte	12
+	.byte	11
+	.byte	11
+	.byte	10
+	.byte	9
+	.byte	8
+	.byte	7
+	.byte	6
+	.byte	6
+	.byte	5
+	.byte	4
+	.byte	3
+	.byte	2
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	-1
+	.byte	-2
+	.byte	-2
+	.byte	-3
+	.byte	-4
+	.byte	-5
+	.byte	-5
+	.byte	-6
+	.byte	-6
+	.byte	-7
+	.byte	-8
+	.byte	-8
+	.byte	-9
+	.byte	-9
+	.byte	-10
+	.byte	-10
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-13
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-12
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-11
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-10
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-9
+	.byte	-8
+	.byte	-8
+	.byte	-8
+	.byte	-8
+	.byte	-8
+	.byte	-8
+	.byte	-8
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	2
+	.byte	2
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	4
+	.byte	4
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	6
+	.byte	6
+	.byte	7
+	.byte	7
+	.byte	7
+	.byte	8
+	.byte	8
+	.byte	8
+	.byte	9
+	.byte	9
+	.byte	9
+	.byte	9
+	.byte	10
+	.byte	10
+	.byte	10
+	.byte	10
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	12
+	.byte	12
+	.byte	12
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	11
+	.byte	10
+	.byte	10
+	.byte	10
+	.byte	10
+	.byte	9
+	.byte	9
+	.byte	9
+	.byte	9
+	.byte	8
+	.byte	8
+	.byte	8
+	.byte	7
+	.byte	7
+	.byte	7
+	.byte	7
+	.byte	6
+	.byte	6
+	.byte	6
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-7
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-6
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-5
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	5
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	4
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	3
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-4
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-3
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	2
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-2
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	-1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.ascii	"\b\371\345\347\374\001"
+	.string	"\366\362\373\003\002\367\360\367\377\374\353\331\325\327\327\324\320\315\311\302\274\267\263\257\252\246\244\243\242\237\233\227\224\222\222\222\220\216\216\215\217\221\224\225\227\230\232\234\240\245\251\255\260\262\266\273\301\306\314\322\330\336\343\347\355\363\372\377\005\n\020\026\034!',159=BFILNPRUWY[\\\\\\ZYXVUTRPMIFC?<83.*&\"\035\031\025\020\013\007\003\377\372\366\361\354\350\344\341\337\334\331\327\326\324\321\317\316\315\314\314\313\315\316\320\322\323\325\330\331\333\336\343\347\352\355\361\365\372\376\003\007\f\021\025\032\037#'+/37<@CGILPSUWYZ\\]^]\\ZXWVUSQMJGC@=:62-($ \033\025\017\n\006\001\375\370\364\360\353\347\342\336\332\326\323\321\316\315\312\311\307\306\306\305\305\306\307\310\311\312\315\317\322\324\327\333\336\342\345\352\356\362\367\373"
+	.string	"\005\n\017\024\030\035!&*/27;>BDGIKMNPRRSSRQQOMKIGD@=951,)$ \033\026\021\013\005\001\374\366\362\355\350\344\337\333\326\322\316\313\310\305\302\300\275\274\272\271\270\270\270\270\271\272\274\276\277\301\303\306\310\314\317\323\326\333\337\343\350\354\357\363\370\374\001\006\013\017\023\027\033\037#'+.136789;<=>>>><:9742/,*&\"\037\033\027\022\016\t\004"
+	.ascii	"\373\366\361\354\347\343\336\332\326\322\315\311\305\302\276"
+	.ascii	"\273\270\265\263\261\257"
+	.string	"\257\256\255\254\253\253\254\255\256\257\261\263\265\267\272\276\301\303\307\313\317\323\330\335\342\345\351\356\362\367\374\001\004\007\n\016\023\027\032\036!$'(*++,,-./..-+)'&$!\036\032\027\024\021\r\t\005\001\374\370\363\357\353\347\342\336\331\326\322\317\314\310\305\301\276\274\272\267\264\262\261\257\256\257\257\256\256\256\260\261\262\263\265\270\272\274\277\302\305\311\314\320\325\331\335\341\345\352\356\362\366\371\375\001\004\b\f\017\021\025\030\032\035\037!$%&()****))('&$\" \036\033\031\026\023\016\013\007\003\377\374\371\365\362\356\352\346\343\336\333\330\325\322\316\313\310\306\303\302\301\277\276\274\273\272\272\271\271\272\273\274\275\277\300\302\304\306\311\314\316\320\323\327\331\334\337\343\346\352\355\361\364\370\373\377\003\006\t\f\017\021\023\026\030\032\034\036 !\"$$%$%$$\"\"! \036\034\032\027\025\023\020\r\n\007\004"
+	.string	"\375\373\370\365\361\356\353\351\345\341\337\335\333\330\326\324\322\321\320\317\316\314\314\313\313\312\312\313\314\315\316\317\321\322\324\324\325\327\333\335\340\341\345\351\353\356\361\365\367\372\373\377\002\004\007\n\f\016\020\023\026\027\031\032\033\035\035\037    !\"!  \037\035\034\032\031\030\026\024\022\020\016\f\t\007\004\001\377\374\371\367\364\362\360\355\353\350\346\344\341\337\335\334\332\331\330\330\327\326\325\325\325\325\324\324\326\326\326\330\332\334\335\337\341\343\345\347\351\353\356\360\363\367\372\374\377\002\005\007\n\f\016\020\022\024\026\031\033\034\036\037!\"###$$$$###\"! \037\036\034\033\031\027\025\024\021\017\r\013\t\007\005\003"
+	.string	"\376\374\372\370\366\364\363\362\360\356\355\353\352\350\347\347\346\346\345\345\345\345\345\345\346\346\347\347\350\351\353\354\356\357\361\362\364\366\370\372\374\377"
+	.string	"\002\005\007\t\f\016\020\023\024\026\030\031\033\034\036\037 !\"\"##$$$$#\"\"! \037\037\036\035\034\032\032\030\027\025\023\021\017\016\f\n\b\007\004\003\001"
+	.string	"\376\374\373\371\370\366\365\364\363\363\362\362\361\362\361\360\361\361\361\361\361\362\363\364\364\365\366\367\370\372\374\375\377\001\002\004\006\b\n\r\017\021\022\024\026\030\032\033\035\037 !\"#$%&&''''&&&&%$$#\"! \037\035\033\031\030\027\025\024\023\021\017\r\f\n\t\006\005\004\002\001"
+	.string	"\377\376\375\374\374\374\373\372\372\372\371\371\371\372\372\373\373\373\373\374\374\376\376\377\377\002\002\004\005\006\b\t\n\f\r\016\020\021\023\024\026\027\031\032\034\035\037 !!\"#$$$$$$$%$$#\"\"! \037\036\035\035\034\033\032\031\027\025\024\022\020\017\r\f\013\n\b\007\006\004\004\002\001"
+	.string	"\377\376\375\374\373\373\373\373\373\373\373\373\374\374\374\375\375\376\377"
+	.string	"\001\002\003\003\004\005\006\007\b\t\n\013\f\016\017\020\021\022\023\024\026\027\027\030\031\032\033\034\035\035\036\036\037\037\036\036\036\035\035\034\034\033\032\032\031\030\030\027\026\025\024\022\021\020\016\r\f\f\013\t\b\007\006\005\004\002\002\001"
+	.string	"\377\376\376\376\375\374\374\374\373\373\373\373\373\373\374\374\375\376\377\377"
+	.string	"\001\001\002\003\004\006\007\t\n\013\f\r\016\017\017\021\023\024\025\025\025\026\026\027\027\030\030\031\031\031\031\031\031\031\031\031\031\031\031\030\030\030\027\026\025\025\024\024\022\021\020\017\016\f\f\013\n\b\b\006\005\004\004\002\001\377\377\375\374\374\373\373\372\372\372\371\371\370\370\370\370\370\370\370\370\370\370\371\371\372\372\373\374\374\375\376\376\377"
+	.string	"\001\002\003\004\006\006\007\b\b\t\n\013\013\f\r\016\017\017\017\020\020\020\020\021\022\022\023\022\022\022\022\022\021\021\021\021\020\017\016\016\r\f\f\013\t\b\b\007\006\006\005\004\003\002\001"
+	.string	"\377\376\375\374\373\372\371\370\370\367\367\366\366\366\365\365\365\365\364\364\364\364\365\366\366\367\367\367\370\370\372\372\373\373\375\374\376\377"
+	.string	"\001\002\003\004\005\006\007\007\b\t\n\013\f\f\r\016\016\016\017\017\017\017\017\017\017\017\017\017\017\016\016\r\f\f\013\n\n\t\t\b\007\006\005\004\003\002\001\377\377\375\374\374\373\372\371\370\367\366\366\365\364\363\362\361\360\360\360\360\360\360\360\360\360\360\360\360\360\361\361\362\363\364\365\365\366\370\370\371\372\372\374\375\376\377\001\002\003\004\005\007\b\t\t\n\013\f\r\r\016\016\017\017\020\020\020\020\020\017\017\017\017\016\016\r\r\f\013\013\n\t\007\006\006\004\003\002\001"
+	.string	"\376\375\374\373\371\370\367\366\365\363\362\361\361\360\360\356\356\355\355\354\354\353\353\353\353\353\354\354\355\356\356\357\357\360\361\362\363\364\365\366\367\370\372\373\374\375\376\377\377\001\001\002\003\003\005\006\007\b\n\n\n\013\013\013\f\f\f\r\r\f\f\013\n\t\b\b\t\n\f\f\f\f\t\007\004\002\002"
+	.string	"\375\373\372\370\366\363\364\364\364\364\364\365\366\366\366\365\362\356\353\352\351\350\347\347\350\351\354\357\360\361\361\361\361\361\361\361\361\361\360\357\357\360\362\365\367\372\374\377\002\003\004\005\005\005\005\005\005\004\005\007\t\t\n\f\020\021\021\020\017\017\017\017\r\f\f\013\013\t\t\t\b\b\b\007\006\006\005\004\002\001\376\375\374\373\372\371\371\370\367\365\365\364\363\362\361\361\361\360\360\360\360\357\356\355\355\355\355\356\357\360\360\361\362\363\363\364\364\366\367\370\371\372\373\374\375\375\377"
+	.string	"\002\002\003\004\005\006\007\b\t\t\n\n\013\013\013\013\013\n\n\n\n\n\n\n\t\t\t\b\007\006\005\003\003\002"
+	.string	"\377\376\376\375\373\373\372\371\370\367\366\365\364\363\363\362\361\360\360\360\357\357\357\357\357\360\360\360\360\360\361\361\361\362\362\363\364\365\366\367\370\371\372\373\374\375\376\377"
+	.string	"\001\002\003\004\005\005\006\006\007\b\b\b\t\t\t\t\t\t\t\t\t\t\t\t\b\b\007\007\006\005\004\003\002\001"
+	.string	"\377\377\376\375\374\373\372\371\370\370\367\366\365\364\364\363\363\362\362\361\361\361\361\361\361\361\361\361\362\362\363\363\364\364\365\366\367\370\370\371\372\373\374\375\375\376\377"
+	.ascii	"\001\002\003\003\004\004\005\006\006\007\007\b"
+	.string	"\b\b\b\b\b\b\b\b\b\b\b\b\007\007\006\006\005\004\004\003\002\001\001"
+	.string	"\377\377\376\375\374\374\373\373\372\371\371\370\370\367\367\367\366\366\366\366\366\366\366\366\366\366\366\367\367\367\370\370\371\371\372\372\373\374\374\375\376\376\377"
+	.string	""
+	.string	"\001\001\002\002\003\003\004\004\004\005\005\005\005\005\005\005\005\005\005\005\005\005\005\004\004\004\003\003\003\002\002\001\001"
+	.string	""
+	.string	""
+	.string	"\377\377\376\376\375\375\375\374\374\374\373\373\373\373\372\372\372\372\372\372\372\372\372\372\373\373\373\373\373\374\374\374\375\375\375\376\376\376\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001\001\001\001\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\002\001\001\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\375\004\371\365\004"
+	.string	"\372\007\004\016\b\007\017\n\021\b\033\032\020\030\020\f\021\022\020\007\020\026\034\031\0176.\0376'\032\035\033 \025\025\037\024\374\006\372\365\004\357\342\343\354\352\347\324\347\344\344\337\317\320\356\334\316\366\326\367\n\360\352\375\004\005\352\360\022\013\001\007\013\362\016\n\013\b\342\0228\350\346\374\377\033\021\344\341\024\005\366\353\351\006\030\366"
+	.string	"\332\006\037\342\371\b\353\351\005\327\351\003\374\347\354\360\021\007\346\371\f\367"
+	.string	"\r\377\350\363\031\347\341\361\377\354\365\370\005\362\" \337\024\002\033*\t"
+	.ascii	"\035>\004\374\033\005*\034\371\005\031+ '\007\022,\021\022\342"
+	.ascii	"\r&\365\022\036\007\367(\n\353\001\342\005\341\003\020\337\376"
+	.ascii	"\363\013\273"
+	.string	"\004\350\357\030\332\362\364\016\3503\377\304\013\033\352\367\t\027\347\350\f\t\351\336\366\317\001\003\367\326\b\326\314\364\334\357\327\343\350\322\356'\332\t\344\320*\353*\004\002'\357\376\334\371\020\366\025\323\007f\002\016\370\"\r\0373\335N<\005\353\3642\373\025\t\320\t\031=\340\333\3628(\330\367)%\354(\272\374G2\243\307\366\3626\312*\372\334\003\f\314\3348,\331\306\")\005\307\004\373\315\037\330\353(\006-\332\030\t\342\364\317\351\n\033\353\331\355\023\355\f\377\327\3472\005\256\b@\346\367\025\350\367\374Q\263\373G\001\003\276\376\3600\365\302\353\3601\377\275\034&\021\"\b\333\fr\373\351\034\020'\034\3705'\372\027\363\316\022)\330\004A\324\364R\310\373B\260\356\017\301\024\365\357\013\t\321\007\342\241\n\336\007\025\031\304\351,\335\363\b\373\375\316\312\340\352i\354\312\005\030\f\035j\360\023Q\b\322\001\030%\001\337\026\016"
+	.string	"9\371\353)\347\352\r\314\023/\321\353\315\007\275\375\311\251+\324\037\355\343\007\335#\372\312\r\t\037\021\364)\357\324"
+	.string	"\345\361\336#/\006\366/#\330>\332\341K\016\332?,\337,\f\361\361)$\340\005GP\343\030\357\365'\360"
+	.string	"\n\024\354\t\313.*\007\343\340\357\032/\333\037\023\354\312J\310\362\t\266\346\365\017\274\376\300\313\355\250\366\336\021\350\347"
+	.ascii	"\355"
+	.string	"Q\264\356\017\362\320\367\370\352\"\001\355\313\025B\361\354\n\350\034\371K\3752[\344\030?\361\r\016\b7\355X\017++\363\031\355+\352\320?\341\373\032\005\356\354'\251\3533\311\351\302\306\021\363\017\352\335\273\371\b\271\n&\326\021\r\342\335\004\365\333\035\316\033\374\354\035\006\343\022\036\332\006\n\016M\357\307U\035\3200\027\307N3\306\372%\335\347\030\036\351\377$\b\004\034\t\343 \361\356\356\022\032\002\372\340.\373\351\342\347$\315#\301\t,\276\023\317\"\377\005\021\363\346\b\013\333\374\370\346\314\021/\026\377\0062\005!\006\326)\375\325\027\037\374\016\n\020\326!\017\345\366\3123\032\361\373\026\340\374;\320\361\007\350\347\305A\355\327\022\003\362\305.\r\364\352\376\373\024\017\005\013\001\031\341\366\376\374\362\004\025\354\037)\t\377\016\035\352\363\n\364\361\370\376\006\352\016\003\f\t\341\005\350\021\001\340 \362\370\026\364\354\003\023\321\t\374"
+	.string	"\016\344\024\351\371\006\345\031\357\007\030\336\363\305%\020\371\001\352\f\004\035\375\370\367\373\030\027\346#\034\321\357\377\001\030\357\360\377\365\023'\373\3643\345\357\020\n\031\335\355\005\030\013\355\020\363\t\n\354\372\026\021\007\373\372\340\007\"\352\002\016\002\333\357\365\363\351\354\303\020"
+	.string	"\b\t\362\021\337)\346\371\374\r\003\325\005\344\r\f\345 \363\347\376\366\r\372\026\t\007\364\326.\363\362\036\344\363\021<\022\003\n\t\023\373\002'\n\022\f\021\363\364,\371\356\376\035\365\0032\376\340\002\347\013\374\373\t\314\f/\366\335)\373\320\367\357\354\022\344\021\t\307\f\373\377\357\0012\347\327\036\364\371\363\023\351\316\032\013\003\3522\005\350\375\f\r\350\f\370"
+	.string	"\356\372\022\332\030(\347\376\375\025\020\374\360\022'\362\022\t\r\366\360\f\343\t\024\356\354\004\001\372\005\315\364'\353\351\t\032\007\370\032\003\371\b\003\374\351\005"
+	.string	"\001\003\003\b\f\376\313\n\374\333\013\t\342\353\035\371\332\377\021\361\f\372\007\004\004\016\361\030\373\f\016\355\377\037\356\004\005\001\004\377\373\324\034\372\013\004\351\023\362!\356\353\031\003\t\334\021\373\002\022\377\370\353\024\370\364\020\375\004\r\351\360\373\n\377\337\364\021\365\025\022\341\363\013\370\361\361\373\367\002\375\353\026\371\005\370\362\363\025\t\375\034\360\001\006\367\377\n\367\f\003\007\376\r\035\353\026\t\377\007\006\013\005\013\001\002\370\005\006\374\r\377\373\365\002\031\004\335\007\022\337\001\b$\377\353\026\003\375\367\357\317"
+	.string	"\025\323\350\r\376\351\347\025\364\363(\357\353\004\016\357\343\035\356\361\n\354\b\365\364&\370\341\004\002\017\365\007\r\003\t\001\034\b\005\005\362"
+	.string	"\370\002\005\374\026\001\t\003\375\t\021\n\006\026\003\376(\b\360\007\334\f"
+	.string	"\346\367\f\376\337\023\357\374\013\354\006\353\363\005\374\354\022"
+	.string	"\364\027\370\376"
+	.string	"\004\361\f\364\360\023\350\004\020\357\006\004\006\004\374\371\367\016\355\374\r\357\003\006\345\367\001\367\371\020\006"
+	.string	"\007\360\004\001\356\370\t\004\370\016$\363\370\017\365\355\372\016\354\371\026\363\374\002\r\376\363\376\002\b\356\021\377\352\377\005\366\365\373\003\375\366\023\353\376\021\b\r\366\023\377\024\017\364\021\373\031\375\001\n\366\"\372\355\026\367\023\366\334 \005\t\003\372\007\372\374\365\361\006\370\376\357\337"
+	.string	"\377\365\360\t\360\374\370\333\r\t\375\371\362\376\f\006\370\370\375\374\373\375\364\342\375\031\360\002\026\370\004\006\374\005\020\r\373\r\r\376\031\002\377\001"
+	.string	"\022\374\364\021\033\374\003\023\366\367\375\367\004\376\002\003\372"
+	.string	"\377\005\b\353\002\376\351\373\366\373\004\371\003\377\355\367\365"
+	.string	"\364\b\371\372\002\371\n\365\005\t\373\365\370\007\006\006\022\363\b\035\355\372\036"
+	.string	"\b\016"
+	.string	"\371\020\n\376\035\354\022\006\347\372\366\016\371\005\002\006\001\361\003\372\371\374\375\365\364\007\372\367\370\374\020\316\361\033\346\001\002\002\355\363\022\367\363\030\016\360\375\006\371\354\002\013\372\367\372\376\376\377\372\370\002\b\006\374\377\t\027\b\001\375\376\375\376\006\005\r\023\006\364\002\005\001\371\003\007\002\372\004\024\004\370\020\376\360\023\376\371\376\b\375\367\001\374\002\362\374\013\363\376\b\371\345\372\006\370\375\366\376\376\371\367\366\366\002"
+	.string	"\376\362\376\024\375\365\001\377\376\375\004\013\366\021\001\364\364\372\027\371\373\004\007\007\377\001\002\371\373\001"
+	.string	"\374\006\021\364\372\001\f\375\374\013\365\002\b\f\366\003\376\374"
+	.string	"\003\026\375\b\372\375\004\f\371\367\016\367\f\006\366\003"
+	.string	"\371\361\363\365\363\006\371\377\370\001\017\354\002\004\364\362\t"
+	.string	"\372\b\003"
+	.string	"\004\370\375\003\354\t\004\003\005\003\001\374\007\370\007\004\377\f\373\001\003\b\003\373\006"
+	.string	"\f\365\365\b\375\r\375\360\004\r\004\364"
+	.string	"\364\370\006\370\373\004\b\370\372\365\001\004\364"
+	.string	"\377\003\001\b\377\374\b\377\003\361\377\006\365\372\375\016\001"
+	.string	"\377\371\374\364\005\f\361\001\016\364\370\f\003\004\f\371"
+	.string	"\006\371\375\r\364\374\t\373\373\367\f\372\370\f\374\373\365\002\007\371\005\372\370\366\370\006\371\376"
+	.string	"\376\377\375\n"
+	.string	"\371\005\b\n\364\372\n\001\007\005"
+	.string	"\377\002\002\366\001\004\003\004\372\005\005\374\004\007\004\372\f\003\363\005\376\375\365\376\003\370\373\002\003\377\371\006\373\366\005\002\b\374\001\002\371\364\374\t\374\374\006\364\375\373\363\377\367\002\373\366\002\003\001\001\004\372\376\377\374\364"
+	.string	"\004\372\003\002\006\374"
+	.string	"\376\376\003"
+	.string	"\005\004\004"
+	.string	"\005\b\002\001\005\375\005\375\005\004"
+	.string	"\005\377\003\370\t\006\372\002\005"
+	.string	"\375\376\001\375\005\002\372\374\375\377\373"
+	.ascii	"\374\377\001\373\375\373\373\004"
+	.string	"\371\373\002\376"
+	.string	"\376\376\374\374\001\002\376\372\372\006\376\002\004\001\005\374\001\373\377\003\376\377\373\376\004"
+	.string	"\376\002\004"
+	.string	"\373\001"
+	.string	"\001\376"
+	.string	"\001\376\004\375\376\374\376\002\376\375\375\377"
+	.string	""
+	.string	""
+	.string	"\374\376\003\002\373\374\002\376"
+	.string	"\002\002\376\377\001\375\377\377\003\374\375\002"
+	.string	"\003\001\001\001\001\001\374\002\377\374\003\376\377\377\003"
+	.string	"\374"
+	.string	""
+	.string	"\002\375\001\001\377\002\001\001\376\002\001\377"
+	.string	"\374\003\001\374\001"
+	.string	"\377"
+	.string	"\377\374\377\377\377\377\376\375\377\001\375\377\001\376"
+	.string	"\376\375"
+	.string	"\377\377"
+	.string	"\376\377\377\377\375\376\376"
+	.string	""
+	.string	"\376"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	"\377\377\377\377\377"
+	.string	"\376"
+	.string	""
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377"
+	.string	""
+	.string	"\377\377"
+	.string	"\377"
+	.string	"\377\377"
+	.ascii	"\377\377\377"
+	.string	"\377"
+	.string	"\377\377"
+	.string	"\374\367\333\317\313\307\373\f!$\"\026\363\002\035\033\017/\030\017\023\365\352\336\277\265\325\362\005\376\362\350\365\016\373\377\f\016\372\004\n\026\013\005\013\337\334\344\333\352\n\376\001\016\r\0323.)\035\f\b\362\345\345\330\321\311\321\313\340\316\302\332\361 '\022\030\r\006\026\020\022\024BQE@@3#\034\n\366\373\353\335\333\312\314\317\330\330\355\374\373\376\365\366\024%4-\031\026\027\017\004\020\375\357\320\306\337\357\362\372\353\336\367\006\002\002"
+	.string	"\363\355\350\016\037)4#\022\001\362\347\346\355\356\344\345\356\377\377\r\033\031\b\360\370\363\373\002\f\033\034\375\366\367\006#\035\030\026\023\022\023\036\022\021\027\026\n\336\310\310\334\351\360\336\344\344\327\333\346\351\362\373"
+	.string	"\f\027\025\031\036!*\030\f\f\017\031!\f\002\370\002\t\376\374\b\013\005\364\360\373"
+	.string	"\366\376\376\353\354\363\350\355\376\013\022\021\020\r\004\002\364\366\005\021\031\030\n\357\340\322\326\340\336\333\337\337\344\357\361\367\013\021\020\032 ..)\035\027\r\001\365\363\355\363\371\374\377\374\374\001\374\365\374\376\004\002\366\371\371"
+	.string	"\013\022\004\365\357\346\344\342\351\372\b\025\035\031\030\023\004\005\373\365\364\361\371\005\n\003\002\006\r\r\007\376\363\363"
+	.string	"\t\016\001\370\354\355\361\371"
+	.string	"\373\362\353\347\363\377\376\377\n\f\005\003\376\001\005\b\021\016\007\373\360\352\336\344\357\360\366\366\356\350\354\357\351\347\344\357\370\372\364\347\354\365\376\t\027\032\035 \037\027\f"
+	.string	"\373\366\364\363\362\365\367\370\367\370\374\367\367\363\363\365\365\361\361\360\372\003\007\b"
+	.string	"\376\372\363\354\350\350\354\357\366\360\357\371\376"
+	.ascii	"\371\371\377\377\375\007\f\b\002\003\001\376\377\374\370\370"
+	.ascii	"\363\363\361\357\360\354\351\351\351\352\362\364\367\373\375"
+	.ascii	"\376\374\367\364\337\311\307\327\372\f"
+	.string	"\376\277\237\276\353\r/A\037\b&@?.\366\273\231\303\363\022 #\030\013\t.&\023.!\017\315\265\267\246\240\331\362\n$)DD+\t\362\372\354\317\311\325\353\027!\036(\026\004\360\350\323\303\313\306\265\264\277\326\351\337\322\344\343\343\351\352\024\013\346\003'\":I;%\b\f\021\031\033\027(.!\030-)\f\016\377\306\235\203\231\225\245\316\270\264\345\024\024\017\013\370\327\323\326\361\343\356\0139HNZM4/#!+'\036%\364\301\226\247\314\330\273\245\302\352\001\f\024\022\017\027\377\362\362\361\371\371\007\006\371\371\326\327\337\374\024\031(!\035\007\341\337\343\362\354\357\0219A0\035\013\375\366\363\003\376\370\341\316\324\353\365\350\371\367\374\374\343\321\313\327\345\365\017\021\022 -'\020\374\371\372\007\f\374\357\335\350\362\364\023\034\023\b\007\t\023\r\001\374\366\351\363\366\373\007\371\351\331\333\350\344\333\350\346\334\343\372\020\013\024\017"
+	.string	"\r\037744%\f\367\374"
+	.string	"\007\002\352\341\333\323\337\361\356\336\356\360\350\342\342\352\355"
+	.string	"\f\024\036)()\035\026\n\365\337\355\372\372\363\361\362\351"
+	.string	"%\"\032\f\007\b\b\367\356\356\362\344\365\376\363\375\004\017\023\016\022\033\026\022\023\007\365\355\355\343\320\317\340\355\372\372\363\375\371\361\375\023\022\007\365\352\356\357\357\364\t\022\020\021\023\021\b\013\n\004\373\354\344\354\354\354\365\377\003\003\004\001\371\364\355\361\374\007\025\032 \027\t"
+	.string	"\377\374\377\003\373\367\371\370\376\375\372\006\003\377\003\006\377\371\003\r\023\017"
+	.string	"\372\363\374\005\003\374\360\355\365\372\007\005"
+	.string	"\003\371\364"
+	.string	"\376\364\356\350\343\347\336\342\353\362\370\371\004\005\004\006\021\026\030\033\030\021\022\f\003\376\367\365\375\002\376\375\377\375\371"
+	.string	"\002"
+	.string	"\003\002\t\023\025\024\025\020\001\001\004\002\376\366\361\356\356\347\344\345\357\365\370"
+	.string	"\374\374\371\363\371\370\370\001\006\006\004\006\t\007\005\375\372\374\376\376"
+	.string	"\001\005\006\013\t\007\003\374\375\376\005\003\001\372\365\366\374\371\372"
+	.string	"\004\t\b\b\005\004\003\006\006\005\003\005\006\005\002\004\004\375\373\366\364\367\370\361\357\364\371\365\370\002\b\030+%/\371\353\323\355$ '\371\332\276\333\007\342\307\321\334\322\345\375\021\031\025\023\001\351\363!D@\020\362\355\367\356\370\022&)1\r\027.\031\365\335\304\251\252\243\301\357\362\343\006\031!0,2?AW35\031\t\016"
+	.string	"\371\357\355\334\347\005\351\366\002\001\021\b\370\375\370\353\335\305\310\342\362\345\303\334"
+	.ascii	"\373\362\003\023\013\356\343\373\0368949+\006\006\022\020\f\032"
+	.ascii	"\035\"\002\351\370\035.\004\361\360\363\353\360\360\310\263\317"
+	.string	"\340\321\307\340\334\305\273\326\372\372\004\023\026*-,-\027!%\"\036-\032\006\t\037\034\022\022\013\t\360\331\334\363\345\340\344\325\357\367\373\367\013\035\f\315\274\342\362\374\006\032-#\007\370\372\366\375\362\362\t\031 \031\027\034\013\020\t\376\006\r\371\347\350\366\376\365\323\335\004\n\013\n\017\376\351\345\007\024\030\027\022\n\n\017\004\371\351\337\337\355\013\031*#\007\377\007\021\016\006\007\027\024\026\032\026\t\364\352\334\326\320\325\327\322\320\324\321\331\366\004\377\020\017\031\035\026\031,AA3\024\r\025\020\363\330\330\326\264\262\327\0175,3;;$\367\334\343\371\336\341\n\031\022\006\363\376&\030\363\340\342\001\007\373\371\351\330\265\304\343\377\b\023\351\300\306\352\025$#\t\0275\027%ZUD\036!(+%\023\t\037\r\335\340\325\353\332\307\255\233\247\232\250\337\020\031#IF\030\375\003\356\370\001\360\370\r\023\366\323\251\330\0261C(!'\025"
+	.string	"\002\016\374\347\364\013\0344Q=3-\024\002\356\370\363\t\007\325\303\232\202\335\007\004\377\340\313\304\306\330\334\346\022MT617(#\001\352\364\377\03438\"\030! \350\275\264\301\276\267\273\272\325\341\346\006\004\007$KOG)\031\r9OYW6\037\370\324\310\315\310\275\245\235\243\321\346\007\030\367\364\001\005\024&\033*NXZF%\371\366\004\360\355\357\b\007\367\366\367\005\354\351\002\352\343\334\326\347"
+	.string	"\350\333\306\312\343\356\r\f"
+	.string	" $\007\016$\017\022NB\007\362\353"
+	.string	"\016\365\b\024\021\374\311\277\267\324\342\356\360\005\017\370\n\"\033%\037\372\341\333\351\356\023@LO4\021\357\304\310\330\330\343\373-6\"\0226N5\022\374\373\367\007"
+	.string	"\362\355\361\350\315\322\350\336\340\361\333\244\233\243\304\365\0353QV_RF22(\031\0373\035\361\341\313\334\324\314\275\323\326\344\315\320\316\311"
+	.string	"\0175-\013\036\037#\037:8 \030\034Bkh]@$\002\342\331\316\270\247\241\226\224\225\212\203\252\276\347\361\367\0331\031\033/):QKMTWP<6\r\361\340\364\002\007\363\326\315\263\256\235\213\223\302\344\371\0254;FP,\027\r\017\027\021\003\0250.\037\024\n$\021\t >O,\374\325\325\326\342\347\321\314\316\315\323\341\334\341\353\363\365\344\352\336\354\367\353"
+	.string	"\r\030\017!'\">'#\017\376\026\035\006"
+	.ascii	"\023\024\377\370\366\005\023\026\023!\017\371\016.,\"\004\333"
+	.ascii	"\331\335\317\327\343\332\323\342\355\361\367\363\346\346\346"
+	.ascii	"\362\364\376\007\377\004\351\341\341\365\024%\026\026\002\363"
+	.ascii	"\020#\030\031.)\"\017\0235RG@;\"#\031\030\022\375\337\301\250"
+	.ascii	"\257\256\250\260\323\337\362\355\324\350\003\374\377\377\n\n"
+	.ascii	"\372\374\007\016\026!\021\005\377\003\024\035#\034&\030#3(\013"
+	.ascii	"\004\t\371\b\020\362\346\343\327\312\314\326\324\310\324\312"
+	.ascii	"\346\355\335\001\034\03127\033\027\033\031\033\036\032\025\033"
+	.ascii	"\377\f\023\r\004\373\366\332\315\322\377/&\013\013\035$&$\036"
+	.ascii	"\037\006\357\366\355\335\336\323\266\271\310\336\346\351\360"
+	.ascii	"\357\367\356\320\333\350\360\b\023,M?/77/,"
+	.string	",8LDD)\005\376\346\351\342\323\306\306\263\265\337\361\367\362\377\363\346\353\374"
+	.string	"\007\003\370\350\344\362\004\023 \036\003\361\357\337\315\323\364\017\005\027NUB6\030\007\002\013./\034\007\363\366\357\354\361\372\t\032!\375\377\002\007\352\347\004\013\362\313\306\306\314\330\325\310\325\362\031\036\033&$ \035\035)#\375\355\353\364\001\007\031\023\n\020\373\353\351\344\360\362\362\374\373\350\360\371\013 \025\021\002\002\013\021\020\025\r\366\346\337\347\371\373\375\005\004\004\002\375"
+	.string	"\375\367\375\n\004\377"
+	.string	"\007\f\t\016\t\r\016\023\032\032\030\017\001\373\365\367\372\374\370\363\370\371\366\361\357\363\364\364\357\363\366\372\371\372\377\375\375\375\377\001\004\004\003\006\005\007\n\t\006\005\002"
+	.string	"\001\377\377\377"
+	.string	""
+	.ascii	"\370\316\243\232\244\244\237\236\240\240\240\242\243\245\245"
+	.ascii	"\245\244\243\243\243\245\247\247\246\246\246\245\245\250\252"
+	.ascii	"\244\244\252\247\247\253\245\250\261\256\251\254\256\256\257"
+	.ascii	"\257\256\257\257\257\257\261\261\260\261\262\263\264\264\265"
+	.ascii	"\263\264\267\266\267\266\267\272\271\270\271\271\273\272\272"
+	.ascii	"\273\271\270\271\273\273\273\273\273\274\275\275\274\275\277"
+	.ascii	"\275\277\277\300\303\300\276\302"
+	.string	"\301\300\302\303\302\303\305\305\306\306\306\307\307\307\307\310\310\311\312\311\311\312\312\314\314\314\312\312\315\315\314\315\315\316\317\317\317\316\316\317\320\320\321\321\321\322\322\322\323\323\323\322\322\323\323\325\325\324\324\324\325\326\327\327\326\326\326\327\327\326\326\327\330\331\332\331\331\332\332\333\334\333\334\334\333\335\335\335\336\335\336\337\336\336\337\340\337\340\341\340\337\337\340\341\341\342\342\342\343\343\343\344\343\343\343\343\343\344\343\344\344\344\345\346\346\345\345\345\345\345\346\346\345\346\347\346\347\346\346\347\347\347\350\347\347\350\347\350\350\350\350\350\350\351\352\351\351\351\352\352\352\352\352\352\352\353\353\353\353\353\353\354\354\354\354\354\354\355\355\355\355\355\356\356\356\356\356\357\356\356\357\357\357\357\357\357\357\360\360\360\360\360\360\360\360\360\361\361\361\361\361\361\362\362\362\362\362\362\362\363\363\363\363\363\363\363\363\363\363\363\363\364\364\364\364\364\364\364\364\365\365\365\366\366\367\367\370\371\371\372\373\374\374\375\376\377"
+	.ascii	"\001\001\002\003\004\004\005\006\006\007\b\t\t\n\n\013\f\f\r"
+	.ascii	"\r\016\017\017\020\021\021\022\023\023\024\024\025\026\026\027"
+	.ascii	"\027\030\031\031\032\032\033\033\034\034\035\035\036\036\037"
+	.ascii	"\037\037  !!\"\"##$$%%%&''(())***+++,,,--...///0001112223344"
+	.ascii	"44555566667777888999::::;;;<<<<<=====>>>>>??????@@@@AAAAAAAB"
+	.ascii	"BBBBBBBBBCCCCCCCCCDDDDDEEEEEEEFFFFFFFGHIJKLNOPQRTUVWXYZ[\\]^"
+	.ascii	"_``abcdeefgghijjklmmnnoppqqrrssttuuuvwwwxxxyyyxxxwwwvvvuuutt"
+	.ascii	"tsssrrrqqqpppoooonnnmmmlllkkkjjjiiihhhhgggfffeeeedddcccbbbba"
+	.ascii	"aa```____^^^]]]]\\\\\\[[[[ZZZYYYYXXXWWWWVVVVUUUTTTTSSSSRRRRQ"
+	.ascii	"QQPPPPOOOONNNNMMMMLLLLKKKKJJJJIIIIHHHHGG"
+	.string	"GFFFEEEDDCCCBBBAA@@@??>>>===<<<;;:::999888777666555444333221111000///...---,,,+++***))))((('''&&&&%%%$$$####\"\"\"!!!!   \037\037\037\037\036\036\036\036\035\035\035\034\034\034\034\033\033\033\033\032\032\032\032\031\031\031\031\030\030\030\030\027\027\027\027\026\026\026\026\025\025\025\025\024\024\024\024\023\023\023\023\022\022\022\022\022\021\021\021\021\020\020\020\020\017\017\017\017\017\016\016\016\016\r\r\r\r\r\f\f\f\f\f\013\013\013\013\n\n\n\n\n\t\t\t\t\t\b\b\b\b\b\007\007\007\007\007\006\006\006\006\006\005\005\005\005\005\004\004\004\004\004\003\003\003\003\003\003\002\002\002\002\002\001\001\001\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\377\377\377\377\377\376\376\376\376\376\375\375\375\375\375"
+	.ascii	"\375\374\374\374\374\374\373\373\373\373\373\373\372\372\372"
+	.ascii	"\372\372\371\371\371\371\371\371\370\370\370\370\370\370\367"
+	.ascii	"\367\367\367\367\367\366\366\366\366\366\366\365\365\365\365"
+	.ascii	"\365\365\364\364\364\364\364\364\363\363\363\363\363\363\363"
+	.ascii	"\362\362\362\362\362\362\361\361\361\361\361\361\360\360\360"
+	.ascii	"\360\360\360\360\357\357\357\357\357\357\357\356\356\356\356"
+	.ascii	"\356\356\355\355\355\355\355\355\355\354\354\354\354\354\354"
+	.ascii	"\354\353\353\353\353\353\353\353\352\352\352\352\352\352\351"
+	.ascii	"\351\351\351\351\351\350\350\350\350\350\350\350\347\347\347"
+	.ascii	"\347\347\347\346\346\346\346\346\345\345\345\345\345\344\344"
+	.ascii	"\344\344\344\343\343\343\343\342\342\342\342\342\341\341\341"
+	.ascii	"\341\340\340\340\340\337\337\337\337\336\336\336\336\336\335"
+	.ascii	"\335\335\335\334\334\334\334\333\333\333\333\333\333\332\332"
+	.ascii	"\332\332\332\331\331\331\331\331\330\330\330\330\330\330\327"
+	.ascii	"\327\327\327\327\326\326\326\326\326\326\325\325\325\325\325"
+	.ascii	"\325\325\324\324\324\324\324\324\323\323\323\323\323\323\323"
+	.ascii	"\323\323\322\322\322\322\322\322\322\321\321\321\321\321\321"
+	.ascii	"\321\321\320\320\320\320\320\320\320\320\317\317\317\317\317"
+	.ascii	"\317\317\317\317\317\316\316\316\316\316\316\316\316\315\315"
+	.ascii	"\315\315\315\315\315\315\315\315\314\314\314\314\314\314\314"
+	.ascii	"\314\313\314\313\313\313\313\313\313\313\313\313\313\313\312"
+	.ascii	"\312\312\312\312\312\312\312\312\312\312\312\312\312\312\311"
+	.ascii	"\311\311\311\311\311\311\311\311\311\311\311\311\311\311\311"
+	.ascii	"\311\311\311\310\311\310\310\310\310\310\310\310\310\310\310"
+	.ascii	"\310\310\310\310\310\310\310\310\310\310\310\310\310\310\307"
+	.ascii	"\307\307\307\307\307\307\307\307\307\307\307\307\307\307\307"
+	.ascii	"\307\307\307\307\307\307\307\307\307\307\307\307\307\307\307"
+	.ascii	"\307\307\307\307\307\307\307\307\307\307\307\307\307\307\307"
+	.ascii	"\307\307\307\306\306\307\307\307\307\307\307\307\307\307\307"
+	.ascii	"\307\307\306\307\307\307\307\307\307\307\307\307\307\307\307"
+	.ascii	"\307\307\307\307\307\310\310\310\310\310\310\310\310\310\310"
+	.ascii	"\310\310\311\311\311\311\311\311\311\311\311\311\311\312\312"
+	.ascii	"\312\312\312\312\312\312\312\312\312\313\313\313\313\313\313"
+	.ascii	"\313\313\313\313\314\314\314\314\314\314\314\314\314\314\315"
+	.ascii	"\315\315\315\315\315\315\315\315\316\316\316\316\316\316\316"
+	.ascii	"\316\316\316\317\317\317\317\317\317\317\317\317\320\320\320"
+	.ascii	"\320\320\320\320\320\320\321\321\321\321\321\321\321\321\322"
+	.ascii	"\322\322\322\322\322\322\322\322\323\323\323\323\323\323\323"
+	.ascii	"\323\323\323\324\324\324\324\324\324\324\324\325\325\325\325"
+	.ascii	"\325\325\325\325\326\326\326\326\326\326\326\326\327\327\327"
+	.ascii	"\327\327\327\327\327\327\330\330\330\330\330\330\330\330\330"
+	.ascii	"\331\331\331\331\331\331\331\331\332\332\332\332\332\332\332"
+	.ascii	"\332\332\333\333\333\333\333\333\333\333\334\334\334\334\334"
+	.ascii	"\334\334\334\335\335\335\335\335\335\335\335\336\336\336\336"
+	.ascii	"\336\336\336\336\337\337\337\337\337\337\337\337\340\340\340"
+	.ascii	"\340\340\340\340\340\341\341\341\341\341\341\341\341\341\342"
+	.ascii	"\342\342\342\342\342\342\343\343\343\343\343\343\343\343\344"
+	.ascii	"\344\344\344\344\344\344\344\345\345\345\345\345\345\345\345"
+	.ascii	"\345\346\346\346\346\346\346\346\346\346\347\347\347\347\347"
+	.ascii	"\347\347\347\347\350\350\350\350\350\350\350\350\350\350\351"
+	.ascii	"\351\351\351\351\351\351\351\352\352\352\352\352\352\352\352"
+	.ascii	"\352\352\353\353\353\353\353\353\353\353\353\353\353\354\354"
+	.ascii	"\354\354\354\354\354\354\354\354\355\355\355\355\355\355\355"
+	.ascii	"\355\355\355\355\356\356\356\356\356\356\356\356\356\356\356"
+	.ascii	"\357\357\357\357\357\357\357\357\357\357\360\360\360\360\360"
+	.ascii	"\360\360\360\360\360\360\361\361\361\361\361\361\361\361\361"
+	.ascii	"\361\361\361\362\362\362\362\362\362\362\362\362\362\362\363"
+	.ascii	"\363\363\363\363\363\363\363\363\363\363\363\363\364\364\364"
+	.ascii	"\364\364\364\364\364\364\364\364\364\364\365\365\365\365\365"
+	.ascii	"\365\365\365\365\365\365\365\365\366\366\366\366\366\366\366"
+	.ascii	"\366\366\366\366\366\366\366\366\367\367\367\367\367\367\367"
+	.ascii	"\367\367\367\367\367\367\367\370\370\370\370\370\370\370"
+	.ascii	"\370\370\370\370\370\370\370\370\370\370\370\371\371\371\371"
+	.ascii	"\371\371\371\371\371\371\371\371\371\371\371\371\371\372\372"
+	.ascii	"\372\372\372\372\372\372\372\372\372\372\372\372\372\372\372"
+	.ascii	"\372\373\373\373\373\373\373\373\373\373\373\373\373\373\373"
+	.ascii	"\373\373\373\373\373\373\373\374\374\374\374\374\374\374\374"
+	.ascii	"\374\374\374\374\374\374\374\374\374\374\374\374\374\374\374"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\375\375"
+	.ascii	"\375\375\375\375\375\375\375\375\375\375\375\375\375\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\376\376\376\376\376\376\376\376\376\376\376\376\376"
+	.ascii	"\376\376\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+	.ascii	"\377\377\377\377\377\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	"\377"
+	.string	"\377"
+	.string	"\377\001\376\001\375\006\001\033#,"
+	.string	"\344\343\363\005\375\004\004\b\005\003\375\375\352\327\323\272\301\272\315\346\367`?8\336\277\277\302\305\301\301\272\301\271\304\264\353\363\031\361\276\313\320\004\320\335\327\024R*'\021@.(\016 PLKLKE0/HLKMCADJKLJIK@.CJMINGQ=0!\03269LLG5+\350\362\356\343\350\352\021\022\020\364\314\312\304\341\343\b\002\354\363\320\310\301\275\275\275\300\310\303\302\277\276\274\300\304\302\301\275\275\276\315\341\340\302\305\304\277\274\300\336@C>\033\023\336\266\304\270\340\360\371\f\354\301\300\274\277\274\277\276\307\302\321\344\354\022\033\034\036\023\023\003\366\364\361\323\320\301\300\302\301\326\335\344\353\352\363\361\366\362\365\351\336\334\351\016\027\023\356\331\324\340\003\005 \031\035\017\371\367\363\367\371"
+	.string	"!%175?A7\033\025\026$+0630 \036\036/398/(\023\035\0332KKKKKKK8*)*\037\034\036$+\r\363\353"
+	.string	"\027\027\036#&\032\b\n\n(8@H:9#\025\026\030\034533\037\372\366\341\363\367\025791\r\b\364\353\353\0044:EKLH?8:)\036\027\f\007\367\377"
+	.string	"\033\037\"\023\360\355\333\346\347\340\311\306\277\275\276\274\307\315\311\325\332\333\320\311\304\273\277\274\276\274\276\275\276\275\276\275\276\277\277\275\276\275\276\275\276\275\276\275\276\275\276\275\276\274\277\274\277\305\357\370\002\b\b\b\017\013.<H>-\034\373\022\t\376\364\362\343\344\346\007\013\016*MLKLKKLKLK@\027\f\376\363\371\370\003"
+	.string	"\f\032!\033\n\373\001\003\005\002\b\032\033()+0\"!\033\035\035\023\021\031\030\025\030\016\r\n\023\021*82-\033!\0303KHLKKKKJ6\033\0371:9014.-59:688FLK>\033\025\007\362\352\371\016\026\b\356\364\351\357\374\371\350\351\335\313\306\312\361\365\003\341\337\306\315\317\330\367\367\375\322\314\277\302\276\327\315\304\301\274\275\276\274\277\273\303\300\325\361\362"
+	.string	"\376\375\354\342\341\324\306\304\312\356\361\003\023\023\002\357\360\337\324\316\326\310\307\303\312\303\341\345\337\327\316\313\305\311\310\312\306\313\327\330\336\365\004\375\327\305\304\317\330\331\337\351\351\351\354\356\357\375\373"
+	.string	"\337\331\317\313\332\032,9&\013\024/LFJ9A63-#\031\"CJLJ98\037\n\b\034DJIMJMJMINELHR*\007\023!1-?JMA\036(!!\023\364\022\0241\034\036\027\030\371\001"
+	.string	"1>@\024\372\376\373\005\004\b\f\023\004\357\350\351\337\310\347\031'\033"
+	.string	"\005\003\007\020\007\350\343\303\345\345\001\375\377\364\333\325\336\323\320\336\345\341\351\331\324\311\306\320\307\307\306\314\320\301\322\340\337\325\272\277\273\277\274\277\301\307\344\361\361\350\345\345\324\326\326\326\307\302\325\364\375\360\342\334\355\007\t\f\370\352\355\352\360\002\n\013\t\377"
+	.string	"\361\341\340\343\362\362\367\366\367\373\366\366\362\002\004\013\367\361\365\001\b\001\367\354\360\343\003\025\031\013\002\007\007\001\365\371\013\032\035('%\031\030\031*)+=87\032\034\036,30'\027DLO-\031\034$&\026\033\007\004\374\371\375"
+	.string	"\013\025\r\361\344\347\376\025\024\020\021\023122\021\f\021\007\004\373\355\361\344\365\371\f\033\035\020\013\026\f\374\362\361\354\361\361\367\365\367\367\357\364\003\367\370\356\360\374\364\362\371\344\342\330\347\355\352\336\324\356\016\034\017\f\004\027\023\006\007\004\013\376\344\347\337\352\367"
+	.string	"\031\030\021"
+	.string	"\375\353\371\373\021\b\007\372\001\003\b\363\354\347\346\354\364\t\003\016\362\354\326\314\326\325\341\340\347\362\356\343\322\327\324\321\315\316\336\340\342\316\315\311\314\316\305\312\312\330\342\342\356\364\362\362\356\361\354\353\350\355\355\364\370\364\372\013\022\023\027 \033\023\n\020\035!\035\020#$)\020\r\03516  !')$.-5( \027\006\005\b\032)\036\030  \033\f\r\377\376\374\017,,$\037\036\035\016\r\n\t\007\023\023-5/1-5'.):-&\026\021\035\") \035\f\t\f\021\005\006"
+	.string	"\016\f\013\f\r\f\r\020\021\021\r\007\b\357\337\336\341\334\321\342\345\350\327\312\322\314\320\322\331\353\355\357\346\335\331\312\323\317\312\311\315\324\326\331\311\307\303\312\314\315\327\327\335\320\316\304\300\302\302\306\304\317\334\326\346\371\373\374\003\b\b\007\t\025\037\035\032\" \024\b\t\022\016\r\013\f\r\017%(60+$&.)-&/\031\t\001\352\374\013\017\b\372\371\375\022\026\030\013\377\374\366\003\003\367\335\333\344"
+	.string	"\003\016\n\007"
+	.string	"\365\363\375\021\032\017\013\005\007\021\r\022\030\017\367\354\360\374"
+	.string	""
+	.string	"\003\r\013\013\016\r\007\376\376\f\031\031\031\013\f\357\356\357"
+	.string	"\007\n\027\034\024\020\016\033$\037\036\032$\036!\033!\031\025\r\371\363\367\001\371\370\361"
+	.string	""
+	.string	"\373\363\361\b\t\022\b\004\006\377\375\367\351\351\344\356\363\365\357\347\352\351\353\350\346\347\351\365"
+	.string	"\374\376\007\n\022\003\005\006\007"
+	.string	"\001"
+	.string	"\b\006\007\373\006\b\021\007"
+	.string	"\001\367\364\370"
+	.string	"\003\376\367\370\367\373\376\373\357\344\352\366\367\367\355\362\370\367\365\355\364\364\360\361\361\355\335\332\347\363\365\366\377\001\003\376\371\372\366\371\363\374"
+	.string	"\b\n\375\003\376\007\013\r\001\350\364\361\372\370\375\r\004\003\370\372\373\376"
+	.string	"\376\377\364\366\344\354\356\372\362\350\353\355\363\364\376\364\360\351\365\002\n\001\376\003\t\022\013\t\002\021\020\031\027\030\020\004\003\006\002"
+	.string	"\005\013\016\016\r\013\n\005\r\t\t\006\017\025\031\037\033\034\021\021\013\020\034\037\037\013\f\002\374\375\r\023\022\001\t\013\002\366\360\r\020\033\020\f\007\007\b\n\b\f\377\373\371\004\001\367\357\346\357\363\n\006\t\004\005\001\371\376\375\373\003\004\t\n\003\373\372\370\351\347\341\341\343\352\367\367\371\367\373\362\356\350\365\377\377\371\363\371\371\366\347\355\363\363\363\361\362\354\335\334\334\360\361\376"
+	.string	""
+	.string	"\362\357\361\370\001\376\005\372\366\366\375\375\007\021\021\f\377\376\367\352\344\351\372\362\357\367\372\377\363\363\352\352\351\357\376\376\b\370\367\343\355\361\376\f\r\004\364\363\357\356\352\365\002\002\004\003\b\013\006\n\023\027\030\032\027\026\022\031\031\031\b\n\03523!\020\r\024\007\003\006\f\016\017\013\b\003\371\007\013\f\007\r\025\023\013\007\004\377\377"
+	.string	"\373\353\353\343\345\345\361\365\366\372\371\371\372\002\005\367\363\360\373\373\006\373\364\356\346\353\350\367\373"
+	.string	"\002\001\377\374\375\376\001"
+	.string	"\001"
+	.string	"\373\375\007\024\022\005\377"
+	.string	"\016\023\023\003"
+	.string	"\377\372\372\377\377\373\006\022\033\n\020\033\025\020\n\023\034\032\027\007\n"
+	.string	"\374\003\n\035\020\022"
+	.string	"\364\362\353\353\361\374\375\n\375\374\371\365\363\374\374\374\361\354\363\352\363\370\372\362\350\351\335\335\333\357"
+	.string	"\001\377\354\360\354\362\373\375\372\360\372\372\b\006\007\002\376\375\374\004\b\002\004"
+	.string	"\f\004\002\366\354\356\363\373\374\370\360\361\356\353\356\367\371\372\377\006\005\006\003\005\001\364\362\345\345\346\346\352\351\374\003\004\001\371\365\372\377\005\375\377\372\t\020\022\377\361\360\374\n\r\025\020\016\005\005\b\017\375\375\374\b\b\005\013\013\027\r\016\371\003\005\023\036 \033\032\021\013\013\025&#&\024\b\t\023#\031\005\377\377\006\020\020\020\016\r\013\t\n\023\025\024\020\007\b\373\370\374"
+	.string	"\001\376\371\373\366\366\363\371\367\364\356\342\344\342\354\360\364\366\360\357\352\355\356\365\361\361\363"
+	.string	""
+	.ascii	"\363\362\363\013\016\007\370\366\363\365\366\374\372\367\364"
+	.ascii	"\353\353\353"
+	.string	"\363\373\364\363\363\373\t\007\007\376\372\372\377\376"
+	.string	"\377\001\n\r\f\375\373\373\376\374\372\366\351\351\350\374"
+	.string	"\003\374\373\367\b\021\022\007\376\376\n\027\024\r\b\002\365\367\372\004\003\002\377\376\362\367\367\372\366\366\004\024\025\b\356\351\360\376\002\003\003\002\006\r\r\016\003\376\371\355\365\373\374\371\363\365\362\362\365\366\375\373\375\003\006\006\006\n\013\r\006\005\003\377\377\376\t\020\003\370\364\375\001\001\001\374\004\b\005\004\376\001\375\003\016\r\013\002\002\001\013\t\001\365\365\365\374\373\t\001"
+	.string	"\364\374\001\375\374\371\360\356\355\370\001"
+	.string	"\002\375\002\003\003"
+	.string	"\374\375\376\001\003\004\b\013\n\005"
+	.string	"\001\t\017\r\377\376\376\003\003\004\b\b\t\005\005\002\003\005\004\005\003\005\004\002\003\002\002\001\377\377\377\377"
+	.string	"\377"
+	.string	""
+	.string	""
+	.ascii	"\377\374\370\370\371\370\364\361\355\344\324\274\262\270\271"
+	.ascii	"\266\271\267\270\270\270\270\270\271\270\271\271\271\271\271"
+	.ascii	"\271\271\271\271\272\272\272\272\272\272\272\272\273\273\273"
+	.ascii	"\273\273\273\273\273\274\274\274\274\274\274\300\306\300\272"
+	.ascii	"\312\346\352\354\323\272\334(\\H\365\263\273\334\n%"
+	.string	"\3347F\211\336\370*\006\353\177\310\276\327\266\344\355\0358PQ-7ZJMKGBLJMKLLLLKLKLJKJKJKJJJJJIJJIJIJIIIIIIHHHHHHHGHGGGGGGGGGFFFFFFFFFFFEEEEEEEEDDCCCBAA>=7'\002\350\363\026%'$\025#;GD>7010*\035\0301?3\"\005\353\372\033,\031\351\304\301\324\361\0266>:\"\003\364\360\320\255\261\265\260\262\263\261\263\261\263\263\275\330\336\266\256\272\262\263\264\262\264\263\264\264\264\265\264\264\264\264\265\265\265\265\265\265\265\265\265\266\265\266\266\266\266\266\266\272\317\342\310\261\271\270\266\271\267\302\304\306\272\262\275\306\370$\024\016\016\003\371\362\371\005\036;KK>+\t\340\275\312\366\0240FPEFE7\021\365\345\351\364"
+	.string	"\027?RFFID6\020\360\345\344\363\001\017&BLGFGA:;??<36;<?EE>/$ #.-\033\370\330\322\352\007\027\035%)'1DE9\030\004"
+	.ascii	"\357\365\370\366\356\363\b(=?,\030\022\026\022\377\355\347\361"
+	.ascii	"\373\362\325\270\255\270\305\317\275\254\267\266\257\264"
+	.string	"\265\263\265\264\265\264\265\265\265\265\265\266\265\266\265\266\266\266\266\266\267\267\267\267\267\267\267\267\267\267\270\270\270\270\270\270\270\270\270\270\271\271\271\271\271\271\272\300\323\336\312\265\270\275\304\333\336\277\263\275\272\276\317\347\353\356\362\371\371\363\367\370\370\373\016(4 \002\356\344\334\332\335\333\311\267\271\305\344-\\PHL;!\037\031#/:?;?AINJJKHD=CHD<2,(\037\024\377\350\325\324\334\351\362\364\005\020\021\023\032$1?JKHIB,\032*ENHGG:/--)!\022\r#APNGEHEGFFFFFEC@EGDFEEEEEEEDDDDB4\037\027\033/GH@EC>;=FBBCBCBB@926?D?6/066/#\036\037$1=@:52,\036\023\022\031\036\036 '+*% \036\"$\036\021\007"
+	.string	"\373\373\377\t\f\f\006\371\366\366\375\006\f\020\024\017\b\377\366\360\360\364\001\016\021\006\367\365"
+	.string	"\b\006"
+	.string	"\375"
+	.string	"\007\004\376\375\376"
+	.ascii	"\002\374\352\320\301\314\356\r\027\f\363\313\261\260\304\335"
+	.ascii	"\343\334\324\317\314\327\344\345\327\311\273\272\341\017\023"
+	.ascii	"42\016\336\267\270\323\352\353\341\331"
+	.string	"\315\275\305\356\021\027\020\004\367\336\305\265\264\301\332\366\002\375\370\003\016\017\031!((\036\022\f\017\022\021\r\006\370\353\343\335\344\357\366\371\370\362\342\314\272\301\335\374\f\021\n\004\001\363\352\347\351\354\360\362\363\363\363\363\362\351\333\313\275\272\305\326\342\345\330\306\266\261\264\305\344\375\003\013\017\022\024\005\356\337\342\361\003\016\020\006\367\353\350\343\322\301\270\267\264\262\263\266\301\320\322\322\324\322\321\320\316\316\314\312\311\312\310\301\265\262\272\311\342\366\001\004\373\354\334\316\303\277\306\314\312\305\314\332\350\355\355\353\346\315\311\270\260\271\266\266\267\266\267\267\267\267\267\270\267\270\267\270\270\270\270\270\270\271\271\271\271\271\271\271\271\272\272\272\272\272\272\272\272\273\273\273\273\273\273\273\273\273\273\274\274\300\312\320\311\276\273\302\323\351\366\356\326\300\271\300\301\324\347\353\340\332\334\354\r(,\034\003\361\352\346\345\341\335\334\356\016-4\"\003\350\336\344\360\374\362\345\343\340\354\363\373"
+	.ascii	"\007\t\006\002\374\360\347\350\353\361\365\373\375\374\373\003"
+	.ascii	"\004\376\372\373\001\001\001\001\003\b\t\007\002\376\377\003"
+	.ascii	"\005\t\t\006\006\013\006\366\350\342\345\361\371\372"
+	.string	"\365\364\374\006\016\027&46(\033\026\030\031\034&3AJMG7&\"',5DPMJKB<CMMJKKKJD:5<>CHGHHC8,)-03;HLF;+*1/,( \024\n\021\037%!\036''6A:(\037-DK?1.9CC=7:CIFEGEFEEEEEDBCCFDDEDDCDDDDCBAA@>>BDBCCBCA:&\0360@EDB=2\034\016\017!7DB7%\020\021\032 !\037$\"\030\004\357\334\322\327\351\367\370\354\345\345\347\361\367\366\356\344\343\356\371\370\356\353\370\t\025\027\013\375\366\367\370\367\366\363\363\364\357\342\324\323\337\357\364\363\356\342\330\322\325\344\370\002\373\352\334\332\343\355\363\366\373\006\026\036\032\017\b\n\017\r\003\376\b\034+.+\037\021\b\002\375\371\366\372\003\013\t"
+	.string	"\366\362\362\363\357\352\347\354\367\377"
+	.ascii	"\003\t\r\b\376\367\370\001\002\006\t\t\021\035'$\033\024\023"
+	.ascii	"\030\037\036\027\022\026\036#\" \"#\037\031\024\023\022\023\021"
+	.ascii	"\017\r\n\n\007\006\n\013\005\373\362\354\345\340\334\332\336"
+	.ascii	"\343\347\356\364\365\362\351\346\355\364\365\353\327\301\262"
+	.ascii	"\264\301\322\333\334\340\333\307\261\257\263\261\264\302\314"
+	.ascii	"\315\313\317\316\313\310\305\301\272\267\265\264\262\263\263"
+	.ascii	"\263\264\263\264\264\271\277\276\271\261\265\265"
+	.string	"\264\265\264\265\265\265\265\265\265\265\266\265\266\266\266\266\266\266\266\267\267\267\267\267\267\267\267\267\267\267\267\270\270\270\273\305\314\311\300\267\267\272\270\271\271\271\272\273\276\273\271\272\275\306\320\325\317\304\271\271\273\273\274\303\317\317\314\315\316\315\310\305\305\305\310\313\315\321\327\333\333\330\325\320\320\334\352\355\346\337\334\334\340\341\345\357\370\001\007\t\b\013\020\023\021\023\035(,*))''1ANOKLLKKC:/-&$-:@9*\032\021\022\033\"$%''&$#\034\023\020\027\033\024\n\013\025\037$\032\013\t\372\354\350\354\353\347\352\363\371\366\364\371\004\016\030\030\n\373\366\376\b\b\370\336\314\313\326\337\342\344\337\331\330\326\336\342\341\344\355\363\363\355\351\353\363\374\003\006\005\376\365\360\361\361\352\342\342\356\367\365\354\341\337\354\363\363\361\354\352\360\371\001\001\372\361\360\370\377\001\377\373\374\003\006\374\351\337\353\377\t\t\002\374\370\367\371"
+	.string	"\003\004\013\016\017\020\026\032\030\016\007\013\032*5:>>910=LMIKJJJJJGFEGKIIIHIHHHHHHHHHGGGGGGGGGFFFFFFFFFFEEEEEEEEEEDDDDDDDC@<@C?;;AB8*\037\036\036$'!\027\024!6?=84.\"\024\n\016!8EC@A;0),-&\033\026\032\032$*)!\033\033  \030\r\001\370\371\002\n\n\003\371\357\353\355\363\367\376\004\002\367\351\344\356\376\007\007\005\374\365\360\351\337\325\321\325\333\336\335\333\331\323\311\304\310\322\335\345\347\345\342\336\331\327\333\342\350\350\347\346\341\334\324\321\320\324\333\343\350\350\344\337\334\330\330\332\330\332\336\345\356\365\371\373\374\373\371\364\361\357\367\372\375\374\352\325\313\324\347\365\366\357\350\350\354\363\373\001\002"
+	.string	"\376\374\373\371\374\002\006\004"
+	.ascii	"\374\376\002\004\375\373\367\370\002\t\007\376\370\372\003\n"
+	.ascii	"\022\033 \033\021\006\001\002\t\024\035\037\033\024\016\n\n\t"
+	.string	"\005\002\001\375\375\367\360\356\357\357\357\361\360\356\355\355\354\343\321\304\306\323\340\352\354\345\326\313\305\306\321\343\361\354\332\312\305\305\312\324\335\334\324\313\305\303\306\317\334\343\341\334\316\306\310\311\311\312\312\312\313\313\314\314\315\315\316\316\316\317\317\320\320\321\321\322\322\322\323\323\324\324\325\325\325\326\326\327\327\330\330\330\331\331\332\332\332\333\333\334\334\334\335\335\336\336\336\337\337\340\340\340\341\341\341\342\342\343\343\343\344\344\345\345\345\346\346\346\347\347\350\353\357\360\356\356\356\360\364\367\367\365\363\363\364\366\371\373\375\376\377\376\376\374\373\371\371\373\376"
+	.string	""
+	.string	"\377\377\001\003\002\377\374\374\374\376\002\004\004\004\003\003\003\004\004\004\003\002\001\001\002\002\001"
+	.string	""
+	.string	"\002\003\003\003\002\001"
+	.string	""
+	.string	"\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.ascii	"\377"
+	.string	"\373\372\370\364\367\n\021\341\257\262\336>C\006Jc\351\256\361\346\315\023^rd]#6;\300\200\236\232\224\235\243"
+	.string	"UwlfT8Hjm`1\310\222\217\232\223\242\301\355\007\017\r ?P_ZL@5\f\344\320\305\252\237\277\336\351\351\374\n\005\b\037/24/$\024\005\375\366\360\353\343\334\330\333\336\345\360\376\t\022\031\033\036!\033\023\022\f\001\373\370\352\341\345\345\345\353\364\374\001\005\n\016\021\022\023\021\013\006\005\377\372\372\367\361\363\364\362\364\370\371\366\374\004\006\b\n\013\b\t\t\004\003\003\376\372\373\370\364\367\373\372\372\374\373\374"
+	.string	"\003\004\004\006\b\006\002"
+	.string	""
+	.string	""
+	.string	"\375\375\002\004"
+	.string	"\376\001"
+	.string	"\372\365\366\375\376\370\372\003\003\376"
+	.string	"\t\013\004"
+	.string	"\004\005\001\377\002\001\370\364\366\367\367\364\372\t\b"
+	.string	"\004\003"
+	.string	"\005\t\006\001\374\367\370\372\371\376\004\002\377\377\373\371\374\002\006\013\r\007\373\367\375\377\375"
+	.string	"\373\360\357\365\374\374\370\367\372\005\007\006\n\005\377\b\023\021\n\n\002\355\341\354\367\361\353\363\001\007\007\016\022\016\022\025\013\374\363\347\342\353\370\377\003\b\007\001\001\005\002\377\002\002\374\367\370\376\377\377\005\n\006\374\371\374\377"
+	.string	"\001\001\377\373\370\370\373\374\375\004\007\003\002\003\002\001\b\007\374\375\377\374\374\372\374"
+	.string	"\003\004\003\004\377\372\372\367\361\363\002\t\007\013\013\377\372\372\365\371\t\016"
+	.string	"\371\376\370\360\373\005\377\373"
+	.string	"\001\001\013\n\372\373\377\366\370\n\017\001\377\004\001\370\372\002\373\360\362\375\004\007\n\016\n\001\375\372\370\365\364\366\372\373\375\002\006\b\007\003\004\007\007\006\004\377\372\372\367\362\363\370\370\371\376\005\007\005\n\f\007\006\003\376\373\370\370\372\375\375\376"
+	.string	"\377\375\376"
+	.string	"\003\004\003\005\007\003\374\376\006\007\377\372\374\370\361\363\374\006\b\004\002\001\375\375\006\007"
+	.string	"\375\372\371\373\374\371\374\003\005\006\t\006\373\361\363\377\003\005\006"
+	.string	"\374\374"
+	.string	"\006\006"
+	.string	"\374\375\376\001\002"
+	.string	"\373\366\367\371\373\377\004\003\003\006\007\005\005\t\b\002\373\365\367\371\366\366\370\373\005\016\020\016\n"
+	.string	"\361\353\360\363\370\004\n\002\373\375\375\376\005\n\006\004\001\374\373\002\005"
+	.string	""
+	.string	"\003"
+	.string	"\372\372\374\374"
+	.string	"\004\002\375\373\373\374\375"
+	.string	"\001\002\003\002"
+	.string	""
+	.string	"\377\001\003\377\372\373\374\372\373\375\370\375\b\013\020\023\016\002\374\372\365\362\364\364\362\363\370\374\003\r\020\020\020\f\b\004\374\371\372\370\363\357\361\365\371\374\377\002\005\007\005\007\r\022\016\007\002\377\371\362\360\361\363\367\373\376"
+	.string	""
+	.string	"\377"
+	.string	"\007\013\t\t\t\003\001"
+	.string	"\374\371\366\364\371\373\367\372"
+	.string	"\003\004\b\007"
+	.string	"\376\377"
+	.string	"\003\b\004\371\371\003\b"
+	.string	"\363\361\372\375\005\006\374\377\t\016\013\002\365\345\342\357\372\377\007\025\026\024\026\020\002\370\374"
+	.string	"\372\364\364\361\351\357\367\374\002"
+	.string	"\370\370\006\016\017\024\024\016\t\005\377\377\376\367\357\350\344\346\364\004\t\n\f\013\n\r\013\003\374\367\360\362\374\003\006\006\007\002\371\371\002\006\373\364\377\004\373\373\373\364\365\371\376\b\r\r\017\f\005"
+	.string	"\375\367\365\371\370\370\373\375\370\370\001\004\005\013\017\n\377\375"
+	.string	"\375\375\003\002\371\363\364\367\371\372\374\377\003\n\013\004\002\006\b\006"
+	.string	"\375\377\377\372\364\364\364\362\370\376\004\t\n\007\001\376"
+	.string	"\004\006\b\006\001\375\375\376\374\371\372\377\377\373\365\364\371\377\004\b\b\007\005\002\003\003\002"
+	.string	"\374\367\367\373\376\001\376\366\364\371"
+	.string	"\004\005\007\t\013\t\b\b\002\371\364\365\370\370\367\371\373\375"
+	.string	"\005\006\003\004\006\b\b\006\001\377\376\375\375\374\370\366\371\373\372\374"
+	.string	"\001"
+	.string	""
+	.string	"\002\001"
+	.string	"\002\005\004\002\003\001\376\376\001"
+	.string	"\374\374\375\371\367\373\376\374\374\005\016\t\376\372\371"
+	.string	"\t\005\374\372"
+	.string	"\005\006\003\372\364\362\365\374\377\374"
+	.string	"\b\t\004\002\377\372\375\004\006\006\013\007\375\372\376\377\374\375\373\367\367\373\374\376\001\002\001\377\002\007\006\003\001"
+	.string	"\001\377\376\376\375\371\364\365\370\376\003\002"
+	.string	"\377"
+	.string	"\005\013\n\n\007\002\002"
+	.string	"\373\370\372\370\363\363\371\374\375\001\001\003\005\005\003\003\b\t\005\004\005\377\366\370\372\364\364\376"
+	.string	"\375\377\377\375\376\001\004\006\006\006\006\003\374\366\366\372\373\374\375\375\377\001\377"
+	.string	"\b\f\b\003\002"
+	.string	"\374\374\372\370\370\372\375\376\001\003\002\003\004\004\001\377\375\374\374\374\375\376\002\004\002"
+	.string	"\376\377\004\006\004\002"
+	.string	"\376\377\001\377\377\377\373\367\367\371\375"
+	.string	"\001"
+	.string	"\376\003\006\003\004\007\006"
+	.string	"\376\376\375\375\374\375\377\377\373\372\373\373\372\375\003\005\006\b\005\375\372\373\373\374\376\001\377\373\377\005\005\006\007\003\376\375\374\367\367\374\373\375\003\002"
+	.string	"\001\001"
+	.string	"\377"
+	.string	"\002\003\006\005\375\372\373\375\374\374\002\b\007\002\374\370\372\375\376\375\377"
+	.string	"\375\376\003\001\376\001\004\003\004\004\377\374\375\377\373\367\371\374\373\375\005\n\t\003"
+	.string	""
+	.string	"\376\375"
+	.string	""
+	.string	"\376\376\376\375"
+	.string	"\005\005\003\002"
+	.string	"\373\373\376\375\374\376\377\377\002\001\374\371\374\377\375\377\003\004\001\376\001\006\007\003\376\375\374\373\375\374\366\371\003\t\007\004\003\377\370\367\374\372\371\375\376\376\001\003\004\004\004\002"
+	.string	"\002\003\377\375"
+	.string	""
+	.string	"\374\375\001\001\377\376\375\373\372\375\003\003"
+	.string	"\001\377\372\373\001\004\002\002\001\375\372\373\376\003\006\003\002\001\376\373\370\367\373\376\002\005\004"
+	.string	"\376"
+	.string	"\003\006\006\005\002\375\372\372\373\372\373\377\376\371\370\373\375\377\006\f\n\005\004\005\003"
+	.string	""
+	.string	"\376\376\376\376"
+	.string	"\377\374\374\374\374\375"
+	.string	"\004\001\374\372\373\372\374\003\006\005\003"
+	.string	"\377\002\003\376"
+	.string	"\001\375\372\373\371\372"
+	.string	"\002\002\004\003\375\376\002\002\002\003\002\376\375\376\376\376\377"
+	.string	""
+	.string	"\376\375"
+	.string	"\001"
+	.string	"\002\004\003\001"
+	.string	"\375\372\373"
+	.string	"\001\376\376"
+	.string	"\375\372\374"
+	.string	"\002\004\006\006\001\374\371\373\377\002\002"
+	.string	"\377\377"
+	.string	"\001"
+	.string	"\376\372\372"
+	.string	"\004\003\003\001\377\375\375\374\377\002\003\001\001\377\374\375\002\005\005\004\001\375\374\373\371\370\373"
+	.string	"\002\377\374\373\375"
+	.string	"\003\007\b\005\005\003\001\001\002\001\376\371\365\365\370\374\374\375\001\002\002\004\005\004\003\004\004\002\001\377\373\374\376\372\366\370\375\004\n\n\003\002\003\002\376\376\377\376\375\376\373\363\364\376\005\004\005\005"
+	.string	"\374\377\003\004\003\002"
+	.string	"\375\371\371\375\377"
+	.string	"\376\373\372\375"
+	.string	"\002\006\006\002\377\001\005\007\004\002"
+	.string	"\375\374\375\377\377\375\372\370\366\364\370\377\003\005\007\007\006\002\002\006\007\003\377\375\375\372\370\371\373\373\374\375\377\001\002\001\002\003\001"
+	.string	"\005\005\001\001\001\376\374"
+	.string	"\376\372\375\001\377\375\377"
+	.string	"\001\002\002\002\001\377\373\371\371\370\367\374\001\003\003\004\002\002\005\b\t\007\003"
+	.string	"\374\370\364\365\372\372\366\367\373\377\002\006\n\f\r\016\t\377\372\373\374\373\374\373\370\367\372\375\377"
+	.string	"\003\006\006\003\002\001\375\374\377\376\374\376\001\377\001\003\001\001"
+	.string	"\377\376\001"
+	.string	"\376\376\374\372\373\377\003\002\001\001\375\371\372\374\377\002\004\004\004\004\003\002\001\375\370\366\372\374\376\001\002\002\005\b\004\374\375\001\001\377\377\376"
+	.string	"\005\007"
+	.string	"\367\364\367\370\373\001\004\005\t\t\004\001"
+	.string	"\377\373\371\372\372\371\372\374\377\002\002\001\003\005\004\003\004\003\376\374\376\377\375\375\377\376\374\376\377\376\375\376\376\376\377\001\003\004\003\001\377\377\376\377\001\002"
+	.string	"\376\376\376\375\375\376\374\375"
+	.string	"\002\001"
+	.string	"\377\377\376\376\001\001"
+	.string	"\001\002\001\002\004\001\376\374\375\377"
+	.string	""
+	.string	"\376\375\376\001\004\004\002\376\375\374\373\374\377\002\004\002\377\375\374\374\374\376\001"
+	.string	"\377"
+	.string	"\001\001\001\001"
+	.string	"\001\001\376\376\376\376\376"
+	.string	"\001\001\001\001\377\377\001\001\377\375\376\377\377\377\377"
+	.string	"\001\001\377\377\376\375\376"
+	.string	"\001\002\003\001\376\375\376\376\376"
+	.string	"\377\375\376\377\377\377\002\003\002\001\001"
+	.string	"\377\377\376\375\374\375\376\377"
+	.string	""
+	.string	"\001\003\003\002"
+	.string	"\377\376\376\377\377\375\374\376\376\376"
+	.string	""
+	.string	""
+	.string	"\001\003\003\001"
+	.string	"\001"
+	.ascii	"\377\376\375\375\376\375"
+	.string	"\374\376\001\001"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\001\001"
+	.string	"\377\375\375\377\377"
+	.string	"\001"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377\376\377\377\377\376\376\377"
+	.string	"\001\001\377\376\377\377\377"
+	.string	"\001\002\001\377\376\376\376\377"
+	.string	"\001\001\377\376"
+	.string	""
+	.string	"\377\377\377"
+	.string	"\001\002\001"
+	.string	"\377\375\375\375\376\377"
+	.string	"\001\001\377\377"
+	.string	"\001\001\001"
+	.string	"\376\374\375\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\376\376\377\001\002\001"
+	.string	"\377"
+	.string	""
+	.string	""
+	.string	"\377\377\377\376\377\001\001\377\375\377"
+	.string	"\377\377"
+	.string	""
+	.string	"\377\377\377\377\376\377\377"
+	.string	"\001\001\001\001"
+	.string	"\377\376\376\376\376\377\377\377\377\377\377"
+	.string	""
+	.string	"\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377"
+	.string	""
+	.string	"\377\377\377\376\376\377"
+	.string	"\001"
+	.string	"\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	"\377\377\377\377\377"
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
+	.string	""
 	.type	lx_open, @object
 	.size	lx_open, 8
 lx_open:
@@ -39591,6 +44977,138 @@ lx_soft:
 	.long	8632
 	.long	8633
 	.long	8635
+	.align	2
+	.type	lx_tpitch, @object
+	.size	lx_tpitch, 512
+lx_tpitch:
+	.long	262144
+	.long	293075
+	.long	324007
+	.long	354938
+	.long	385870
+	.long	416801
+	.long	447733
+	.long	478664
+	.long	509596
+	.long	540527
+	.long	571458
+	.long	602390
+	.long	633321
+	.long	664253
+	.long	695184
+	.long	726116
+	.long	757047
+	.long	787979
+	.long	818910
+	.long	849841
+	.long	880773
+	.long	911704
+	.long	942636
+	.long	973567
+	.long	1004499
+	.long	1035430
+	.long	1066362
+	.long	1097293
+	.long	1128224
+	.long	1159156
+	.long	1190087
+	.long	1221019
+	.long	1251950
+	.long	1282882
+	.long	1313813
+	.long	1344744
+	.long	1375676
+	.long	1406607
+	.long	1437539
+	.long	1468470
+	.long	1499402
+	.long	1530333
+	.long	1561265
+	.long	1592196
+	.long	1623128
+	.long	1654059
+	.long	1684990
+	.long	1715922
+	.long	1746853
+	.long	1777785
+	.long	1808716
+	.long	1839648
+	.long	1870579
+	.long	1901510
+	.long	1932442
+	.long	1963373
+	.long	1994305
+	.long	2025236
+	.long	2056168
+	.long	2087099
+	.long	2118030
+	.long	2148962
+	.long	2179894
+	.long	2210825
+	.long	2241756
+	.long	2272688
+	.long	2303619
+	.long	2334551
+	.long	2365482
+	.long	2396414
+	.long	2427345
+	.long	2458276
+	.long	2489208
+	.long	2520140
+	.long	2551071
+	.long	2582002
+	.long	2612934
+	.long	2643865
+	.long	2674797
+	.long	2705728
+	.long	2736660
+	.long	2767591
+	.long	2798522
+	.long	2829454
+	.long	2860385
+	.long	2891317
+	.long	2922248
+	.long	2953180
+	.long	2984111
+	.long	3015042
+	.long	3045974
+	.long	3076906
+	.long	3107837
+	.long	3138768
+	.long	3169700
+	.long	3200631
+	.long	3231563
+	.long	3262494
+	.long	3293426
+	.long	3324357
+	.long	3355288
+	.long	3386220
+	.long	3417151
+	.long	3448083
+	.long	3479014
+	.long	3509946
+	.long	3540877
+	.long	3571808
+	.long	3602740
+	.long	3633672
+	.long	3664603
+	.long	3695534
+	.long	3726466
+	.long	3757397
+	.long	3788328
+	.long	3819260
+	.long	3850192
+	.long	3881123
+	.long	3912054
+	.long	3942986
+	.long	3973917
+	.long	4004849
+	.long	4035780
+	.long	4066712
+	.long	4097643
+	.long	4128574
+	.long	4159506
+	.long	4190438
 	.align	2
 	.type	lx_decim, @object
 	.size	lx_decim, 512
