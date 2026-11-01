@@ -40,7 +40,7 @@ def contour(eng):
 def dials(e, t, eng, color=64, shape=64, sweep=64):
     for i, v in enumerate((color << 8, shape << 8, sweep << 8, contour(eng))):
         e.w16(TD + 22 + 2 * i, v)
-    e.run('lxr_params', stack=[t, TD])
+    e.run('lxr_params', stack=[t, TD, 0])
 
 
 def play(e, blocks, t=0, step=STEP1, trig=True, eng=None, **kw):

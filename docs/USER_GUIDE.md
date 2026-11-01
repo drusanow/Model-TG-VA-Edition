@@ -482,8 +482,46 @@ saved.
 
 Its twelve sampled attack transients are in (the init kit's presets use the
 snap instead, as on an LXR). Not ported: user samples as oscillator waves,
-its LFOs and velocity routing (the Cycles has its own), pan. Every other
-setting of an LXR voice is in the engine; a page to edit them all is next.
+its LFOs and velocity routing (the Cycles has its own), pan.
+
+### The voice menu: every LXR setting
+
+Hold **SETTINGS** and press **PRESET** on an LXR track: a full-screen page
+lists every setting of the voice the track plays, as an LXR's panel has them.
+The title shows the voice and **PRESET** (as it comes) or **EDITED**.
+
+- Turn **DATA** to move through the settings (five on screen, a bar on the
+  right shows where you are).
+- Turn **any other knob** to change the selected one; turn faster to go
+  further. Or press **DATA**, and DATA changes it too (only its value is lit)
+  until you press DATA again.
+- The last row, **PUT BACK THE PRESET**: press **DATA** there and the track
+  plays the preset as it comes.
+- **SETTINGS**, **PRESET** or the return key close the page.
+
+| voice | settings |
+|---|---|
+| KICK, TOM, PERC | OSC WAVE, COARSE, FINE, MOD WAVE, MOD FREQ, FM AMOUNT, MOD MODE (FM / MIX), PITCH DEC, PITCH AMT, PITCH SLOPE, ATTACK, DECAY, VOL SLOPE |
+| SNAR, CLAP | OSC WAVE, COARSE, FINE, NOISE FREQ, NOISE MIX, PITCH DEC, PITCH AMT, PITCH SLOPE, ATTACK, DECAY, VOL SLOPE, REPEAT |
+| CHAT, OHAT | OSC WAVE, COARSE, FINE, MOD1 / MOD2 WAVE, FREQ and GAIN, ATTACK, DECAY, OPEN DECAY, VOL SLOPE |
+| CYMB | OSC WAVE, COARSE, FINE, MOD1 / MOD2 WAVE, FREQ and GAIN, ATTACK, DECAY, VOL SLOPE, REPEAT |
+| all, then | FILTER (LP, HP, BP, UNITY BP, NOTCH, PEAK, LP2, OFF), CUTOFF, RESONANCE, FILT DRIVE, DISTORTION, SAMPLE RATE (127: full rate), TRANSIENT (SNAP, OFFSET or one of the twelve samples), TRANS VOL, TRANS PITCH, PWM, VOLUME |
+
+Values are the LXR's own, 0 to 127 (FINE: -64 to +63). What it does:
+
+- **The edits belong to the preset you make them on.** Turn Contour to
+  another preset and the track plays that one as it comes; your edits wait
+  for you on theirs. Edit another preset and that becomes the track's edited
+  one (one edited preset a track).
+- **Color, Shape and Sweep still work**, moving their settings from your
+  edited values (at 64: as you edited them). The menu shows the values
+  before them.
+- **Saved with the pattern**, like LFO 3 and 4: each pattern keeps its own
+  edits for each track, saved with the project (in its small settings file on
+  the card, with the LFOs' MIDI CC settings), copied with a pattern copy, and
+  cleared when the track is cleared or a new kit starts. They do not go into
+  a sound preset saved from the track.
+- Turning a setting while the voice plays is heard at once.
 
 ## Additions for every machine
 

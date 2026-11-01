@@ -4,7 +4,10 @@
 | built into src/lxr/lxr_gen.s by tools/gen_lxr.py). This file is ours, MIT.
 |
 | lx_params: va_pre's branch for machine 13 (d2 = track, a2 = trackData):
-|   Contour kept for the page (lx_cont), then lxr_params(track, trackData).
+|   Contour kept for the page (lx_cont), then lxr_params(track, trackData,
+|   edits): the edits are the track's voice menu block in the playing kit.
+| lx_m_*: the voice menu (SETTINGS + PRESET on an LXR track), mm_open's
+|   kind MM_LXR; src/lxr/lxr_menu.c draws and drives it.
 | lx_watch: from led_hook once a block, as mi_watch: the four knobs' names
 |   follow the selected track's engine group (drums, snare, clap, metal).
 | lx_eng_fmt: Contour's value -> the engine's name (mi_fmtswap installs it
@@ -20,9 +23,81 @@ lx_params:
     mvsw    %a2@(28),%d0          | Contour
     lea.l   lx_cont,%a0
     movel   %d0,%a0@(0,%d2:l:4)
+    movel   %d2,%d0               | the voice menu's edits, the playing kit's
+    bsr     lx_edp
+    movel   %a0,%sp@-
     movel   %a2,%sp@-
     movel   %d2,%sp@-
     jsr     lxr_params
+    lea.l   %sp@(12),%sp
+    rts
+
+| lx_edp(d0 = a track) -> a0 = its voice menu edits in the playing kit's
+| block (lfo2.inc: LX_OFF, LX_ED bytes a track). Clobbers d0/d1.
+lx_edp:
+    movel   %d0,%sp@-
+    movel   CUR_KIT,%d0
+    jsr     l34_blk
+    movel   %sp@+,%d0
+    lsll    #5,%d0                | x LX_ED
+    lea.l   %a0@(LX_OFF),%a0
+    adda.l  %d0,%a0
+    rts
+
+| ---- the voice menu: SETTINGS + PRESET on an LXR track ----------------------
+| mm_open's page, kind MM_LXR, drawn and driven by src/lxr/lxr_menu.c (every
+| setting of the voice; the edits in the kit's block, saved with the pattern
+| in its MIDI CC file: lfocc.inc). These pass it the track's edits and Contour.
+| lx_m_args -> a0 = mm_track's edits, d0 = its Contour. Clobbers d1.
+lx_m_args:
+    movel   mm_track,%d0
+    bsr     lx_edp
+    movel   mm_track,%d0
+    lea.l   lx_cont,%a1
+    movel   %a1@(0,%d0:l:4),%d0
+    rts
+
+| lx_m_draw (d2 = ctx): the whole screen. Keeps d2-d7/a2-a6.
+lx_m_draw:
+    bsr     lx_m_args
+    movel   %d0,%sp@-
+    movel   %a0,%sp@-
+    movel   %d2,%sp@-
+    jsr     lxr_menu_draw
+    lea.l   %sp@(12),%sp
+    rts
+
+| lx_m_turn (d2 = the encoder event) -> d0 = 1 to redraw. Keeps d2-d7/a2-a6.
+lx_m_turn:
+    movel   %d3,%sp@-
+    movea.l %d2,%a0
+    movel   %a0@(12),%d3          | the knob: 1 DATA
+    movel   %d3,%sp@-
+    jsr     lxr_menu_accel
+    addql   #4,%sp
+    movel   %d0,%sp@-
+    pea     0x1
+    movel   %d2,%sp@-
+    jsr     0x4006f73a            | clicks (accelerated when it changes a value)
+    lea.l   %sp@(12),%sp
+    tstl    %d0
+    beqs    1f
+    movel   %d0,%sp@-             | (ed, contour, knob, clicks)
+    movel   %d3,%sp@-
+    bsr     lx_m_args
+    movel   %d0,%sp@-
+    movel   %a0,%sp@-
+    jsr     lxr_menu_turn
+    lea.l   %sp@(16),%sp
+1:  movel   %sp@+,%d3
+    rts
+
+| lx_m_press: DATA's press -> d0 = 1 to redraw. Keeps d2-d7/a2-a6.
+lx_m_press:
+    bsr     lx_m_args
+    movel   %d0,%sp@-
+    movel   %a0,%sp@-
+    jsr     lxr_menu_press
     addql   #8,%sp
     rts
 

@@ -26,11 +26,12 @@
  * Not ported: user samples as oscillator waves (silent, as an LXR without them), the LFOs and velocity routing (the
  * Cycles has its own), pan.
  *
- * Contract (as dx_fill / mi_fill): lxr_params(track, trackData) once a block, before lxr_fill(track, step, machine),
+ * Contract (as dx_fill / mi_fill): lxr_params(track, trackData, edits) once a block, before lxr_fill(track, step, machine),
  * which writes 64 values at sampler_buf+32 (96 kHz, each 48 kHz sample twice, a sample << 15) and reads and clears
  * dr_trig[track]. step: the note, Q16, 1.0 = note 60 (the LXR's default note). The amp stage (Model-TG: Attack,
  * Filter, Resonance, Amp Decay) follows. No floating point, no 64-bit arithmetic, no library call: built with gcc -S
  * into lxr_gen.s. Also built on a host (-DLX_HOST, any FS / NB) to be compared with the LXR's own code (tests).
+ * edits: the track's voice menu block (LX_ED bytes, lxr_menu.c), or 0: the preset's knobs as edited there.
  */
 typedef int s32;
 typedef unsigned int u32;
@@ -118,6 +119,8 @@ typedef struct {
 	u32 tphase;                             /* the sampled transient's place: 2204 << 20 at its end */
 	s32 cooked;                             /* the dials and preset p[] was made from; -1: none */
 	s32 dknob;                              /* the distortion knob dcurve was made for; -1: none */
+	const u8 *ed;                           /* the voice menu's edits for this track (lxr_menu.c), or 0 */
+	u32 edsum;                              /* ... their sum when p[] was made */
 	s16 dcurve[130];
 } Voice;
 
@@ -473,10 +476,12 @@ static inline u8 knob(s32 x)
 	return (u8)(x < 0 ? 0 : (x > 127 ? 127 : x));
 }
 
+#include "lxr_menu.c"
+
 /* Color / Shape / Sweep: each moves one of the voice's knobs from the preset's value (64: the preset as it is) */
 static void cook(Voice *v, s32 pr)
 {
-	const u8 *src = lx_presets[pr];
+	const u8 *src = lx_src(v->ed, pr);
 	s32 i, c = (v->dial[0] >> 8) - 64, s = (v->dial[1] >> 8) - 64, w = (v->dial[2] >> 8) - 64;
 	for (i = 0; i < N_P; i++)
 		v->p[i] = src[i];
@@ -522,10 +527,11 @@ static void cook(Voice *v, s32 pr)
 }
 
 /* ---- lxr_params: the four dials of a track, every block ----------------------------------------------------- */
-void lxr_params(s32 track, const s16 *td)
+void lxr_params(s32 track, const s16 *td, const u8 *ed)
 {
 	Voice *v = &v_[track];
 	s32 i;
+	v->ed = ed;
 	for (i = 0; i < 4; i++) {
 		s32 x = td[11 + i];
 		v->dial[i] = x < 0 ? 0 : (x > 0x7f00 ? 0x7f00 : x);
@@ -712,9 +718,11 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	}
 	{
 		s32 key = pr | (v->dial[0] >> 8) << 4 | (v->dial[1] >> 8) << 11 | (v->dial[2] >> 8) << 18;
-		if (v->cooked != key) {
+		u32 es = lx_edsum(v->ed);
+		if (v->cooked != key || v->edsum != es) {
 			cook(v, pr);
 			v->cooked = key;
+			v->edsum = es;
 		}
 		if (v->dknob != v->p[P_DIST]) {
 			v->dknob = v->p[P_DIST];

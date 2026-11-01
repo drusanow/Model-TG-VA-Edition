@@ -74,6 +74,38 @@ Color, Shape and Sweep move one of the preset's knobs each (two for the hats'
 Shape), from its value at 64: two knob steps a step (the hats' and cymbal's
 tuning, half a semitone; the clap's count, one per eight).
 
+## The voice menu
+
+SETTINGS + PRESET on an LXR track opens a page of every setting the voice
+uses (`src/lxr/lxr_menu.c`, GPL-3.0-only; glue in `src/lxr_glue.inc`, the page
+kind `MM_LXR` of `mm_open` in `src/model_tg.s`). How to use it:
+[USER_GUIDE.md](USER_GUIDE.md#the-voice-menu-every-lxr-setting).
+
+**The edits.** Each kit (pattern) holds a 32-byte block per track after its
+MIDI CC settings in its LFO 3/4 block (`lfo2.inc`: `LX_OFF` = 172, the block
+now 364 bytes): the preset the edits were made on + 1 (0: none), then its 31
+knobs in `P_*` order. `lx_params` hands `lxr_params` the playing kit's block
+for the track every block; `cook` takes its knobs from there when Contour is
+on that preset, else from the preset, and the macros then move them as
+before. A change is seen from a sum of the block (`lx_edsum`), so an edit, a
+pasted kit or a loaded pattern re-cooks the voice at the next block, without
+restarting it. The first edit on a preset copies its knobs in; PUT BACK THE
+PRESET clears the block.
+
+**Saved with the pattern.** The block goes wherever the kit's LFO 3/4 block
+goes: copied with the kit (`kit_memcpy`), cleared with a track's sound
+(`l34_snd_reset`) and with a new kit (`lcc_kclr`), and saved in the kit's
+MIDI CC file (`lfocc.inc`): with edits the file is 240 bytes, the 48 of MIDI
+CC then the six tracks' blocks, hashed whole; without, it is the 48-byte file
+as before, hashed as before. So every older project loads as it did, with no
+edits, and a kit with only edits gets a file too.
+
+`tests/test_lxr_menu.py`: the rows of each voice, the values shown, the
+screen's layout (everything fits), the edits (the preset copied in, clamped,
+put back, another preset's giving way), the sound (the edits on their preset
+only, the macros from them, heard while playing, the playing kit's), the file
+(240 and 48 bytes, wrong files), the copy and clear, and the page's handlers.
+
 ## How close it is
 
 `tools/lxr_reference.py` builds the LXR's own voice code on a computer
@@ -133,5 +165,6 @@ changes).
 | `src/lxr/lxr.c` | the port (GPL-3.0-only) |
 | `src/lxr/lxr_tables.h`, `lxr_gen.s` | written by `tools/gen_lxr.py`: the curves; the ColdFire assembly |
 | `src/lxr/lxr_wave.h`, `lxr_trans.h`, `lxr_presets.h` | imported by `tools/lxr_import.py` from the LXR's sources |
-| `src/lxr_glue.inc` | the machine's glue: labels, names, pictures, the Contour screen (MIT) |
+| `src/lxr/lxr_menu.c` | the voice menu: its rows, values, edits and screen (GPL-3.0-only) |
+| `src/lxr_glue.inc` | the machine's glue: labels, names, pictures, the Contour screen, the voice menu's page (MIT) |
 | `tools/lxr_ref/`, `tools/lxr_reference.py` | the reference renderer, and `tests/data/lxr_ref.json` |

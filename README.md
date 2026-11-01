@@ -64,7 +64,9 @@ keeps working.
   code. Contour picks one of eight presets - the voices of the LXR's init kit:
   KICK, TOM, PERC, SNAR, CLAP, CHAT, OHAT, CYMB - and Color / Shape / Sweep
   move their LXR settings; Attack, Filter, Resonance and Decay are the ones
-  every machine has ([USER_GUIDE](docs/USER_GUIDE.md#lxr), [LXR.md](docs/LXR.md)).
+  every machine has. SETTINGS + PRESET opens its voice menu: every LXR
+  setting of the voice, saved with the pattern
+  ([USER_GUIDE](docs/USER_GUIDE.md#lxr), [LXR.md](docs/LXR.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale

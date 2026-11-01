@@ -58,7 +58,7 @@ class Base(unittest.TestCase):
             uc.mem_write(out, self.stock_out)
 
     def blk(self, n=None):
-        return self.s['lfo34_kits'] + 172 * (self.KIT if n is None else n)
+        return self.s['lfo34_kits'] + 364 * (self.KIT if n is None else n)
 
     def types(self, d=None, r=None):
         if d is not None:

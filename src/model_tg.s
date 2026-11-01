@@ -8635,6 +8635,7 @@ MM_SIZE   = 0xd0
 MM_SYS    = 3                     | mm_kind: the System page (sys_render)
 MM_RTG    = 4                     | mm_kind: the retrig page (rtg_render)
 MM_SLE    = 5                     | mm_kind: the slice editor (sle_render)
+MM_LXR    = 6                     | mm_kind: LXR's voice menu (lxr_glue.inc)
 MM_VT_SRC = 0x40117918
 MM_VT_LEN = 0xb0
 | The page serves three menus: kind 0 the playback mode (Settings + Preset),
@@ -8682,7 +8683,19 @@ mm_open:
     moveb   %a2@(38),%d0
     andil   #0xff,%d0
     cmpil   #6,%d0
-    bnew    mm_o_done             | not a Sampler track: the chord means nothing
+    beqs    mm_o_smp
+    lea.l   trk_mach,%a0          | an LXR track: Settings + Preset opens its
+    moveq   #LX_MACH,%d0          | voice menu (lxr_glue.inc, lxr_menu.c)
+    cmpl    %a0@(0,%d2:l:4),%d0
+    bnew    mm_o_done             | anything else: the chord means nothing
+    tstl    mm_kind_req
+    bnew    mm_o_done             | (Settings + Punch: no options menu here)
+    lea.l   mm_track,%a0
+    movel   %d2,%a0@
+    jsr     lxr_menu_open
+    moveq   #MM_LXR,%d0
+    braw    mm_o_kind
+mm_o_smp:
     lea.l   mm_track,%a0
     movel   %d2,%a0@
     lea.l   mm_kind_req,%a0
@@ -8813,9 +8826,9 @@ mm_key:
     addql   #4,%sp
     moveq   #MM_SLE,%d1           | the slice editor: DATA's press adds a
     cmpl    mm_kind,%d1           | marker, with FUNC removes one
-    bnes    mm_k_nsle
+    bnew    mm_k_nsle
     cmpil   #MM_KEY_DATA,%d0
-    bnes    mm_k_nrt
+    bnew    mm_k_nrt
     movel   %d2,%sp@-
     jsr     0x40072434            | the click
     addql   #4,%sp
@@ -8827,6 +8840,24 @@ mm_key:
     addql   #4,%sp
     braw    mm_k_used
 mm_k_nsle:
+    moveq   #MM_LXR,%d1           | LXR's voice menu: DATA's press
+    cmpl    mm_kind,%d1
+    bnes    mm_k_nlx
+    cmpil   #MM_KEY_DATA,%d0
+    bnes    mm_k_nrt
+    movel   %d2,%sp@-
+    jsr     0x40072434            | the click
+    addql   #4,%sp
+    tstb    %d0
+    beqw    mm_k_used
+    jsr     lx_m_press
+    tstl    %d0
+    beqw    mm_k_used
+    movel   %a2,%sp@-
+    jsr     0x40076082            | redraw
+    addql   #4,%sp
+    braw    mm_k_used
+mm_k_nlx:
     moveq   #MM_RTG,%d1
     cmpl    mm_kind,%d1
     bnes    mm_k_nrt
@@ -8927,6 +8958,14 @@ mm_enc:
     moveq   #MM_SLE,%d0           | the slice editor: DATA and knobs 2-4
     cmpl    mm_kind,%d0
     beqw    mm_e_sle
+    moveq   #MM_LXR,%d0           | LXR's voice menu: DATA and every knob
+    cmpl    mm_kind,%d0
+    bnes    mm_e_nlx
+    jsr     lx_m_turn
+    tstl    %d0
+    beqw    mm_e_done
+    braw    mm_e_redraw
+mm_e_nlx:
     moveq   #MM_RTG,%d0
     cmpl    mm_kind,%d0
     bnew    mm_e_nrtg
@@ -9164,8 +9203,14 @@ mm_r_nsys:
 mm_r_nrtg:
     moveq   #MM_SLE,%d0
     cmpl    mm_kind,%d0
-    bnes    mm_r_std
+    bnes    mm_r_nsle
     jsr     sle_render            | the slice editor: the whole screen
+    braw    mm_r_end
+mm_r_nsle:
+    moveq   #MM_LXR,%d0
+    cmpl    mm_kind,%d0
+    bnes    mm_r_std
+    jsr     lx_m_draw             | LXR's voice menu: the whole screen
     braw    mm_r_end
 mm_r_std:
     pea     0x1
@@ -9999,8 +10044,9 @@ dbh_pass:
     SLD_BASE    = MK_BASE - 0x800 | slide trigs: armed and running glides
     SFX_DBUF    = SLD_BASE - 0x80000 | the send effects' delay lines (sendfx.inc)
     SFX_RBUF    = SFX_DBUF - 0x20000 | ... the spring's and RESO's
-    L34_KITS    = SFX_RBUF - 0x5000 | LFO 3/4, the send FX and MIDI CC of each kit
-                                  | (lfo2.inc: lfo34_kits, cleared at boot)
+    L34_KITS    = SFX_RBUF - 0x9000 | LFO 3/4, the send FX, MIDI CC and LXR's edits
+                                  | of each kit (lfo2.inc: lfo34_kits, 96 x 364
+                                  | bytes, cleared at boot)
     OVL_MAX     = 0x40000         | the overlay: code and tables run from here
     OVL_BASE    = L34_KITS - OVL_MAX | (build.py links `.section .ovl` here;
                                   | boot_extra_hook copies it up from the image)
@@ -16947,7 +16993,7 @@ rs_menu_open:
     lea.l   rs_desc,%a0
     lea.l   gm_cur,%a1
     movel   %a0,%a1@
-    braw    lm_build
+    jmp     lm_build
 
 | values: a0 = &setting, a1 = its names
 rs_val_src:

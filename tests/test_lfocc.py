@@ -90,12 +90,12 @@ class Base(unittest.TestCase):
         return a[1]
 
     def blk(self):
-        return self.s['lfo34_kits'] + 172 * self.KIT
+        return self.s['lfo34_kits'] + 364 * self.KIT
 
     def area(self, kit=None):
         """A kit's MIDI CC settings: the numbers (0 OFF, CC + 1), then the
         bases ^ 64."""
-        return self.s['lfo34_kits'] + 172 * (self.KIT if kit is None else kit) + 124
+        return self.s['lfo34_kits'] + 364 * (self.KIT if kit is None else kit) + 124
 
     def num(self, lfo, t, cc, kit=None):
         """LFO lfo of track t sends CC cc (None: OFF)."""

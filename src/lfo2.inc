@@ -742,7 +742,8 @@ lup_out:
 | ============== LFO 3 and 4: one block per pattern, saved with its kit ========
 | All 96 patterns' kits sit in RAM (KIT_BASE + n x KIT_SIZE, model_tg.s), and
 | LFO 1 and 2 live in their track sounds - so they change with the pattern.
-| LFO 3 and 4 do the same from lfo34_kits: a 172-byte block per kit, laid out
+| LFO 3 and 4 do the same from lfo34_kits: a 364-byte block per kit (the
+| send effects', the MIDI CC settings and LXR's voice menu edits too), laid out
 | [LFO 3, LFO 4][track 0..5] x {Speed, Multiplier, Waveform, Destination,
 | Depth}. Everything reads the playing kit's (*CUR_KIT). The block follows the
 | kit everywhere the kit goes:
@@ -754,9 +755,12 @@ lup_out:
 |   copied          kit_memcpy: any memcpy of a whole kit - the new project's
 |                   copies, pattern copy / paste and undo, which keep the kit
 |                   in a buffer of their own
-L34_BLK   = 172                   | one kit's block: 120 of LFOs, the send
-                                  | effects' types (sendfx.inc, +120), and the
-                                  | LFOs' MIDI CC settings (lfocc.inc, +124)
+L34_BLK   = 364                   | one kit's block: 120 of LFOs, the send
+                                  | effects' types (sendfx.inc, +120), the
+                                  | LFOs' MIDI CC settings (lfocc.inc, +124),
+                                  | and LXR's voice menu edits (+172)
+LX_OFF    = 172                   | in it: LXR's edits, LX_ED bytes a track
+LX_ED     = 32                    | (src/lxr/lxr_menu.c: the preset + 1, its knobs)
 L34_NBUF  = 4                     | kit buffers remembered (kit_memcpy)
 L34_ST    = 648                   | in the kit's storage record (below)
 L34_MAGIC = 0x4C463334            | "LF34"
@@ -794,28 +798,37 @@ l34_snd_reset:
     movel   %d2,%sp@-
     movel   %a0,%d0
     subil   #KIT_BASE,%d0
-    bcss    lsr_out
+    bcsw    lsr_out
     movel   %d0,%d2
     movel   #KIT_SIZE,%d1
     divul   %d1,%d0               | the kit
     cmpil   #NPAT,%d0
-    bccs    lsr_out
+    bccw    lsr_out
     mulul   %d0,%d1
     subl    %d1,%d2               | the offset in it
     subil   #KIT_SND,%d2
-    bcss    lsr_out
+    bcsw    lsr_out
     movea.l %d2,%a1
     moveq   #SND_SIZE,%d1
     divul   %d1,%d2               | the track
     cmpil   #MAX_TRK,%d2
-    bccs    lsr_out
+    bccw    lsr_out
     mulul   %d2,%d1               | exactly on its sound?
     cmpl    %a1,%d1
-    bnes    lsr_out
+    bnew    lsr_out
     movel   #L34_BLK,%d1
     mulul   %d0,%d1
     lea.l   lfo34_kits,%a0
     adda.l  %d1,%a0
+    lea.l   %a0@(LX_OFF),%a1      | LXR's edits for the track: none
+    movel   %d2,%d0
+    lsll    #5,%d0
+    adda.l  %d0,%a1
+    moveq   #LX_ED/4-1,%d0
+lsr_lx:
+    clrl    %a1@+
+    subql   #1,%d0
+    bpls    lsr_lx
     mulu.w  #10,%d2
     adda.l  %d2,%a0
     lea.l   lfo2_dflt,%a1
@@ -1147,6 +1160,7 @@ lfo34_w:    .rept 12
             .endr
             .long 0                   | the send effects: stock
             .space 48                 | MIDI CC: all OFF, bases 64
+            .space 6*LX_ED            | LXR: no edits
 | LFO 3 and 4 of each pattern's kit: in the sample region (model_tg.s,
 | L34_KITS), not the blob, which they would fill; the boot clear (phase1.s)
 | zeroes them before anything reads them.

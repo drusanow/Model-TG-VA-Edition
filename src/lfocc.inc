@@ -40,6 +40,13 @@ LCC_OFF   = 124                   | in a kit's LFO 3/4 block (lfo2.inc): the
                                   | numbers (0 OFF, CC + 1), then the bases
                                   | (stored ^ 64, so a cleared block is 64)
 LCC_SZ    = 2*LCC_N               | ... 48 bytes
+LCC_FSZ   = LCC_SZ + 6*LX_ED      | the file: those, then LXR's voice menu
+                                  | edits (lfo2.inc: LX_OFF, right after them)
+                                  | - 240 bytes, or 48 with no edits (as every
+                                  | older file)
+    .if LCC_OFF + LCC_SZ - LX_OFF
+    .error "LXR's edits must follow the MIDI CC settings"
+    .endif
 LCC_REC   = 700                   | in the kit's storage record: "C", the
                                   | settings' hash (4 bytes), a check byte
 LCC_TAG   = 0x43
@@ -616,6 +623,9 @@ lra_free:
     rts
 
 | ---- saved with the pattern -------------------------------------------------
+| (LXR's voice menu edits ride in the same file: LCC_FSZ. A kit with edits has
+| a 240-byte file, hashed whole; without, the 48-byte one, hashed as before -
+| so every older file and record loads as it did, with no edits.)
 | A kit's storage record has no room for 48 bytes, but +700..+707 are free
 | (the FX save writes zeros there, the FX load never reads them). There go
 | "C", the FNV-1a hash of the kit's settings and a check byte; the settings
@@ -639,13 +649,28 @@ lcc_area:
     rts
 
 | lcc_hash(a0 = settings) -> d0 = their FNV-1a hash, 0 when all zero (1 for
-| a real 0). Clobbers d1/a1.
+| a real 0), and d1 = the file's length: LCC_FSZ when LXR's edits hold any,
+| else LCC_SZ (hashing those 48 bytes, as before them). Clobbers a1.
 lcc_hash:
     movel   %d2,%sp@-
+    movel   %d3,%sp@-
+    movel   #LCC_SZ,%d3
+    lea.l   %a0@(LCC_SZ),%a1
+    movel   #LCC_FSZ-LCC_SZ-1,%d1
+lhh_x:
+    tstb    %a1@+
+    bnes    lhh_all
+    subql   #1,%d1
+    bpls    lhh_x
+    bras    lhh_go
+lhh_all:
+    movel   #LCC_FSZ,%d3
+lhh_go:
     movea.l %a0,%a1
     movel   #0x811c9dc5,%d0
     moveq   #0,%d2                | any set?
-    moveq   #LCC_SZ-1,%d1
+    movel   %d3,%d1
+    subql   #1,%d1
 lhh_l:
     movel   %d1,%sp@-
     moveq   #0,%d1
@@ -666,6 +691,8 @@ lhh_set:
     bnes    lhh_out
     moveq   #1,%d0
 lhh_out:
+    movel   %d3,%d1
+    movel   %sp@+,%d3
     movel   %sp@+,%d2
     rts
 
@@ -724,7 +751,7 @@ lcc_kload:
     movel   %d2,%sp@-
     movel   %d0,%d2
     bsr     lcc_area
-    moveq   #LCC_SZ/4-1,%d1
+    moveq   #LCC_FSZ/4-1,%d1      | (LXR's edits too)
 lkl_c:
     clrl    %a0@+
     subql   #1,%d1
@@ -767,7 +794,7 @@ lcc_kclr:
     lea.l   lcc_lh,%a0
     clrl    %a0@(0,%d0:l:4)
     bsr     lcc_area
-    moveq   #LCC_SZ/4-1,%d1
+    moveq   #LCC_FSZ/4-1,%d1      | (LXR's edits too)
 lkc_c:
     clrl    %a0@+
     subql   #1,%d1
@@ -806,7 +833,7 @@ lp_dig:
 | lcc_fread, on the UI clock while lcc_lpn: the first kit with a hash noted -
 | its file, if it is there and right, into its settings. Keeps d2-d7/a2-a6.
 lcc_fread:
-    linkw   %fp,#-72
+    linkw   %fp,#-264
     lea.l   %sp@(-12),%sp
     moveml  %d2-%d3/%a2,%sp@
     lea.l   lcc_lh,%a2
@@ -818,7 +845,7 @@ lfr_f:
     cmpil   #NPAT,%d2
     bcss    lfr_f
     clrl    lcc_lpn               | none left
-    bras    lfr_out
+    braw    lfr_out
 lfr_go:
     clrl    %a2@(0,%d2:l:4)
     movel   %d3,%d0
@@ -831,8 +858,8 @@ lfr_go:
     tstl    %d0
     bnes    lfr_out               | not there: OFF and 64
     pea     %fp@(-16)
-    pea     LCC_SZ
-    pea     %fp@(-64)
+    pea     LCC_FSZ
+    pea     %fp@(-256)
     jsr     0x4007baaa
     lea.l   %sp@(12),%sp
     movel   %d0,%sp@-
@@ -840,17 +867,27 @@ lfr_go:
     jsr     0x4007bc1c
     addql   #4,%sp
     movel   %sp@+,%d0
+    movel   #LCC_FSZ,%d1          | the whole file, or the CC settings alone
+    cmpl    %d0,%d1               | (an older one, or no LXR edits): those
+    beqs    lfr_len               | with no edits
     moveq   #LCC_SZ,%d1
     cmpl    %d0,%d1
-    bnes    lfr_out
-    lea.l   %fp@(-64),%a0         | the right file?
+    bnew    lfr_out
+    lea.l   %fp@(-256+LCC_SZ),%a0
+    movel   #(LCC_FSZ-LCC_SZ)/4-1,%d1
+lfr_z:
+    clrl    %a0@+
+    subql   #1,%d1
+    bpls    lfr_z
+lfr_len:
+    lea.l   %fp@(-256),%a0        | the right file?
     bsr     lcc_hash
     cmpl    %d3,%d0
-    bnes    lfr_out
+    bnew    lfr_out
     movel   %d2,%d0
     bsr     lcc_area
-    lea.l   %fp@(-64),%a1
-    moveq   #LCC_SZ/4-1,%d1
+    lea.l   %fp@(-256),%a1
+    moveq   #LCC_FSZ/4-1,%d1
 lfr_c:
     movel   %a1@+,%a0@+
     subql   #1,%d1
@@ -908,6 +945,7 @@ lw_k:
     bsr     lcc_hash
     tstl    %d0
     beqw    lw_n
+    movel   %d1,%fp@(-40)         | the file's length
     bsr     lcc_path
     movel   %a0,%sp@-
     jsr     0x4007c18e
@@ -937,13 +975,13 @@ lw_open:
     lea.l   %sp@(12),%sp
     tstl    %d0
     bnes    lw_n
-    pea     LCC_SZ
+    movel   %fp@(-40),%sp@-
     clrl    %sp@-
     pea     %fp@(-16)
     jsr     0x4007bb76
     lea.l   %sp@(12),%sp
     pea     %fp@(-16)
-    pea     LCC_SZ
+    movel   %fp@(-40),%sp@-
     movel   %a2,%sp@-
     jsr     0x4007bb0a
     lea.l   %sp@(12),%sp
