@@ -148,8 +148,8 @@ them), the LFOs and the velocity routing (the Cycles has its own), pan.
 
 ## CPU
 
-`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 7,400 to
-8,700 instructions a block (the hats the most: three oscillators and the
+`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 7,600 to
+8,900 instructions a block (6,000 to 7,300 at LXR Rate 48K) (the hats the most: three oscillators and the
 filter), against a stock voice's ~7,600; its first block after a change of
 preset or of the distortion knob ~3,500 more (its distortion curve and tuning
 made). A silent LXR track costs nothing. Made cheaper without changing a sample:
@@ -157,6 +157,12 @@ the filter's output chosen once a block rather than every sample, the
 oscillators' FM test out of their loops, the distortion a branch-free table, the
 oscillators' tuning cached (its multiplications only when a note or knob
 changes).
+
+**LXR Rate** (Device Config, default the LXR's 44.14 kHz): at **48K** the
+voice runs at the Cycles' rate, without the resampling - the same pitches and
+times, its oscillators aliasing as at 48 kHz; ~18% cheaper. Its 16-bit
+filter shapers and cached filter coefficients are bit-exact. See
+[CPU.md](CPU.md).
 
 ## Files
 

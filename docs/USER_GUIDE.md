@@ -31,6 +31,7 @@ The twelve parameter knobs are numbered 1 to 12.
 - [Scale Lock](#scale-lock)
 - [Uploading samples with Elektron Transfer](#uploading-samples-with-elektron-transfer)
 - [The System page](#the-system-page)
+- [CPU Guard and LXR Rate](#cpu-guard-and-lxr-rate)
 - [Tweaks from elektron-model-tweaks](#tweaks-from-elektron-model-tweaks)
 - [Files Model-TG writes](#files-model-tg-writes)
 - [Button reference](#button-reference)
@@ -609,7 +610,34 @@ keeps its own choice, saved with it. Details: [SENDFX.md](SENDFX.md).
 
 **Device Config > System** shows the audio CPU load (now and at its worst)
 and sample memory used and free. Turn **DATA** right for each track's share
-of the CPU. Return, **PRESET** or **SETTINGS** closes it.
+of the CPU. Return, **PRESET** or **SETTINGS** closes it. Next to PEAK,
+**GUARD n** counts the notes the CPU Guard has ended since the page opened
+(**GUARD OFF** when it is off).
+
+## CPU Guard and LXR Rate
+
+The Cycles makes its sound in blocks of 0.67 ms. When the voices need more
+than that, a block is late: the sound drops out, and the screen and buttons
+slow down (the sound always comes first). The stock machines leave room; the
+new ones (VA, the VA drums, PLAITS, DX, LXR) are heavier, and many of them
+sounding at once, with a heavy send effect, can fill it.
+
+- **Device Config > CPU Guard** (**ON** at every start-up): when a block
+  takes over 90% of its time, the guard ends one note early - of the new
+  machines' notes still sounding, the one that started longest ago (a long
+  tail, a ringing cymbal), never one under 16 ms old, never a stock machine
+  or the Sampler. It fades out in 1.3 ms, and its track then costs nothing
+  until its next trig, which plays as always. One note at most every 8 ms.
+  The tails go before the beat does. Turn it **OFF** to hear every note to
+  its end whatever the load.
+- **Device Config > LXR Rate** (**44.1K** at every start-up): **48K** runs
+  LXR at the Cycles' own rate, without converting from the LXR's - about 18%
+  cheaper an LXR track. The drums, snare, clap and cymbal sound the same (the
+  same pitch and length); the hats, whose sound is mostly the LXR's aliasing,
+  come out 1.5 to 2.5 dB brighter. 44.1K is the LXR exactly.
+
+Neither setting is saved: each start-up begins with the guard ON and LXR at
+its own rate. Details: [CPU.md](CPU.md).
 
 ## Tweaks from elektron-model-tweaks
 

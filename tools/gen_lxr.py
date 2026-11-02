@@ -75,6 +75,11 @@ def lxr_curves():
     c['fq'] = np.where(q < F(0.1), F(0.02), q)
     c['fdrv'] = (F(0.4) + flt * flt * F(6)).astype(F)
     c['flp2'] = (f * F(2.21)).astype(F)
+    # the same cutoffs (in Hz) for the 48 kHz option (lxr.c: lx_r48): f x 44140 / 48000
+    f48 = (f * F(44140 / 48000)).astype(F)
+    x48 = (F(math.pi) * f48).astype(F)
+    c['fg48'] = ((-15 * x48 + x48 * x48 * x48) / (F(3) * (F(-5) + F(2) * x48 * x48))).astype(F)
+    c['flp2_48'] = (f48 * F(2.21)).astype(F)
     # distortion.c, setDistortionShape: shape = x / 127 - 1/128 (k = 2 shape / (1 - shape))
     c['dist'] = (flt - F(0.0078125)).astype(F)
     # mixer.c's decimator: valueShaperF2F(x / 127, -0.7)
@@ -104,7 +109,7 @@ def tables():
         'psl': (32768, 's32'), 'vsl': (32768, 's32'), 'pamt': (4096, 's32'),
         'freq': (256, 'u32'), 'det': (65536, 'u32'), 'snap': (1 << 24, 'u32'),
         'ff': (65536, 's32'), 'fg': (4096, 's32'), 'fq': (4096, 's32'), 'fdrv': (4096, 's32'),
-        'flp2': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32'), 'tpitch': (1, 'u32')}
+        'flp2': (4096, 's32'), 'fg48': (4096, 's32'), 'flp2_48': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32'), 'tpitch': (1, 'u32')}
     t = [HEAD, '/* the LXR-02\'s knob curves (tools/gen_lxr.py: lxr_curves) and its filter\'s shapers, fixed point */\n']
     for name, (scale, typ) in fix.items():
         vals = [int(round(float(v) * scale)) for v in c[name]]
@@ -115,11 +120,13 @@ def tables():
             t.append('\t' + ', '.join(map(str, vals[i:i + 16])) + ',\n')
         t.append('};\n')
     s, h = soft_tables()
-    t.append('static const s32 lx_soft[2049] __attribute__((section(".lxr_ro"))) = {\n')
+    # (16-bit: the values fit, and the two tables read every sample take half the data cache)
+    assert max(map(abs, s)) < 32768 and max(map(abs, h)) < 32768
+    t.append('static const s16 lx_soft[2049] __attribute__((section(".lxr_ro"))) = {\n')
     for i in range(0, 2049, 16):
         t.append('\t' + ', '.join(map(str, s[i:i + 16])) + ',\n')
     t.append('};\n')
-    t.append('static const s32 lx_tanh[513] __attribute__((section(".lxr_ro"))) = {\n')
+    t.append('static const s16 lx_tanh[513] __attribute__((section(".lxr_ro"))) = {\n')
     for i in range(0, 513, 16):
         t.append('\t' + ', '.join(map(str, h[i:i + 16])) + ',\n')
     t.append('};\n')

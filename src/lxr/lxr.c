@@ -58,6 +58,13 @@ typedef unsigned char u8;
 #define NI (NB + 2)                                       /* the voice's samples a block, at most */
 #define KF ((u32)(1099511627776.0 / LXR_FS + 0.5))        /* Hz Q8 -> a 32-bit increment: x 2^40 / 44140, >> 16 */
 #define INC440 ((u32)(440.0 * 4294967296.0 / LXR_FS + 0.5))   /* 440 Hz's increment */
+/* The 48 kHz option (lx_r48: Device Config > LXR Rate, lxr_glue.inc): the voice at our rate, no resampling. The same
+ * sounds in Hz and seconds: the increments from 48 kHz, the filter's cutoffs from its 48 kHz tables, every step the
+ * envelopes, the transient and the decimator take x 44140 / 48000. Its oscillators alias as at 48 kHz, not as an
+ * LXR's. */
+#define KF48 ((u32)(1099511627776.0 / 48000 + 0.5))
+#define INC440_48 ((u32)(440.0 * 4294967296.0 / 48000 + 0.5))
+#define R48 ((u32)(65536.0 * LXR_FS / 48000 + 0.5))      /* a step at 48 kHz: x 44140 / 48000, Q16 */
 
 enum { K_DRUM, K_SNARE, K_CYM, K_HAT };
 enum { W_SINE, W_TRI, W_SAW, W_REC, W_NOISE, W_PWM };
@@ -73,6 +80,7 @@ enum { EG_STOP, EG_A, EG_D, EG_REP };
 #include "lxr_presets.h"
 #include "lxr_trans.h"
 
+extern s32 lx_r48;                              /* the 48 kHz option (lxr_glue.inc) */
 #ifdef LX_HOST
 extern unsigned char dr_trig[8];
 extern s32 sampler_buf[];
@@ -96,6 +104,8 @@ typedef struct {
 
 typedef struct {
 	s32 s1, s2, a, b;                       /* the filter: ZDF states / the naive 2-pole's, Q12 */
+	s32 key;                                /* the cutoff, resonance and rate the coefficients below are for */
+	s32 g0, f1, den, gg0, q;                /* (made when those change: no division per block) */
 } Svf;
 
 typedef struct {
@@ -122,9 +132,13 @@ typedef struct {
 	const u8 *ed;                           /* the voice menu's edits for this track (lxr_menu.c), or 0 */
 	u32 edsum;                              /* ... their sum when p[] was made */
 	s16 dcurve[130];
+	s32 r48;                                /* rendered at 48 kHz (the option) */
 } Voice;
 
 static Voice v_[6] OVL;
+/* this block's rate: KF and INC440 at it, the filter's tables, the envelopes' steps' scale (Q16) */
+static u32 g_kf OVL, g_inc440 OVL, g_r OVL;
+static const s32 *g_fg OVL, *g_flp2 OVL;
 
 /* ---- arithmetic --------------------------------------------------------------------------------------------- */
 static inline s32 sat16(s32 x)
@@ -192,7 +206,7 @@ static inline s32 tab_at(const s16 *t, u32 ph)  /* a 1024-sample table, interpol
  * frequency under 440 Hz uses the fifth (the LXR's (12 log2(f / 440) + 70) / 12 over integers) */
 static s32 band_of(u32 inc)
 {
-	u32 b = INC440;
+	u32 b = g_inc440;
 	s32 k = 5;
 	if (inc < b)
 		return 4;
@@ -270,7 +284,7 @@ static void osc_tune(Osc *o, s32 coarse, s32 fine, u32 step, u32 mod_q12)
 {
 	s32 note = coarse | fine << 8;
 	if (note != o->knote || step != o->kstep) {     /* (cached: these change rarely) */
-		u32 inc = mulshr(lx_freq[coarse], KF, 16);
+		u32 inc = mulshr(lx_freq[coarse], g_kf, 16);
 		inc = mulshr(inc, lx_det[fine], 16);
 		o->base = mulshr(inc, step, 16);
 		o->knote = note;
@@ -326,15 +340,26 @@ static inline s32 clampq(s32 x, s32 m)
 static void svf_block(Svf *s, s32 type, s32 freq, s32 reso, s32 drive, s16 *buf, s32 n)
 {
 	s32 i;
-	s32 g = lx_fg[freq];                    /* fastTan(pi f), Q12 */
+	s32 g = g_fg[freq];                     /* fastTan(pi f), Q12 */
 	s32 R = lx_ff[freq] >= 29485 ? 4096 : lx_fq[reso];  /* f >= 0.4499: no resonance */
 	s32 drv = lx_fdrv[drive];               /* Q12 */
 	if (type == F_OFF)
 		return;
+	{                                       /* the coefficients, when the knobs or the rate change */
+		s32 key = freq | reso << 8 | (g_fg != lx_fg) << 16;
+		if (s->key != key) {
+			s32 q1 = 4096 - lx_fq[reso];
+			s->key = key;
+			s->g0 = (1 << 24) / (4096 + ((2 * g * R) >> 12));       /* 1 / (1 + 2 f R), Q12 */
+			s->f1 = (s32)(((u32)((g * g) >> 12) * (u32)s->g0) >> 12); /* f^2 g0 */
+			s->den = (1 << 24) / (s->f1 + 4096);                     /* 1 / (f1 + 1) */
+			s->gg0 = (g * s->g0) >> 12;
+			s->q = ((q1 * 5734) >> 12) + (q1 << 12) / (4096 - g_flp2[freq]);   /* the naive one's */
+		}
+	}
 	if (type == F_NAIVE) {                  /* the alternative 2-pole low-pass */
-		s32 f2 = lx_flp2[freq];             /* f x 2.21, Q12 */
-		s32 q1 = 4096 - lx_fq[reso];
-		s32 q = ((q1 * 5734) >> 12) + (q1 << 12) / (4096 - f2);   /* (1-q) 1.4 + (1-q) / (1 - f2) */
+		s32 f2 = g_flp2[freq];              /* f x 2.21, Q12 */
+		s32 q = s->q;                       /* (1-q) 1.4 + (1-q) / (1 - f2) */
 		for (i = 0; i < n; i++) {
 			s32 x = softclip((buf[i] * drv) >> 15);
 			s->a += (f2 * ((x - s->a) + ((q * (s->a - s->b)) >> 12))) >> 12;
@@ -346,11 +371,7 @@ static void svf_block(Svf *s, s32 type, s32 freq, s32 reso, s32 drive, s16 *buf,
 		return;
 	}
 	{
-		s32 g0 = (1 << 24) / (4096 + ((2 * g * R) >> 12));     /* 1 / (1 + 2 f R), Q12 */
-		s32 gg = (g * g) >> 12;
-		s32 f1 = (s32)(((u32)gg * (u32)g0) >> 12);             /* f^2 g0 */
-		s32 den = (1 << 24) / (f1 + 4096);                     /* 1 / (f1 + 1) */
-		s32 gg0 = (g * g0) >> 12, g2 = 2 * g, r2 = 2 * R;
+		s32 g0 = s->g0, f1 = s->f1, den = s->den, gg0 = s->gg0, g2 = 2 * g, r2 = 2 * R;
 		s32 s1 = s->s1, s2 = s->s2;
 		/* one loop per output (cheaper than choosing it every sample) */
 #define SVF_LOOP(OUT)                                                                    \
@@ -399,9 +420,15 @@ static inline s32 dist(const s16 *t, s32 x)     /* x: a 16-bit sample */
 }
 
 /* ---- envelopes ---------------------------------------------------------------------------------------------- */
+/* a step for the LXR's rate, at this block's (x 44140 / 48000 at 48 kHz) */
+static inline u32 at_rate(u32 x)
+{
+	return g_r == 65536 ? x : mulshr(x, g_r, 16);
+}
+
 static s32 pitch_calc(Voice *v)                 /* DecayEg_calc: linear down, through the slope, Q15 */
 {
-	s32 d = (s32)lx_pdec[v->p[P_PDEC]];
+	s32 d = (s32)at_rate(lx_pdec[v->p[P_PDEC]]);
 	v->pval = v->pval > 0 ? v->pval - d : 0;    /* (it may end a hair under 0 for a block, as the LXR's) */
 	return slope(v->pval >> 9, lx_psl[v->p[P_PSLOPE]]);
 }
@@ -419,8 +446,8 @@ static void vol_trigger(Voice *v)               /* slopeEg2_trigger: the attack 
 
 static s32 vol_calc(Voice *v)                   /* slopeEg2_calc, Q15 */
 {
-	s32 att = (s32)lx_att[v->p[P_ATT]];
-	s32 dec = (s32)lx_dec[(v->open ? v->p[P_DECO] : v->p[P_DEC])];
+	s32 att = (s32)at_rate(lx_att[v->p[P_ATT]]);
+	s32 dec = (s32)at_rate(lx_dec[(v->open ? v->p[P_DECO] : v->p[P_DEC])]);
 	s32 a = lx_vsl[v->p[P_VSLOPE]];
 	switch (v->vstate) {
 	case EG_REP:                            /* the attack time as a second decay, looped */
@@ -458,7 +485,7 @@ static s32 snap_calc(Voice *v)                  /* SnapEg_calc: value^2 x 24, fa
 	if (v->snap > 0) {
 		s32 x = v->snap >> 12;              /* Q12 */
 		r = ((x * x) >> 12) * 24;
-		v->snap -= (s32)lx_snap[v->p[P_TFREQ]];
+		v->snap -= (s32)at_rate(lx_snap[v->p[P_TFREQ]]);
 	}
 	return r;
 }
@@ -562,7 +589,7 @@ static void trans_add(Voice *v, s16 *buf, s32 n)
 		return;
 	t = lx_trans[w - 2];
 	vol = q15(v->p[P_TVOL]);
-	inc = lx_tpitch[v->p[P_TFREQ]];
+	inc = at_rate(lx_tpitch[v->p[P_TFREQ]]);
 	for (i = 0; i < n && ph < T_END; i++, ph += inc)
 		buf[i] = (s16)sat16(buf[i] + ((vol * (t[ph >> 20] * 256)) >> 15));
 	v->tphase = ph < T_END ? ph : T_END;
@@ -616,7 +643,7 @@ static void control(Voice *v, s32 kind, u32 step)
 		}
 	} else if (kind == K_SNARE) {
 		v->noise.wave = W_NOISE;
-		v->noise.inc = mulshr((u32)v->p[P_NOISEF] * 22000u * 256u / 127u, KF, 16);   /* mix x 22 kHz */
+		v->noise.inc = mulshr((u32)v->p[P_NOISEF] * 22000u * 256u / 127u, g_kf, 16);  /* mix x 22 kHz */
 		v->last = ve;
 	} else {
 		v->mod.wave = v->p[P_WAVE2];
@@ -679,6 +706,7 @@ static void render(Voice *v, s32 kind, s16 *buf, s32 n, s32 b)
 			v->dhold = buf[n - 1];
 			return;
 		}
+		rate = at_rate(rate);
 		for (i = 0; i < n; i++) {
 			v->dcnt += rate;
 			if (v->dcnt >= 65536) {
@@ -699,9 +727,22 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	s16 xb[NI + 4];
 	s16 *x = xb + 3, *buf = xb + 4;         /* x[-3..0]: the block before's last four; x[1..n]: this block's */
 	s32 i, n, done;
+	s32 r48 = lx_r48 && FS == 48000;
 	(void)machine;
 	if (!step)
 		step = 0x10000;
+	g_kf = r48 ? KF48 : KF;                 /* this block's rate */
+	g_inc440 = r48 ? INC440_48 : INC440;
+	g_r = r48 ? R48 : 65536;
+	g_fg = r48 ? lx_fg48 : lx_fg;
+	g_flp2 = r48 ? lx_flp2_48 : lx_flp2;
+	if (v->r48 != r48) {                    /* the option turned: the tuning made again, from silence there */
+		v->r48 = r48;
+		v->osc.knote = v->mod.knote = v->mod2.knote = -1;
+		v->hist[0] = v->hist[1] = v->hist[2] = v->hist[3] = 0;
+		v->t = 65536;
+		v->bpos = 0;
+	}
 	if (v->preset != pr + 1) {              /* a new preset: from rest */
 		v->preset = pr + 1;
 		v->vstate = EG_STOP;
@@ -714,6 +755,7 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 		v->bpos = 0;
 		v->seed = 0x2545f491u * (u32)(track + 1);
 		v->cooked = v->dknob = -1;
+		v->f.key = -1;
 		v->osc.knote = v->mod.knote = v->mod2.knote = -1;
 	}
 	{
@@ -743,8 +785,9 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 		return;
 	}
 	/* the voice's samples this block: as many as our NB frames span, so that the next block's first frame is after
-	 * this block's last sample (t stays in 0 .. 1]; at the LXR's own rate, exactly NB */
-	n = (s32)((v->t + NB * STEP_Q16 - 1) >> 16);
+	 * this block's last sample (t stays in 0 .. 1]; at the LXR's own rate, exactly NB. At 48 kHz: NB, and they are
+	 * the frames */
+	n = r48 ? NB : (s32)((v->t + NB * STEP_Q16 - 1) >> 16);
 	for (done = 0; done < n; ) {            /* in the LXR's blocks */
 		s32 seg = LB - v->bpos;
 		if (seg > n - done)
@@ -754,6 +797,11 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 		render(v, kind, buf + done, seg, v->bpos);
 		v->bpos = (v->bpos + seg) & (LB - 1);
 		done += seg;
+	}
+	if (r48) {
+		for (i = 0; i < NB; i++)
+			out[2 * i] = out[2 * i + 1] = buf[i] * 32768;
+		return;
 	}
 	/* ---- to our rate: NB frames, 4-point Hermite between the voice's samples, two samples late ---- */
 	xb[0] = v->hist[0];                     /* (a frame less than a sample after the last: x[-3..0]) */

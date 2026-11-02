@@ -2964,7 +2964,9 @@ vq_tap:
     cmpl    rs_src,%d1
     beqw    vq_no
 vq_ns:
+    jsr     gd_trig               | a note the CPU guard ended: a trig brings it back
     movel   mute_sil,%d0          | muted by hand (a Sampler), and faded out:
+    orl     gd_mask,%d0           | (or ended by the CPU guard, guard.inc)
     btst    %d1,%d0               | its note is over, so an unmute waits for
     beqs    vq_rs                 | the next trig
     lea.l   gv_gain,%a1
@@ -3023,6 +3025,8 @@ vq_gmute:
     movel   %sp@+,%d2
     braw    vq_yes
 vq_trig:
+    lea.l   gd_age,%a1            | the note's age, for the CPU guard
+    clrl    %a1@(0,%d1:l:4)
     lea.l   trig_seen,%a1
     moveq   #1,%d0
     moveb   %d0,%a1@(0,%d1:l)
@@ -12218,6 +12222,7 @@ ah_ng:
     movel   #32768,%d5            | target: open...
     movel   rs_silence,%d0
     orl     mute_sil,%d0
+    orl     gd_mask,%d0           | (or the CPU guard's: guard.inc)
     btst    %d3,%d0
     beqs    ah_gt
     moveq   #0,%d5                | ...or MUT's silence, or muted by hand
@@ -14618,6 +14623,7 @@ sys_nop:
 sys_press:
     clrl    sys_pg                | always opens on the first page
     clrl    prof_max              | PEAK counts from now
+    clrl    gd_count              | ...and the guard's notes
     movel   blk_clk,%d0
     movel   %d0,sys_last
     moveq   #MM_SYS,%d0
@@ -14660,6 +14666,16 @@ sys_render:
     bsr     sys_pctbuf
     moveq   #19,%d0
     bsr     sys_right
+    lea.l   gd_s_x,%a0            | the CPU guard: notes it ended (guard.inc)
+    tstl    gd_on
+    beqs    sys_gd
+    movel   gd_count,%d0
+    jsr     gd_text               | "GUARD n"
+    lea.l   sys_vbuf,%a0
+sys_gd:
+    moveq   #19,%d0
+    moveq   #36,%d1
+    bsr     sys_atl
     bsr     sys_used              | RAM: used / all
     movel   %d0,%d3
     lea.l   sys_s_ram,%a0
@@ -15213,6 +15229,14 @@ cfg_hook:
     jsr     lm_add_row
     addql   #8,%sp
     pea     qm_row                | and Mute Q (mutesolo.inc)
+    movel   %a2,%sp@-
+    jsr     lm_add_row
+    addql   #8,%sp
+    pea     gd_row                | CPU Guard and LXR Rate (guard.inc)
+    movel   %a2,%sp@-
+    jsr     lm_add_row
+    addql   #8,%sp
+    pea     lr_row
     movel   %a2,%sp@-
     jsr     lm_add_row
     addql   #8,%sp
@@ -16342,6 +16366,7 @@ prof_end:
     lea.l   prof_c100,%a1
     mulul   %a1@,%d0
     divul   %d1,%d0               | this block, percent
+    jsr     gd_block              | the CPU guard (guard.inc)
     cmpl    prof_max,%d0
     blss    pe_nm
     movel   %d0,prof_max
@@ -21146,6 +21171,7 @@ dx_bus2:    .space 32*4
     .include "lfo2.inc"
     .align 2
     .include "mutesolo.inc"
+    .include "guard.inc"
     .include "sendfx.inc"
     .include "lfocc.inc"
     .align 2
