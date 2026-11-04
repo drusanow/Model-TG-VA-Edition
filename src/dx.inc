@@ -752,6 +752,26 @@ dx_fill:
     bpls    8b
     braw    dx_out
 dx_play:
+    | ---- the rate: 48 kHz, or 32 kHz when the CPU guard asks (guard.inc:
+    | gd_eco). eco_n (src/lxr/eco_rs.c) gives the samples to render, 32 or
+    | 21-22; eco_out makes them the block's 32 frames, at either rate (a copy
+    | two samples late at 48 kHz), so a change of rate does not click. At 32
+    | kHz the increments are x 1.5; the envelopes, the LFO and the pitch EG
+    | step once a block as always, the gains ramp across the samples. ----
+    moveq   #0,%d0
+    movel   gd_eco,%d1
+    btst    %d6,%d1
+    beqs    1f
+    moveq   #1,%d0
+1:  movel   %d0,%sp@(52)          | eco
+    movel   %d0,%sp@-
+    movel   %d6,%sp@-
+    jsr     eco_n
+    addql   #8,%sp
+    movel   %d0,%sp@(44)          | N, the samples this block
+    movel   #65536,%d1
+    divul   %d0,%d1
+    movel   %d1,%sp@(48)          | 65536 / N
     | ---- the algorithm: the voice's, or the track's choice (dx_algo,
     | SETTINGS + Shape: 1..32, 0 the voice's) ----
     lea.l   dx_algo,%a0
@@ -827,7 +847,12 @@ dx_play:
     movel   %d0,%d1
     movel   %d5,%d0
     bsr     dx_mul16
-5:  movel   %d0,%sp@(4)
+5:  tstl    %sp@(52)              | (32 kHz: x 1.5)
+    beqs    6f
+    movel   %d0,%d1
+    lsrl    #1,%d1
+    addl    %d1,%d0
+6:  movel   %d0,%sp@(4)
     | ---- the six operators ----
     movea.l %a3,%a0               | the output, summed in the window's first half
     moveq   #31,%d0
@@ -845,6 +870,10 @@ dx_opl:
     bpls    1f
     bclr    #31,%d1               | fixed
     movel   %d1,%d2
+    tstl    %sp@(52)              | (32 kHz: x 1.5)
+    beqs    3f
+    lsrl    #1,%d1
+    addl    %d1,%d2
     bras    3f
 1:  movel   %sp@(4),%d0
     bsr     dx_mul16
@@ -916,8 +945,17 @@ dx_opl:
     movel   %d0,%a6@(8)
     movel   %d0,%d5
     subl    %d4,%d5
+    tstl    %sp@(52)
+    bnes    dxg_e
     addil   #16,%d5
     asrl    #5,%d5                | its step a sample
+    bras    dxg_d
+dxg_e:
+    asrl    #8,%d5                | (32 kHz: over N samples)
+    asrl    #2,%d5
+    mulsl   %sp@(48),%d5
+    asrl    #6,%d5
+dxg_d:
     movel   %a6@,%d2              | phase
     movel   %a6@(4),%d3           | increment
     | where it writes and reads
@@ -947,7 +985,8 @@ dx_opl:
     cmpil   #0x20000,%d0
     bccs    dx_go
     movel   %d3,%d0               | the phase still turns
-    lsll    #5,%d0
+    movel   %sp@(44),%d1
+    mulul   %d1,%d0
     addl    %d0,%d2
     btst    #2,%d7
     bnew    dx_nx
@@ -960,7 +999,8 @@ dx_opl:
     bpls    11b
     braw    dx_nx
 dx_go:
-    moveq   #31,%d6
+    movel   %sp@(44),%d6          | N samples
+    subql   #1,%d6
     movea.l %d5,%a4               | the level's step (d5: DXSIN's scratch)
     DXSIN_BASE
     movel   %d7,%d0
@@ -1103,6 +1143,12 @@ dx_nx:
     moveq   #6,%d0
     cmpl    %sp@(20),%d0
     bnew    dx_opl
+    | ---- the N samples -> the block's 32 frames (eco_rs.c) ----
+    movel   %sp@(44),%sp@-
+    movel   %a3,%sp@-
+    movel   %sp@(8),%sp@-         | the track (sp@(0) before the two pushes)
+    jsr     eco_out
+    lea.l   %sp@(12),%sp
     | ---- the sum (x 1/4, Q15: a full carrier at -12 dB, so several add up
     | before they clip, as in Dexed) to 96 kHz, from the end ----
     lea.l   %a3@(128),%a1

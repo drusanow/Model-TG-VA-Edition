@@ -80,6 +80,11 @@ def lxr_curves():
     x48 = (F(math.pi) * f48).astype(F)
     c['fg48'] = ((-15 * x48 + x48 * x48 * x48) / (F(3) * (F(-5) + F(2) * x48 * x48))).astype(F)
     c['flp2_48'] = (f48 * F(2.21)).astype(F)
+    # ... and at 32 kHz, for the CPU guard's lower rate (guard.inc: gd_eco): f x 44140 / 32000, at most 0.45
+    f32 = np.minimum((f * F(44140 / 32000)).astype(F), F(0.45))
+    x32 = (F(math.pi) * f32).astype(F)
+    c['fg32'] = ((-15 * x32 + x32 * x32 * x32) / (F(3) * (F(-5) + F(2) * x32 * x32))).astype(F)
+    c['flp2_32'] = (f32 * F(2.21)).astype(F)
     # distortion.c, setDistortionShape: shape = x / 127 - 1/128 (k = 2 shape / (1 - shape))
     c['dist'] = (flt - F(0.0078125)).astype(F)
     # mixer.c's decimator: valueShaperF2F(x / 127, -0.7)
@@ -109,7 +114,7 @@ def tables():
         'psl': (32768, 's32'), 'vsl': (32768, 's32'), 'pamt': (4096, 's32'),
         'freq': (256, 'u32'), 'det': (65536, 'u32'), 'snap': (1 << 24, 'u32'),
         'ff': (65536, 's32'), 'fg': (4096, 's32'), 'fq': (4096, 's32'), 'fdrv': (4096, 's32'),
-        'flp2': (4096, 's32'), 'fg48': (4096, 's32'), 'flp2_48': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32'), 'tpitch': (1, 'u32')}
+        'flp2': (4096, 's32'), 'fg48': (4096, 's32'), 'flp2_48': (4096, 's32'), 'fg32': (4096, 's32'), 'flp2_32': (4096, 's32'), 'dist': (32768, 's32'), 'decim': (65536, 'u32'), 'tpitch': (1, 'u32')}
     t = [HEAD, '/* the LXR-02\'s knob curves (tools/gen_lxr.py: lxr_curves) and its filter\'s shapers, fixed point */\n']
     for name, (scale, typ) in fix.items():
         vals = [int(round(float(v) * scale)) for v in c[name]]

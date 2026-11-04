@@ -58,13 +58,23 @@ typedef unsigned char u8;
 #define NI (NB + 2)                                       /* the voice's samples a block, at most */
 #define KF ((u32)(1099511627776.0 / LXR_FS + 0.5))        /* Hz Q8 -> a 32-bit increment: x 2^40 / 44140, >> 16 */
 #define INC440 ((u32)(440.0 * 4294967296.0 / LXR_FS + 0.5))   /* 440 Hz's increment */
-/* The 48 kHz option (lx_r48: Device Config > LXR Rate, lxr_glue.inc): the voice at our rate, no resampling. The same
+/* The 48 kHz option (lx_r48: Device Config > LXR Rate, lxr_glue.inc): the voice at our rate, no interpolation. The same
  * sounds in Hz and seconds: the increments from 48 kHz, the filter's cutoffs from its 48 kHz tables, every step the
  * envelopes, the transient and the decimator take x 44140 / 48000. Its oscillators alias as at 48 kHz, not as an
  * LXR's. */
 #define KF48 ((u32)(1099511627776.0 / 48000 + 0.5))
 #define INC440_48 ((u32)(440.0 * 4294967296.0 / 48000 + 0.5))
 #define R48 ((u32)(65536.0 * LXR_FS / 48000 + 0.5))      /* a step at 48 kHz: x 44140 / 48000, Q16 */
+/* The CPU guard's lower rate (guard.inc: gd_eco, a track's bit): the voice at 32 kHz, two thirds of the samples, made
+ * up to 48 kHz (linearly: the cheapest) - the same pitches and times as at 44.14, its top end at 14.4 kHz. Every rate
+ * goes through the resampling (at 48 kHz, a copy two samples late, as the others), so a change of rate carries on
+ * from the same place in the sound: no click. */
+#define KF32 ((u32)(1099511627776.0 / 32000 + 0.5))
+#define INC440_32 ((u32)(440.0 * 4294967296.0 / 32000 + 0.5))
+#define R32 ((u32)(65536.0 * LXR_FS / 32000 + 0.5))      /* a step at 32 kHz: x 44140 / 32000, Q16 */
+#define STEP32 ((u32)(65536.0 * 32000 / FS + 0.5))         /* 32 kHz samples a frame of ours, Q16 */
+enum { RT_LXR, RT_48, RT_32 };
+extern u32 gd_eco;                              /* the guard's 32 kHz tracks (guard.inc) */
 
 enum { K_DRUM, K_SNARE, K_CYM, K_HAT };
 enum { W_SINE, W_TRI, W_SAW, W_REC, W_NOISE, W_PWM };
@@ -132,7 +142,7 @@ typedef struct {
 	const u8 *ed;                           /* the voice menu's edits for this track (lxr_menu.c), or 0 */
 	u32 edsum;                              /* ... their sum when p[] was made */
 	s16 dcurve[130];
-	s32 r48;                                /* rendered at 48 kHz (the option) */
+	s32 rate;                               /* the rate it renders at: RT_* */
 } Voice;
 
 static Voice v_[6] OVL;
@@ -504,6 +514,7 @@ static inline u8 knob(s32 x)
 }
 
 #include "lxr_menu.c"
+#include "eco_rs.c"
 
 /* Color / Shape / Sweep: each moves one of the voice's knobs from the preset's value (64: the preset as it is) */
 static void cook(Voice *v, s32 pr)
@@ -727,21 +738,31 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	s16 xb[NI + 4];
 	s16 *x = xb + 3, *buf = xb + 4;         /* x[-3..0]: the block before's last four; x[1..n]: this block's */
 	s32 i, n, done;
-	s32 r48 = lx_r48 && FS == 48000;
+	s32 rate = (gd_eco >> track) & 1 ? RT_32 : (lx_r48 && FS == 48000 ? RT_48 : RT_LXR);
+	u32 rs;                                 /* the voice's samples a frame, Q16 */
 	(void)machine;
 	if (!step)
 		step = 0x10000;
-	g_kf = r48 ? KF48 : KF;                 /* this block's rate */
-	g_inc440 = r48 ? INC440_48 : INC440;
-	g_r = r48 ? R48 : 65536;
-	g_fg = r48 ? lx_fg48 : lx_fg;
-	g_flp2 = r48 ? lx_flp2_48 : lx_flp2;
-	if (v->r48 != r48) {                    /* the option turned: the tuning made again, from silence there */
-		v->r48 = r48;
+	if (rate == RT_32) {                    /* this block's rate */
+		g_kf = KF32, g_inc440 = INC440_32, g_r = R32, g_fg = lx_fg32, g_flp2 = lx_flp2_32, rs = STEP32;
+	} else if (rate == RT_48) {
+		g_kf = KF48, g_inc440 = INC440_48, g_r = R48, g_fg = lx_fg48, g_flp2 = lx_flp2_48, rs = 65536;
+	} else {
+		g_kf = KF, g_inc440 = INC440, g_r = 65536, g_fg = lx_fg, g_flp2 = lx_flp2, rs = STEP_Q16;
+	}
+	if (v->rate != rate) {                  /* a new rate: the tuning made again; the sound carries on */
+		v->rate = rate;
 		v->osc.knote = v->mod.knote = v->mod2.knote = -1;
-		v->hist[0] = v->hist[1] = v->hist[2] = v->hist[3] = 0;
+	}
+	if (!v->t)
 		v->t = 65536;
-		v->bpos = 0;
+	if (rs == 65536 && v->t != 65536) {     /* back to 48 kHz from another rate: a hair faster (at most 1.6%)
+	                                         * for a block or two, until the frames fall on the samples again */
+		u32 d = (65536 - v->t) >> 5;
+		if (d)
+			rs += d;
+		else
+			v->t = 65536;
 	}
 	if (v->preset != pr + 1) {              /* a new preset: from rest */
 		v->preset = pr + 1;
@@ -787,7 +808,7 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	/* the voice's samples this block: as many as our NB frames span, so that the next block's first frame is after
 	 * this block's last sample (t stays in 0 .. 1]; at the LXR's own rate, exactly NB. At 48 kHz: NB, and they are
 	 * the frames */
-	n = r48 ? NB : (s32)((v->t + NB * STEP_Q16 - 1) >> 16);
+	n = (s32)((v->t + NB * rs - 1) >> 16);
 	for (done = 0; done < n; ) {            /* in the LXR's blocks */
 		s32 seg = LB - v->bpos;
 		if (seg > n - done)
@@ -798,19 +819,25 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 		v->bpos = (v->bpos + seg) & (LB - 1);
 		done += seg;
 	}
-	if (r48) {
-		for (i = 0; i < NB; i++)
-			out[2 * i] = out[2 * i + 1] = buf[i] * 32768;
-		return;
-	}
 	/* ---- to our rate: NB frames, 4-point Hermite between the voice's samples, two samples late ---- */
 	xb[0] = v->hist[0];                     /* (a frame less than a sample after the last: x[-3..0]) */
 	xb[1] = v->hist[1];
 	xb[2] = v->hist[2];
 	xb[3] = v->hist[3];
-	{
+	if (rs == 65536 && v->t == 65536) {     /* 48 kHz: the samples are the frames, two late */
+		for (i = 0; i < NB; i++)
+			out[2 * i] = out[2 * i + 1] = x[i - 1] * 32768;
+	} else if (rate == RT_32) {             /* the guard's 32 kHz: linear, cheaper than the 4 points */
 		u32 t = v->t;
-		for (i = 0; i < NB; i++, t += STEP_Q16) {
+		for (i = 0; i < NB; i++, t += rs) {
+			s32 k = (s32)(t >> 16) - 2, fr = (s32)(t & 0xffff) >> 4;
+			s32 x0 = x[k];
+			out[2 * i] = out[2 * i + 1] = (x0 + (((x[k + 1] - x0) * fr) >> 12)) * 32768;
+		}
+		v->t = t - ((u32)n << 16);
+	} else {
+		u32 t = v->t;
+		for (i = 0; i < NB; i++, t += rs) {
 			s32 k = (s32)(t >> 16) - 2, fr = (s32)(t & 0xffff) >> 4;   /* the place, Q12 */
 			s32 xm1, x0, x1, x2, c1, c2, c3, y;
 			if (k > n - 2) {

@@ -612,7 +612,8 @@ keeps its own choice, saved with it. Details: [SENDFX.md](SENDFX.md).
 and sample memory used and free. Turn **DATA** right for each track's share
 of the CPU. Return, **PRESET** or **SETTINGS** closes it. Next to PEAK,
 **GUARD n** counts the notes the CPU Guard has ended since the page opened
-(**GUARD OFF** when it is off).
+(**GUARD OFF** when it is off), and next to CPU, **32K n** shows how many
+tracks it is running at 32 kHz right now.
 
 ## CPU Guard and LXR Rate
 
@@ -622,14 +623,24 @@ slow down (the sound always comes first). The stock machines leave room; the
 new ones (VA, the VA drums, PLAITS, DX, LXR) are heavier, and many of them
 sounding at once, with a heavy send effect, can fill it.
 
-- **Device Config > CPU Guard** (**ON** at every start-up): when a block
-  takes over 90% of its time, the guard ends one note early - of the new
-  machines' notes still sounding, the one that started longest ago (a long
-  tail, a ringing cymbal), never one under 16 ms old, never a stock machine
-  or the Sampler. It fades out in 1.3 ms, and its track then costs nothing
-  until its next trig, which plays as always. One note at most every 8 ms.
-  The tails go before the beat does. Turn it **OFF** to hear every note to
-  its end whatever the load.
+- **Device Config > CPU Guard** (**ON** at every start-up): when blocks keep
+  taking over 90% of their time (a few in a row: one busy block alone, when
+  several notes start together, is not an overload), the guard steps in, one
+  step every 8 ms:
+  1. **first, a DX or LXR track drops to 32 kHz** - the one costing the most.
+     It keeps playing, at the same pitch and length; only its top end goes
+     (above about 14-16 kHz), and the change is seamless, without a click.
+     That saves about 28% of an LXR track and 14% of a DX track. It goes back
+     to full rate when it falls silent, or one track a second once the load
+     has stayed low.
+  2. **only when no DX or LXR track is left to slow**, it ends one note
+     early: of the new machines' notes still sounding (VA, the VA drums,
+     PLAITS, DX, LXR), the one that started longest ago, never one under
+     16 ms old. It fades out over 10 ms, and its track then costs nothing
+     until its next trig, which plays as always.
+
+  The stock machines and the Sampler are never touched. Turn it **OFF** to
+  hear every note whole, at full rate, whatever the load.
 - **Device Config > LXR Rate** (**44.1K** at every start-up): **48K** runs
   LXR at the Cycles' own rate, without converting from the LXR's - about 18%
   cheaper an LXR track. The drums, snare, clap and cymbal sound the same (the

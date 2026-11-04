@@ -161,8 +161,9 @@ changes).
 **LXR Rate** (Device Config, default the LXR's 44.14 kHz): at **48K** the
 voice runs at the Cycles' rate, without the resampling - the same pitches and
 times, its oscillators aliasing as at 48 kHz; ~18% cheaper. Its 16-bit
-filter shapers and cached filter coefficients are bit-exact. See
-[CPU.md](CPU.md).
+filter shapers and cached filter coefficients are bit-exact. Under load the
+CPU guard can run a track at 32 kHz (5,500 to 6,300 instructions a block),
+without a click either way. See [CPU.md](CPU.md).
 
 ## Files
 

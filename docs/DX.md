@@ -320,8 +320,11 @@ bytes), the machine page's second line of markers (five).
 
 **CPU** (`tests/test_dx.py`, `VA_TEST_VERBOSE=1`): the worst block, six
 operators sounding with feedback, the LFO and amplitude modulation on every
-operator, is **~7,100 instructions**, against PLAITS' heaviest engine at
-~6,800.
+operator, is **~7,300 instructions** (~220 of it being ready for the CPU
+guard's 32 kHz: the output goes through a copy two samples late), against
+PLAITS' heaviest engine at ~6,800. At the guard's 32 kHz (CPU.md): ~6,400 -
+21 or 22 samples a block, linearly made up to 48 kHz, the same pitch and
+level.
 
 **The sine** is the stock OS's own table in the processor's internal SRAM
 (`0x8000eee4`: 257 longs, filled at boot, only ever read by the stock voices;

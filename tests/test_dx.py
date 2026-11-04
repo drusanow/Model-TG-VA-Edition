@@ -665,7 +665,7 @@ class TVoices(unittest.TestCase):
                 worst = max(worst, n)
         if os.environ.get('VA_TEST_VERBOSE'):
             print("\n  dx_fill instructions a block:", worst)
-        self.assertLess(worst, 7200)
+        self.assertLess(worst, 7400)      # (~220 of it the CPU guard's rate: eco_n, the copy two samples late)
 
 # ---- a drive, as the sample loader reads it (model_tg.s: load_at) ------------
 TABLE_BLOCK, DATA_BASE = 1835088, 1851472

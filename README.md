@@ -115,8 +115,9 @@ keeps working.
   included, from the trig before it, on any machine.
 - **Scale Lock**, **sample upload through Elektron Transfer**, a **System**
   page with CPU and memory use, and lower CPU use overall.
-- A **CPU Guard** (Device Config, on by default): near overload, the oldest
-  new-machine note ends early instead of the audio dropping out; and **LXR
+- A **CPU Guard** (Device Config, on by default): near overload, DX and LXR
+  tracks drop to 32 kHz without a click, and only then does the oldest
+  new-machine note end early, instead of the audio dropping out; and **LXR
   Rate** 48K, a cheaper LXR ([CPU.md](docs/CPU.md)).
 
 The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**, and every

@@ -12240,15 +12240,31 @@ ah_z:
     bras    ah_out
 ah_ramp:
     movea.l %sp@(28),%a2
+    movel   #512,%d1              | the step: MUT's, 64 samples end to end...
+    movel   rs_silence,%d0
+    orl     mute_sil,%d0
+    btst    %d3,%d0
+    bnes    ah_st
+    movel   gd_mask,%d0           | ...or the CPU guard's ending a note, slower:
+    btst    %d3,%d0               | 512 samples (guard.inc: GD_FADE)
+    beqs    ah_st
+    moveq   #GD_FADE,%d1
+ah_st:
     moveq   #31,%d2
 ah_rl:
-    cmpl    %d5,%d4               | step 512 towards the target
+    cmpl    %d5,%d4               | a step towards the target, not past it
     beqs    ah_rs
     bgts    ah_rd
-    addil   #512,%d4
+    addl    %d1,%d4
+    cmpl    %d5,%d4
+    blts    ah_rs
+    movel   %d5,%d4
     bras    ah_rs
 ah_rd:
-    subil   #512,%d4
+    subl    %d1,%d4
+    cmpl    %d5,%d4
+    bgts    ah_rs
+    movel   %d5,%d4
 ah_rs:
     movel   %a2@,%d0
     asrl    #8,%d0
@@ -14659,6 +14675,16 @@ sys_render:
     moveq   #12,%d0
     movel   %d3,%d1
     bsr     sys_bar
+    tstl    gd_on                 | the CPU guard's tracks at 32 kHz now
+    beqs    sys_ne
+    jsr     gd_neco
+    lea.l   gd_s_e,%a0
+    jsr     gd_text               | "32K n"
+    lea.l   sys_vbuf,%a0
+    moveq   #1,%d0
+    moveq   #36,%d1
+    bsr     sys_atl
+sys_ne:
     lea.l   sys_s_peak,%a0        | PEAK
     moveq   #19,%d0
     bsr     sys_left
@@ -14670,6 +14696,7 @@ sys_render:
     tstl    gd_on
     beqs    sys_gd
     movel   gd_count,%d0
+    lea.l   gd_s_n,%a0
     jsr     gd_text               | "GUARD n"
     lea.l   sys_vbuf,%a0
 sys_gd:
@@ -17693,9 +17720,9 @@ rs_val_sav:
     lea.l   rs_n_sav,%a1
     movel   rs_save_req,%d0
     orl     rs_sv_state,%d0
-    beqw    gm_val
+    beqs    1f
     lea.l   rs_n_busy,%a1
-    braw    gm_val
+1:  jmp     gm_val
 
 rs_save_do:
     movel   rs_sv_state,%d0

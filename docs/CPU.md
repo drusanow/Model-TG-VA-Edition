@@ -60,25 +60,59 @@ come out 1.5-2.5 dB brighter. The default stays the LXR's rate.
 
 ## The CPU guard (guard.inc)
 
-`gd_block`, from `prof_end` once a block: over GD_HI (90) percent, of the new
-machines' tracks (trk_mach >= VA_MACH) that are sounding (not `sv_idle`, not
-faded by a mute), the one whose note started longest ago (`gd_age`, blocks
-since its trig, at least GD_AGE = 24) is ended: its bit in `gd_mask`. One at
-most every GD_COOL (12) blocks, so the load is measured again first. Ending a
-note is MUT's mechanism: `gd_mask` joins `mute_sil` in amp_hook's fade target
-(gv_gain, 64 samples to 0) and in `voice_quiet`, which then calls the track
-idle - its parameters, fill, filter, effects and gains all skipped - until a
-trig (`gd_trig` clears the bit and opens the gain at once, the voice having
-been silent). The stock machines and the Sampler are never ended. It cannot
-help when the load is the stock voices' or the effects' own.
+`gd_block`, from `prof_end` once a block. It acts when the load stays over
+GD_HI (90%) for GD_HOT (4) blocks in a row - a single busy block, a few notes
+starting together, is not an overload - and then one step at most every
+GD_COOL (12) blocks, so the load is measured again first:
 
-Device Config > CPU Guard: ON (every boot) / OFF. Device Config > System:
-GUARD n, the notes ended since the page opened.
+1. **32 kHz** (`gd_eco`, a bit a track): of the DX and LXR tracks that are
+   sounding, the one that costs the most (`prof_trk`). LXR renders at 32 kHz
+   (`RT_32` in lxr.c: increments from 32 kHz, the filter's 32 kHz tables
+   `lx_fg32`/`lx_flp2_32` with the cutoff held under 14.4 kHz, the
+   envelopes', the transient's and the decimator's steps x 44140 / 32000);
+   DX renders 21 or 22 samples a block instead of 32 (`eco_n`, the
+   increments x 1.5; its envelopes, LFO and pitch EG step once a block as
+   always). Both are made up to 48 kHz by linear interpolation (the
+   cheapest: for DX much of what 32 kHz saves would go into a 4-point
+   interpolation). Every rate goes through the same resampling - at 48 kHz a
+   copy two samples late, as LXR always was - so a change of rate carries on
+   from the same place in the sound: no click (`tests/test_guard.py`
+   TRate32: the largest step between two samples around a change is no
+   larger than in the second around it). Back at 48 kHz the frames run up to
+   1.6% faster for a block or two until they fall on the samples again.
+   Costs (Unicorn): LXR 7,600-8,900 -> 5,500-6,300 instructions a block
+   (-28%), DX ~7,300 -> ~6,400 (-14%). A track returns to 48 kHz when it
+   falls silent or is no longer DX or LXR, and one track every GD_CALM (1,500
+   blocks, 1 s) of load under GD_LO (70%).
+2. **Ending a note**, only when no DX or LXR track is left to slow: of the
+   new machines' tracks (trk_mach >= VA_MACH) that are sounding (not
+   `sv_idle`, not faded by a mute), the one whose note started longest ago
+   (`gd_age`, at least GD_AGE = 24 blocks): its bit in `gd_mask`. MUT's
+   mechanism: `gd_mask` joins `mute_sil` in amp_hook's fade target (gv_gain,
+   at GD_FADE = 64 a sample: 512 samples, 10.7 ms - MUT's own fade stays 64
+   samples; the steps no longer overshoot) and in `voice_quiet`, which then
+   calls the track idle - its parameters, fill, filter, effects and gains all
+   skipped - until a trig (`gd_trig` clears the bit and opens the gain at
+   once, the voice having been silent).
 
-`tests/test_guard.py`: the choice (oldest, never stock or Sampler, silent,
-muted or fresh), the pace, OFF, the fade and the idle and the return on a
-trig, a hand mute kept, the two rows, the System page; LXR Rate's pitches,
-lengths, bounds, switching and cost.
+The first version ended notes on any single block over 90%, with a 1.3 ms
+fade: on held DX chords, drones and cymbals that clicked, and often, as one
+busy block is normal when notes start together.
+
+The stock machines and the Sampler are never touched. It cannot help when
+the load is the stock voices' or the effects' own. DX pays ~220 instructions
+a block at 48 kHz for being ready to change rate (the copy two samples late).
+
+Device Config > CPU Guard: ON (every boot) / OFF (every track back to 48
+kHz). Device Config > System: 32K n (tracks at 32 kHz now) on CPU's line,
+GUARD n (notes ended since the page opened) on PEAK's.
+
+`tests/test_guard.py`: the streak, the order (the costliest DX or LXR slowed,
+then the oldest note ended), the pace, the return to 48 kHz, OFF; the slow
+fade without a jump, the idle and the return on a trig, MUT's fade kept; the
+two rows, the System page; LXR Rate; 32 kHz's pitch, length, level, cost,
+and no click either way, for LXR's presets and DX voices (a sine, FM with
+feedback, a fixed-frequency operator).
 
 ## Still to measure on a Cycles
 
