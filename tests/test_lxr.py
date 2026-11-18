@@ -85,6 +85,7 @@ class TReference(unittest.TestCase):
         cls.got = {}
         for name in REF['voices']:
             e = emu()
+            e.w32(e.sym['lx_level'], 0)              # the LXR's own level (TLevel: the Cycles')
             x = play(e, 1500, eng=NAMES.index(name))
             cls.got[name] = features(x, 48000)
 
@@ -109,6 +110,7 @@ class TReference(unittest.TestCase):
         """the LXR's sampled transients (and its offset mode), switched on in a preset: as the LXR plays them"""
         for name, ref in REF['variants'].items():
             e = emu()
+            e.w32(e.sym['lx_level'], 0)
             base = NAMES.index(name.split('+')[0])
             at = e.sym['lx_presets'] + base * 31
             for k, val in ref['knobs'].items():
@@ -138,6 +140,43 @@ class TReference(unittest.TestCase):
             for g, r in zip(self.got[name].get('f0', []), ref.get('f0', [])):
                 if r:
                     self.assertAlmostEqual(g / r, 1.0, delta=0.03, msg=name)
+
+
+class TLevel(unittest.TestCase):
+    """each preset as loud as the Cycles' other machines: its gain after the voice, a soft limiter over -2 dB"""
+    GAIN_DB = [4, 4, 4, 2, 8, 12, 10, 8]
+
+    def test_loud_parts_near_full_scale(self):
+        for eng in range(8):
+            x = play(emu(), 300, eng=eng)
+            pk = 20 * np.log10(np.max(np.abs(x)) / 32768)
+            p995 = 20 * np.log10(np.percentile(np.abs(x[:9600]), 99.5) / 32768)
+            self.assertGreater(pk, -2.0, NAMES[eng])
+            self.assertLess(pk, 0.0, NAMES[eng])
+            self.assertGreater(p995, -5.0, NAMES[eng])
+
+    def test_the_gain_below_the_knee_and_the_sound_the_lxrs(self):
+        for eng in range(8):
+            e = emu()
+            e.w32(e.sym['lx_level'], 0)
+            a = play(e, 200, eng=eng)
+            b = play(emu(), 200, eng=eng)
+            quiet = np.abs(a) * 10 ** (self.GAIN_DB[eng] / 20) < 26000          # under the knee: exactly x the gain
+            g = b[quiet & (np.abs(a) > 200)] / a[quiet & (np.abs(a) > 200)]
+            self.assertAlmostEqual(float(np.median(g)), 10 ** (self.GAIN_DB[eng] / 20), delta=0.02, msg=NAMES[eng])
+            self.assertTrue(np.all(np.sign(b[np.abs(a) > 50]) == np.sign(a[np.abs(a) > 50])), NAMES[eng])
+
+    def test_limited_not_clipped(self):
+        """the loudest edits and macros: the peaks rounded off under full scale, no run of flat-topped samples"""
+        for eng in range(8):
+            e = emu()
+            at = e.sym['lx_presets'] + eng * 31
+            e.w8(at + 25, 127)                        # volume
+            e.w8(at + 24, 127)                        # distortion
+            x = play(e, 200, eng=eng, color=127, shape=127, sweep=127)
+            self.assertLessEqual(np.max(np.abs(x)), 32767)
+            flat = np.sum((np.abs(x[1:]) >= 32760) & (x[1:] == x[:-1]))
+            self.assertLess(flat, 4, NAMES[eng])
 
 
 class TSound(unittest.TestCase):
@@ -345,8 +384,8 @@ class TCost(unittest.TestCase):
             worst[NAMES[eng]] = (first, n)
         if os.environ.get('VA_TEST_VERBOSE'):
             print("\n  lxr_fill instructions a block (first, then):", worst)
-        self.assertLess(max(w[1] for w in worst.values()), 9000, worst)      # the hats are the heaviest
-        self.assertLess(max(w[0] for w in worst.values()), 12500, worst)
+        self.assertLess(max(w[1] for w in worst.values()), 9500, worst)      # the hats are the heaviest
+        self.assertLess(max(w[0] for w in worst.values()), 13000, worst)
 
 
 if __name__ == '__main__':

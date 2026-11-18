@@ -481,6 +481,10 @@ the track's Amp Decay comes after it - turn Decay up to hear the preset's full
 length, down to shorten it. Every knob p-locks, slides, takes LFOs and is
 saved.
 
+Each preset is raised to the level of the Cycles' other machines (the LXR's
+own balance left them 2 to 8 dB quieter, the hats most): its peaks sit just
+under full scale, a soft limiter rounding off the loudest.
+
 Its twelve sampled attack transients are in (the init kit's presets use the
 snap instead, as on an LXR). Not ported: user samples as oscillator waves,
 its LFOs and velocity routing (the Cycles has its own), pan.

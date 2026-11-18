@@ -729,6 +729,34 @@ static void render(Voice *v, s32 kind, s16 *buf, s32 n, s32 b)
 	}
 }
 
+/* ---- the level: each preset made as loud as the Cycles' other machines ------------------------------------- */
+/* The LXR balances its voices for its own mixer and output stage, and the port, exactly as loud as the LXR's code,
+ * came out 2 to 8 dB quieter at its peaks than the other machines (the hats ~16 dB quieter on average than this
+ * port's first version). So the voice's output is raised, a gain a preset (the edits of the voice menu keep their
+ * preset's), chosen to put the loud part of each preset (its 99.5th percentile) about 1.5 dB under full scale -
+ * after the voice, so the sound itself is the LXR's - and a soft limiter above -2 dB rounds off the short peaks
+ * (the hats' and cymbal's attack spikes, an edit or a macro that goes louder) towards full scale instead of
+ * clipping them. lx_level 0 (the tests against the LXR's own code) leaves the output exactly as the LXR's. */
+s32 lx_level OVL = 1;
+static const s16 lx_gain[N_PRESETS] __attribute__((section(".lxr_ro"))) = {   /* Q12: 10^(dB / 20) */
+	6492, 6492, 6492, 5157, 10289, 16306, 12953, 10289,  /* KICK TOM PERC +4, SNAR +2, CLAP +8, CHAT +12,
+	                                                       * OHAT +10, CYMB +8 dB */
+};
+#define LIM_K 26029                                      /* the limiter's knee: -2 dB */
+#define LIM_R (32767 - LIM_K)
+
+static inline s32 level(s32 y, s32 g)                  /* a sample x the preset's gain, softly limited: 16-bit */
+{
+	s32 u, neg;
+	y = (y * g) >> 12;
+	neg = y < 0;
+	u = (neg ? -y : y) - LIM_K;
+	if (u <= 0)
+		return y;
+	u = LIM_K + (LIM_R * u) / (u + LIM_R);               /* slope 1 at the knee, full scale at infinity */
+	return neg ? -u : u;
+}
+
 /* ---- lxr_fill: one block ------------------------------------------------------------------------------------ */
 void lxr_fill(s32 track, u32 step, s32 machine)
 {
@@ -737,7 +765,7 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	s32 pr = preset_of(v->dial[3]), kind = lx_kind[pr];
 	s16 xb[NI + 4];
 	s16 *x = xb + 3, *buf = xb + 4;         /* x[-3..0]: the block before's last four; x[1..n]: this block's */
-	s32 i, n, done;
+	s32 i, n, done, g = lx_level ? lx_gain[pr] : 4096;
 	s32 rate = (gd_eco >> track) & 1 ? RT_32 : (lx_r48 && FS == 48000 ? RT_48 : RT_LXR);
 	u32 rs;                                 /* the voice's samples a frame, Q16 */
 	(void)machine;
@@ -826,13 +854,13 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	xb[3] = v->hist[3];
 	if (rs == 65536 && v->t == 65536) {     /* 48 kHz: the samples are the frames, two late */
 		for (i = 0; i < NB; i++)
-			out[2 * i] = out[2 * i + 1] = x[i - 1] * 32768;
+			out[2 * i] = out[2 * i + 1] = level(x[i - 1], g) * 32768;
 	} else if (rate == RT_32) {             /* the guard's 32 kHz: linear, cheaper than the 4 points */
 		u32 t = v->t;
 		for (i = 0; i < NB; i++, t += rs) {
 			s32 k = (s32)(t >> 16) - 2, fr = (s32)(t & 0xffff) >> 4;
 			s32 x0 = x[k];
-			out[2 * i] = out[2 * i + 1] = (x0 + (((x[k + 1] - x0) * fr) >> 12)) * 32768;
+			out[2 * i] = out[2 * i + 1] = level(x0 + (((x[k + 1] - x0) * fr) >> 12), g) * 32768;
 		}
 		v->t = t - ((u32)n << 16);
 	} else {
@@ -852,7 +880,7 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 			c2 = xm1 - ((5 * x0) >> 1) + 2 * x1 - (x2 >> 1);
 			c3 = ((x2 - xm1) >> 1) + ((3 * (x0 - x1)) >> 1);
 			y = x0 + ((((((((c3 * fr) >> 12) + c2) * fr) >> 12) + c1) * fr) >> 12);
-			out[2 * i] = out[2 * i + 1] = sat16(y) * 32768;
+			out[2 * i] = out[2 * i + 1] = level(sat16(y), g) * 32768;
 		}
 		v->t = t - ((u32)n << 16);
 	}

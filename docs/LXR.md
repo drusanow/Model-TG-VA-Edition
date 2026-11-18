@@ -106,6 +106,30 @@ put back, another preset's giving way), the sound (the edits on their preset
 only, the macros from them, heard while playing, the playing kit's), the file
 (240 and 48 bytes, wrong files), the copy and clear, and the page's handlers.
 
+## Its level
+
+The LXR balances its voices for its own mixer and output, and played exactly
+as loud as its code makes them they came out 2 to 8 dB under the Cycles'
+other machines at their peaks (a kick at -4 dBFS, the hats at -6.5 with
+little body). So each preset's output is raised after the voice - the sound
+itself stays the LXR's - by a gain chosen to put its loud part (its 99.5th
+percentile) near full scale, and a soft limiter above -2 dB rounds off the
+short peaks (the hats' and cymbal's attack spikes, a loud edit or macro)
+instead of clipping them:
+
+| preset | gain | peak | level over its first 100 ms |
+|---|---|---|---|
+| KICK, TOM, PERC | +4 dB | -1.0 dBFS | kick -4 dBFS (was -8) |
+| SNAR | +2 dB | -0.9 | -12.6 (was -14.5) |
+| CLAP | +8 dB | -0.8 | -11.8 (was -19.8) |
+| CHAT, OHAT | +12, +10 dB | -0.3, -0.4 | -18.7, -15.2 (were -29.7, -24.9) |
+| CYMB | +8 dB | -0.3 | -17.0 (was -24.4) |
+
+The voice menu's edits keep their preset's gain. The tests against the
+LXR's own code run with the gain off (`lx_level` 0); `tests/test_lxr.py`
+TLevel checks the gain, the peaks and that the limiter rounds rather than
+clips. Cost: ~320 instructions a block.
+
 ## How close it is
 
 `tools/lxr_reference.py` builds the LXR's own voice code on a computer
@@ -148,8 +172,8 @@ them), the LFOs and the velocity routing (the Cycles has its own), pan.
 
 ## CPU
 
-`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 7,600 to
-8,900 instructions a block (6,000 to 7,300 at LXR Rate 48K) (the hats the most: three oscillators and the
+`tests/test_lxr.py` (`VA_TEST_VERBOSE=1`): a sounding voice costs 7,900 to
+9,150 instructions a block (6,300 to 7,600 at LXR Rate 48K; its level stage included) (the hats the most: three oscillators and the
 filter), against a stock voice's ~7,600; its first block after a change of
 preset or of the distortion knob ~3,500 more (its distortion curve and tuning
 made). A silent LXR track costs nothing. Made cheaper without changing a sample:
