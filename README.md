@@ -67,11 +67,13 @@ keeps working.
   every machine has. SETTINGS + PRESET opens its voice menu: every LXR
   setting of the voice, saved with the pattern
   ([USER_GUIDE](docs/USER_GUIDE.md#lxr), [LXR.md](docs/LXR.md)).
-- **ACHORD** (Plaits Edition), the fifteenth machine: a thick analogue-style
-  chord machine - four drifting saw/pulse voices, a sub, a 24 dB filter with
-  its envelope and a classic chorus - with chords that fit a key, sixteen
-  progressions or your own, voices that lead smoothly from chord to chord, a
-  bass note and strum, all on SETTINGS + PRESET and saved with the pattern
+- **ACHORD** (Plaits Edition), the fifteenth machine: a wavetable chord
+  machine for leads, stabs and pads with edge - four voices reading four
+  banks (ANALOG, SYNC, DIGITAL, FM), a warp, drive and grit, a chorus, and the
+  track's own filter for the LFOs to move - with chords that fit a key,
+  sixteen progressions or your own, voices that lead smoothly from chord to
+  chord, a bass note and strum, all on SETTINGS + PRESET and saved with the
+  pattern
   ([USER_GUIDE](docs/USER_GUIDE.md#achord), [ACHORD.md](docs/ACHORD.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean

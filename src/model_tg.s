@@ -10086,9 +10086,12 @@ dbh_pass:
     dx_base     = DX_BASE
     dx_tst      = DX_TST
     dx_end      = DX_END
-    .globl  ovl_vma, ovl_max
+    AC_WT       = L34_KITS - 0x8000 | ACHORD's wavetables (achord.c: 32 x 501
+                                  | samples, built at run time), the overlay's top 32 KiB
+    .globl  ovl_vma, ovl_max, ac_wt
     ovl_vma     = OVL_BASE
-    ovl_max     = OVL_MAX
+    ovl_max     = AC_WT - OVL_BASE  | (the overlay stops under them)
+    ac_wt       = AC_WT
     PCM_CACHED  = 0x4C000000      | from here up the data cache holds it (ACR1,
                                   | set in boot_extra_hook): files go here
                                   | first. Below, the 16 MiB block shared with
