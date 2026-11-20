@@ -3,7 +3,7 @@
 Everything Model-TG adds to the Model:Cycles, and how to play it. To install,
 see [BUILD.md](BUILD.md).
 
-On two pages: the [Quick Reference (PDF)](../flasher/Model-TG-Plaits-Quick-Reference.pdf).
+On three pages: the [Quick Reference (PDF)](../flasher/Model-TG-Plaits-Quick-Reference.pdf).
 
 Button names are in **BOLD CAPS**; "hold A + B" means hold A and press B.
 
@@ -26,6 +26,8 @@ The twelve parameter knobs are numbered 1 to 12.
 - [The VA machine](#the-va-machine)
 - [PLAITS](#plaits)
 - [DX](#dx)
+- [LXR](#lxr)
+- [ACHORD](#achord)
 - [Additions for every machine](#additions-for-every-machine)
 - [Slide trigs](#slide-trigs)
 - [Scale Lock](#scale-lock)
@@ -527,6 +529,72 @@ Values are the LXR's own, 0 to 127 (FINE: -64 to +63). What it does:
   cleared when the track is cleared or a new kit starts. They do not go into
   a sound preset saved from the track.
 - Turning a setting while the voice plays is heard at once.
+
+## ACHORD
+
+*Plaits Edition only.* The fifteenth machine: a thick, analogue-style chord
+machine, like the stock Chord but warmer, and with keys and progressions you
+set once and then just play. Pick it like any machine (it comes after LXR).
+
+**The sound.** Up to four notes at once, each a saw and a pulse (both
+band-limited) drifting a little and set a few cents apart, a square
+sub-oscillator an octave under the lowest note, one 24 dB/octave low-pass
+filter swept by its own envelope, and a chorus in the style of the classic
+polysynths (I, II, I+II). The track's Attack and Decay shape the level as on
+every machine.
+
+| knob | does |
+|---|---|
+| **Color** (BRIT) | the filter's cutoff (it also follows the chord's root a little) |
+| **Shape** (WAVE) | saw (0), saw + square (64), square (96), then a moving, narrowing pulse (PWM) up to 127 |
+| **Sweep** (FENV) | how far the envelope opens the filter on each trig |
+| **Contour** (CHRD) | the chord: with SCALE at FREE its type - MAJ, MIN, 7, MAJ7, MIN7, M7B5, DIM, DIM7, AUG, SUS2, SUS4, 6, MIN6, ADD9, 9, MIN9; in a key its size - TRIAD, 7TH, 9TH, ADD9, SUS2, SUS4, 6TH, POWER |
+
+**Pitch** and the keyboard choose the note.
+
+### Settings: SETTINGS + PRESET
+
+On an ACHORD track, hold **SETTINGS** and press **PRESET**. The title shows
+the chord the track is playing (C, Am7, Fmaj7 ...). **DATA** moves through the
+rows, **any other knob** changes the selected one (or press **DATA** to make
+DATA change it), and the last row puts every setting back to its default.
+Saved with the pattern, like LFO 3 and 4: each pattern can have its own key
+and progression on each track.
+
+| row | values | what it does |
+|---|---|---|
+| **KEY** | C .. B | the key |
+| **SCALE** | FREE, MAJOR, MINOR, DORIAN, MIXOLYD, HARM MIN, PHRYGIAN, LYDIAN | FREE: the note you play is the chord's root and Contour its type, as the stock Chord. A scale: every chord is built from the key's notes, so it always fits |
+| **NOTES** | SNAP, DEGREES | in a key - SNAP: the note you play is moved down into the scale and the key's chord on it plays (in C major: D gives Dm, G gives G). DEGREES: each semitone up is the next chord of the key, so neighbouring pads play I, ii, iii, IV, V, vi, vii° and on into the next octave |
+| **PROG** | OFF, 16 progressions, USER | a progression: I-V-vi-IV, I-vi-IV-V, vi-IV-I-V, I-IV-V-IV, ii-V-I-I, I-vi-ii-V, IV-V-iii-vi, I-iii-IV-V, I-IV-vi-V, I-V-IV-V, i-VI-III-VII, i-iv-v-i, i-VII-VI-VII, i-iv-VII-III, i-VI-iv-v, i-iv-VI-v. USER: the eight steps below |
+| **ADVANCE** | TRIG, 1 BAR, 2 BARS, 4 BARS | how the progression moves: the next chord on each trig (back to the first on the pattern's first step), or a chord a bar, two or four, with the pattern. With the sequencer stopped, a chord a trig |
+| **USER 1 .. 8** | I .. VII, END | your own progression: up to eight chords of the key, ending at the first END (by default I-V-VI-IV) |
+| **VOICING** | AUTO, CLOSE, OPEN, DROP 2, WIDE | AUTO: each chord's notes move as little as they can from the last chord's, as a keyboard player would, so progressions glide. Or a fixed shape |
+| **BASS** | OFF, -1 OCT, -2 OCT | the chord's root added an octave or two below (the upper notes then leave the root out of a big chord) |
+| **STRUM** | 0 .. 10 | the notes start one after another, low to high, 2 ms apart for each step |
+| **SUB** | 0 .. 10 | the sub-oscillator's level |
+| **CHORUS** | OFF, I, II, I+II | the chorus: I slow and wide, II faster, I+II a quick shimmer |
+| **DRIFT** | 0 .. 10 | how far the notes wander and sit apart (0: in tune) |
+| **RESO** | 0 .. 10 | the filter's resonance |
+| **ENV DECAY** | 0 .. 10 | how long the filter's envelope takes to close (30 ms to 4 s) |
+
+**Making a progression.** Set **KEY** and **PROG** (or **SCALE** and **PROG**
+to play a progression in another mode), and put trigs where the chords
+change: each trig plays the next chord. Or set **ADVANCE** to **1 BAR** and the
+chords follow the bars of the pattern, whatever trigs you place. With a
+progression on, the note you play transposes it (a tone up plays it a tone
+up). Or leave **PROG** off, set **SCALE**, and play or lock notes: every note
+gives a chord of the key. With **NOTES** at **DEGREES** each pad is the next
+chord of the key, a quick way to play progressions live.
+
+Contour still picks how rich the chords are (triads, 7ths, 9ths, sus, 6ths),
+in or out of a progression.
+
+Default sound: saw, a little sub, chorus I, a soft filter envelope, voices
+leading. Cost: 5,700 instructions a block for the default triad with chorus,
+up to 7,900 with four notes, saw and square and the chorus (a stock voice:
+~7,600). The CPU Guard may end one of its notes under heavy load, as any new
+machine's. Details: [ACHORD.md](ACHORD.md).
 
 ## Additions for every machine
 

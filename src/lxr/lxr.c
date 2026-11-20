@@ -889,3 +889,6 @@ void lxr_fill(s32 track, u32 step, s32 machine)
 	v->hist[2] = x[n - 1];
 	v->hist[3] = x[n];
 }
+
+/* ---- ACHORD (machine 14, MIT): built in the same overlay ---- */
+#include "../achord/achord.c"

@@ -357,7 +357,7 @@ class TPage(unittest.TestCase):
     def test_machine_page_picture_follows_the_engine(self):
         e = emu(); s = e.sym
         TB = SCRATCH + 0x70000                           # table B: 14 entries
-        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 392)
+        e.w32(0x40fe384c, TB); e.w32(0x40fe3850, TB + 420)
         e.uc.mem_write(0x400cf866, bytes.fromhex('70004e75'))
         e.uc.mem_write(0x4000eb90, bytes.fromhex('70004e75'))
         e.uc.mem_write(0x40012412, bytes.fromhex('70024e75'))   # the selected track: 2

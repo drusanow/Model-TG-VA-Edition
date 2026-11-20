@@ -286,7 +286,7 @@ class TSound(Base):
         e = self.e
         T = 2
         e.reset()
-        blk = lambda k: self.s['lfo34_kits'] + 364 * k + 172 + 32 * T
+        blk = lambda k: self.s['lfo34_kits'] + 508 * k + 172 + 32 * T
         e.uc.mem_write(blk(4), bytes([L.KICK + 1] + PRE[L.KICK]))
         e.w8(blk(4) + 1 + P['VOL'], 0)                                       # kit 4: silent
         for kit, silent in ((4, True), (5, False)):
@@ -338,7 +338,7 @@ class TKits(Base):
         return KIT_BASE + n * KIT_SIZE
 
     def area(self, n):                                   # the file: MIDI CC settings, then LXR's edits
-        return self.s['lfo34_kits'] + 364 * n + 124
+        return self.s['lfo34_kits'] + 508 * n + 124
 
     def edits(self, n, t):
         return self.area(n) + 48 + 32 * t
@@ -359,16 +359,16 @@ class TKits(Base):
         e = self.e
         mine = bytes([L.SNARE + 1] + PRE[L.SNARE])
         e.uc.mem_write(self.edits(4, 3), mine)
-        want = bytes(e.uc.mem_read(self.area(4), 240))
+        want = bytes(e.uc.mem_read(self.area(4), 384))
         self.save(4)
         h = fnv(want)
         self.assertEqual(bytes(e.uc.mem_read(self.STO + 700, 5)), bytes([0x43]) + h.to_bytes(4, 'big'))
         e.run('lcc_write', stack=[0, 0])
-        self.assertEqual(self.files, {'/LFOCC/%08X' % h: want})              # 240 bytes: CC and edits
-        e.uc.mem_write(self.area(9), b'\x11' * 240)
+        self.assertEqual(self.files, {'/LFOCC/%08X' % h: want})              # 384 bytes: CC, edits, ACHORD
+        e.uc.mem_write(self.area(9), b'\x11' * 384)
         self.load(9)
         self.assertEqual(bytes(e.uc.mem_read(self.edits(9, 3), 32)), mine)
-        self.assertEqual(bytes(e.uc.mem_read(self.area(9), 240)), want)
+        self.assertEqual(bytes(e.uc.mem_read(self.area(9), 384)), want)
 
     def test_no_edits_the_file_as_before(self):
         """Only MIDI CC settings: the 48-byte file, hashed as before, which loads with no edits."""
@@ -465,7 +465,7 @@ class TPage(unittest.TestCase):
         st.set(RECT, lambda a: 0)
 
     def edits(self):
-        return list(self.e.uc.mem_read(self.s['lfo34_kits'] + 364 * 6 + 172 + 32 * self.T, 32))
+        return list(self.e.uc.mem_read(self.s['lfo34_kits'] + 508 * 6 + 172 + 32 * self.T, 32))
 
     def knob(self, k, clicks):
         EV = SCRATCH + 0x9000

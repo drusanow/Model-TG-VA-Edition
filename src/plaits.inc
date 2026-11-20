@@ -2326,7 +2326,7 @@ mi_icon:
 1:  movea.l 0x40fe384c,%a0
     movel   0x40fe3850,%d1
     subl    %a0,%d1
-    cmpil   #392,%d1
+    cmpil   #420,%d1
     bnes    2f
     movel   %a1,%a0@(308+16)
 2:  rts
@@ -2359,14 +2359,19 @@ mi_fmtswap:
     bnes    11f
     lea.l   dx_vfmt,%a1
 11: cmpil   #8,%d1
-    bnes    2f
+    bnes    13f
     lea.l   lx_eng_fmt,%a1
+13: cmpil   #9,%d1                | (ACHORD: the chord, achord_glue.inc)
+    bnes    2f
+    lea.l   ac_cfmt,%a1
 2:  movel   %a0@,%d0
     cmpl    %a1,%d0
     beqs    5f                    | already
     cmpil   #mi_eng_fmt,%d0
     beqs    3f
     cmpil   #lx_eng_fmt,%d0
+    beqs    3f
+    cmpil   #ac_cfmt,%d0
     beqs    3f
     cmpil   #dx_vfmt,%d0
     bnes    4f

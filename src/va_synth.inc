@@ -54,8 +54,13 @@ vp_dx:
     bras    vp_tr
 vp_lx:
     cmpil   #LX_MACH,%d1          | 13: LXR's (lxr_glue.inc)
-    bnes    vp_dr
+    bnes    vp_ac
     jsr     lx_params
+    bras    vp_tr
+vp_ac:
+    cmpil   #AC_MACH,%d1          | 14: ACHORD's (achord_glue.inc)
+    bnes    vp_dr
+    jsr     ac_params_g
     bras    vp_tr
 vp_dr:
     jsr     dr_params

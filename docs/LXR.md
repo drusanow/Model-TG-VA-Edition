@@ -82,8 +82,8 @@ kind `MM_LXR` of `mm_open` in `src/model_tg.s`). How to use it:
 [USER_GUIDE.md](USER_GUIDE.md#the-voice-menu-every-lxr-setting).
 
 **The edits.** Each kit (pattern) holds a 32-byte block per track after its
-MIDI CC settings in its LFO 3/4 block (`lfo2.inc`: `LX_OFF` = 172, the block
-now 364 bytes): the preset the edits were made on + 1 (0: none), then its 31
+MIDI CC settings in its LFO 3/4 block (`lfo2.inc`: `LX_OFF` = 172; the block
+is now 508 bytes, ACHORD's settings after these): the preset the edits were made on + 1 (0: none), then its 31
 knobs in `P_*` order. `lx_params` hands `lxr_params` the playing kit's block
 for the track every block; `cook` takes its knobs from there when Contour is
 on that preset, else from the preset, and the macros then move them as
@@ -95,10 +95,11 @@ PRESET clears the block.
 **Saved with the pattern.** The block goes wherever the kit's LFO 3/4 block
 goes: copied with the kit (`kit_memcpy`), cleared with a track's sound
 (`l34_snd_reset`) and with a new kit (`lcc_kclr`), and saved in the kit's
-MIDI CC file (`lfocc.inc`): with edits the file is 240 bytes, the 48 of MIDI
-CC then the six tracks' blocks, hashed whole; without, it is the 48-byte file
-as before, hashed as before. So every older project loads as it did, with no
-edits, and a kit with only edits gets a file too.
+MIDI CC file (`lfocc.inc`): with edits (or ACHORD settings) the file is 384
+bytes, the 48 of MIDI CC, the six tracks' blocks, then ACHORD's, hashed whole;
+without, it is the 48-byte file as before, hashed as before; the 240-byte files
+written before ACHORD still load. So every older project loads as it did, and a
+kit with only edits gets a file too.
 
 `tests/test_lxr_menu.py`: the rows of each voice, the values shown, the
 screen's layout (everything fits), the edits (the preset copied in, clamped,

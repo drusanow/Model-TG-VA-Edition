@@ -195,13 +195,13 @@ class T4Gates(unittest.TestCase):
     def test_lfo_gate(self):
         e = emu()
         ids = [e.r32(e.sym['sampler_lfo_ids'] + 4 * i) for i in range(4)]
-        for grp in (6, 7, 8, 9, 10, 11, 12, 13):    # the Sampler, the VA, the drums,
-            for idx in range(11, 15):               # PLAITS, DX, LXR
+        for grp in (6, 7, 8, 9, 10, 11, 12, 13, 14):    # the Sampler, the VA, the drums,
+            for idx in range(11, 15):               # PLAITS, DX, LXR, ACHORD
                 e.run('sampler_lfo_gate', 0x4005a6fc, regs={D[2]: grp, A[2]: idx})
                 self.assertEqual(e.d(0), ids[idx - 11])
             for idx in (10, 15, 18):
                 e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: idx})
-        for grp in (14, 100, -1):
+        for grp in (15, 100, -1):
             e.run('sampler_lfo_gate', 0x4005a6ac, regs={D[2]: grp, A[2]: 12})
         for grp in range(6):
             e.run('sampler_lfo_gate', 0x4005a6dc, regs={D[2]: grp, A[2]: 12})
@@ -227,16 +227,16 @@ class T4Gates(unittest.TestCase):
     def test_table_lookups(self):
         e = emu()
         exp_a = {i: 0x40a71540 + 76 * i for i in range(7)}
-        for i in range(7, 15):                      # Sampler, VA, drums, PLAITS, DX, LXR
+        for i in range(7, 16):                      # Sampler, VA, drums, PLAITS, DX, LXR, ACHORD
             exp_a[i] = 0x40a71540 + 76
         for i, v in exp_a.items():
             e.run('table_lookup_a_fixed', stack=[i])
             self.assertEqual(e.d(0), v, i)
-        e.run('table_lookup_a_fixed', stack=[15])
+        e.run('table_lookup_a_fixed', stack=[16])
         self.assertEqual(e.d(0), (0x40a71540 - 76) & M32)       # stock: out of range
         for i in range(6):
             e.w8(0x401091b4 + i, i)
-        for i in range(14):
+        for i in range(15):
             e.run('table_lookup_b_fixed', stack=[i])
             self.assertEqual(e.d(0), 0x40a71540 + 76 * (i if i < 6 else 0), i)
 
@@ -465,7 +465,7 @@ class T7Static(unittest.TestCase):
 
     def test_build_patch_list(self):
         b = open(os.path.join(REPO, 'build.py')).read()
-        self.assertIn('MACH_MAX=13', b)
+        self.assertIn('MACH_MAX=14', b)
         for site in ('0x400147a5', '0x400148ab', '0x400148b3', '0x4005a79d', '0x400a25e1',
                      '0x4010e5e6'):
             self.assertRegex(b, re.escape(f"({site},'05',_M)"))
@@ -489,6 +489,8 @@ class T7Static(unittest.TestCase):
                            ('gen_lxr.py', ['src/lxr/lxr_tables.h', 'src/lxr/lxr_gen.s']),
                            ('gen_lxr_icons.py', ['src/va_icons/lxr_icon_A_48x33.bin',
                                                  'src/va_icons/lxr_icon_B_34x34.bin']),
+                           ('gen_achord_icons.py', ['src/va_icons/ac_icon_A_48x33.bin',
+                                                    'src/va_icons/ac_icon_B_34x34.bin']),
                            ('gen_dx_icons.py', ['src/va_icons/dx_icon_A_48x33.bin',
                                                 'src/va_icons/dx_icon_B_34x34.bin']),
                            ('gen_mi_icons.py', ['src/va_icons/plaits_icon_A_48x33.bin',

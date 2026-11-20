@@ -57,8 +57,11 @@ lx_m_args:
     movel   %a1@(0,%d0:l:4),%d0
     rts
 
-| lx_m_draw (d2 = ctx): the whole screen. Keeps d2-d7/a2-a6.
+| lx_m_draw (d2 = ctx): the whole screen. Keeps d2-d7/a2-a6. (An ACHORD
+| track's page is ACHORD's: ac_m_*, achord_glue.inc.)
 lx_m_draw:
+    jsr     ac_m_mine
+    bnew    ac_m_draw
     bsr     lx_m_args
     movel   %d0,%sp@-
     movel   %a0,%sp@-
@@ -69,6 +72,8 @@ lx_m_draw:
 
 | lx_m_turn (d2 = the encoder event) -> d0 = 1 to redraw. Keeps d2-d7/a2-a6.
 lx_m_turn:
+    jsr     ac_m_mine
+    bnew    ac_m_turn
     movel   %d3,%sp@-
     movea.l %d2,%a0
     movel   %a0@(12),%d3          | the knob: 1 DATA
@@ -94,6 +99,8 @@ lx_m_turn:
 
 | lx_m_press: DATA's press -> d0 = 1 to redraw. Keeps d2-d7/a2-a6.
 lx_m_press:
+    jsr     ac_m_mine
+    bnew    ac_m_press
     bsr     lx_m_args
     movel   %d0,%sp@-
     movel   %a0,%sp@-
@@ -180,7 +187,7 @@ lx_icon:
 1:  movea.l 0x40fe384c,%a0
     movel   0x40fe3850,%d1
     subl    %a0,%d1
-    cmpil   #392,%d1
+    cmpil   #420,%d1
     bnes    2f
     movel   %a1,%a0@(364+16)
 2:  rts

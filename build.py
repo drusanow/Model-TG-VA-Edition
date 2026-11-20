@@ -432,8 +432,8 @@ assert bytes(d[_o:_o+4])==struct.pack('>I',_osum)
 def _p(n): return '%08x' % sym[n]
 for _n in ('sampler_name_table','sampler_lazy_init_trampoline'):
     assert sym[_n]>>24==0x40, (_n, hex(sym[_n]))   # only the low 3 bytes are patched
-MACH_MAX=13                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
-                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS, 12 DX, 13 LXR
+MACH_MAX=14                   # the last machine: 0-5 stock, 6 Sampler, 7 VA,
+                              # 8-10 VA KICK / VA SNARE / VA HIHAT, 11 PLAITS, 12 DX, 13 LXR, 14 ACHORD
 _M=f'{MACH_MAX:02x}'; _L=f'{4*(MACH_MAX+1):02x}'
 PHASE1=[
  (0x40000531,'baff8041f9','b9'+_p('boot_extra_hook')),

@@ -7,7 +7,7 @@ LFOs a track, a trig generator, resampling, beat-repeat with master FX, and
 more.**
 
 > **The Plaits Edition is this fork's main version** (branch `main`):
-> everything in the VA Edition plus **PLAITS**, **DX** and **LXR**
+> everything in the VA Edition plus **PLAITS**, **DX**, **LXR** and **ACHORD**
 > ([docs/PLAITS.md](docs/PLAITS.md), [docs/DX.md](docs/DX.md)). The earlier VA
 > Edition stays on the branch `va-machine`.
 >
@@ -67,6 +67,12 @@ keeps working.
   every machine has. SETTINGS + PRESET opens its voice menu: every LXR
   setting of the voice, saved with the pattern
   ([USER_GUIDE](docs/USER_GUIDE.md#lxr), [LXR.md](docs/LXR.md)).
+- **ACHORD** (Plaits Edition), the fifteenth machine: a thick analogue-style
+  chord machine - four drifting saw/pulse voices, a sub, a 24 dB filter with
+  its envelope and a classic chorus - with chords that fit a key, sixteen
+  progressions or your own, voices that lead smoothly from chord to chord, a
+  bass note and strum, all on SETTINGS + PRESET and saved with the pattern
+  ([USER_GUIDE](docs/USER_GUIDE.md#achord), [ACHORD.md](docs/ACHORD.md)).
 - **A trig generator** (this fork): **SETTINGS** + **TRACK** fills the
   selected track with random trigs at a chosen density, or a Euclidean
   rhythm (hits and rotation), optionally with random notes in a key, scale
@@ -121,7 +127,7 @@ keeps working.
   Rate** 48K, a cheaper LXR ([CPU.md](docs/CPU.md)).
 
 The full, button-by-button guide is in **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**, and every
-knob, macro and shortcut fits on two pages in the
+knob, macro and shortcut fits on three pages in the
 **[Quick Reference (PDF)](flasher/Model-TG-Plaits-Quick-Reference.pdf)**
 (also on the [web flasher](https://drusanow.github.io/Model-TG-VA-Edition/Model-TG-Plaits-Quick-Reference.pdf)).
 

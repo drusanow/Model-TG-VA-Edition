@@ -565,7 +565,9 @@ dr_punch:
     cmpil   #DX_MACH-DR_KICK,%d0
     beqs    1f
     cmpil   #LX_MACH-DR_KICK,%d0
-    bnew    dp_out                | not a drum, nor PLAITS, DX or LXR
+    beqs    1f
+    cmpil   #AC_MACH-DR_KICK,%d0
+    bnew    dp_out                | not a drum, nor PLAITS, DX, LXR or ACHORD
 1:
     | PLAITS: a clean x2 - the 6 dB the Sampler path is short of the stock
     | machines' level - held at full scale
@@ -736,5 +738,6 @@ dr_defaults:
     .word 64<<8, 64<<8, 64<<8, 0       | PLAITS: HARM 64 TIMB 64 MORP 64 ENG 0
     .word 64<<8, 64<<8, 64<<8, 0       | DX: BRIG, AENV, MENV at the voice's, VOIC 1
     .word 64<<8, 64<<8, 64<<8, 8<<8    | LXR: the preset as it is (64), KICK (the middle of its 16)
+    .word 72<<8, 0, 40<<8, 4<<8        | ACHORD: BRIT 72 WAVE saw FENV 40 CHRD MAJ / TRIAD
     .include "drum_tables.inc"
     .align 2

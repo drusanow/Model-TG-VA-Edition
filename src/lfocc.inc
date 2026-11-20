@@ -40,12 +40,17 @@ LCC_OFF   = 124                   | in a kit's LFO 3/4 block (lfo2.inc): the
                                   | numbers (0 OFF, CC + 1), then the bases
                                   | (stored ^ 64, so a cleared block is 64)
 LCC_SZ    = 2*LCC_N               | ... 48 bytes
-LCC_FSZ   = LCC_SZ + 6*LX_ED      | the file: those, then LXR's voice menu
-                                  | edits (lfo2.inc: LX_OFF, right after them)
-                                  | - 240 bytes, or 48 with no edits (as every
-                                  | older file)
+LCC_LXZ   = LCC_SZ + 6*LX_ED      | the file: those, then LXR's voice menu
+LCC_FSZ   = LCC_LXZ + 6*AC_SETB   | edits (lfo2.inc: LX_OFF, right after them),
+                                  | then ACHORD's settings (AC_OFF) - 384
+                                  | bytes, or 48 with neither (as every older
+                                  | file); a 240-byte one (LXR's edits, before
+                                  | ACHORD) still loads
     .if LCC_OFF + LCC_SZ - LX_OFF
     .error "LXR's edits must follow the MIDI CC settings"
+    .endif
+    .if LX_OFF + 6*LX_ED - AC_OFF
+    .error "ACHORD's settings must follow LXR's edits"
     .endif
 LCC_REC   = 700                   | in the kit's storage record: "C", the
                                   | settings' hash (4 bytes), a check byte
@@ -651,6 +656,13 @@ lcc_area:
 | lcc_hash(a0 = settings) -> d0 = their FNV-1a hash, 0 when all zero (1 for
 | a real 0), and d1 = the file's length: LCC_FSZ when LXR's edits hold any,
 | else LCC_SZ (hashing those 48 bytes, as before them). Clobbers a1.
+| lcc_hashn(a0 = settings, d1 = a file's length) -> d0 = their hash over
+| that length, as lcc_hash; d1 = the length. Clobbers a1.
+lcc_hashn:
+    movel   %d2,%sp@-
+    movel   %d3,%sp@-
+    movel   %d1,%d3
+    bras    lhh_go
 lcc_hash:
     movel   %d2,%sp@-
     movel   %d3,%sp@-
@@ -833,7 +845,7 @@ lp_dig:
 | lcc_fread, on the UI clock while lcc_lpn: the first kit with a hash noted -
 | its file, if it is there and right, into its settings. Keeps d2-d7/a2-a6.
 lcc_fread:
-    linkw   %fp,#-264
+    linkw   %fp,#-400
     lea.l   %sp@(-12),%sp
     moveml  %d2-%d3/%a2,%sp@
     lea.l   lcc_lh,%a2
@@ -857,36 +869,37 @@ lfr_go:
     lea.l   %sp@(12),%sp
     tstl    %d0
     bnes    lfr_out               | not there: OFF and 64
+    lea.l   %fp@(-400),%a0        | (cleared: a shorter file leaves the rest 0)
+    movel   #LCC_FSZ/4-1,%d1
+lfr_z:
+    clrl    %a0@+
+    subql   #1,%d1
+    bpls    lfr_z
     pea     %fp@(-16)
     pea     LCC_FSZ
-    pea     %fp@(-256)
+    pea     %fp@(-400)
     jsr     0x4007baaa
     lea.l   %sp@(12),%sp
     movel   %d0,%sp@-
     pea     %fp@(-16)
     jsr     0x4007bc1c
     addql   #4,%sp
-    movel   %sp@+,%d0
-    movel   #LCC_FSZ,%d1          | the whole file, or the CC settings alone
-    cmpl    %d0,%d1               | (an older one, or no LXR edits): those
-    beqs    lfr_len               | with no edits
-    moveq   #LCC_SZ,%d1
-    cmpl    %d0,%d1
+    movel   %sp@+,%d1
+    cmpil   #LCC_FSZ,%d1          | the whole file; LXR's edits and no
+    beqs    lfr_len               | ACHORD (an older one); or the CC settings
+    cmpil   #LCC_LXZ,%d1          | alone (older still, or neither): the rest
+    beqs    lfr_len               | as cleared
+    moveq   #LCC_SZ,%d0
+    cmpl    %d1,%d0
     bnew    lfr_out
-    lea.l   %fp@(-256+LCC_SZ),%a0
-    movel   #(LCC_FSZ-LCC_SZ)/4-1,%d1
-lfr_z:
-    clrl    %a0@+
-    subql   #1,%d1
-    bpls    lfr_z
 lfr_len:
-    lea.l   %fp@(-256),%a0        | the right file?
-    bsr     lcc_hash
+    lea.l   %fp@(-400),%a0        | the right file? (hashed over its own length)
+    bsr     lcc_hashn
     cmpl    %d3,%d0
     bnew    lfr_out
     movel   %d2,%d0
     bsr     lcc_area
-    lea.l   %fp@(-256),%a1
+    lea.l   %fp@(-400),%a1
     moveq   #LCC_FSZ/4-1,%d1
 lfr_c:
     movel   %a1@+,%a0@+

@@ -742,8 +742,9 @@ lup_out:
 | ============== LFO 3 and 4: one block per pattern, saved with its kit ========
 | All 96 patterns' kits sit in RAM (KIT_BASE + n x KIT_SIZE, model_tg.s), and
 | LFO 1 and 2 live in their track sounds - so they change with the pattern.
-| LFO 3 and 4 do the same from lfo34_kits: a 364-byte block per kit (the
-| send effects', the MIDI CC settings and LXR's voice menu edits too), laid out
+| LFO 3 and 4 do the same from lfo34_kits: a 508-byte block per kit (the
+| send effects', the MIDI CC settings, LXR's voice menu edits and ACHORD's
+| settings too), laid out
 | [LFO 3, LFO 4][track 0..5] x {Speed, Multiplier, Waveform, Destination,
 | Depth}. Everything reads the playing kit's (*CUR_KIT). The block follows the
 | kit everywhere the kit goes:
@@ -755,12 +756,15 @@ lup_out:
 |   copied          kit_memcpy: any memcpy of a whole kit - the new project's
 |                   copies, pattern copy / paste and undo, which keep the kit
 |                   in a buffer of their own
-L34_BLK   = 364                   | one kit's block: 120 of LFOs, the send
+L34_BLK   = 508                   | one kit's block: 120 of LFOs, the send
                                   | effects' types (sendfx.inc, +120), the
                                   | LFOs' MIDI CC settings (lfocc.inc, +124),
-                                  | and LXR's voice menu edits (+172)
+                                  | LXR's voice menu edits (+172) and ACHORD's
+                                  | settings (+364)
 LX_OFF    = 172                   | in it: LXR's edits, LX_ED bytes a track
 LX_ED     = 32                    | (src/lxr/lxr_menu.c: the preset + 1, its knobs)
+AC_OFF    = 364                   | ...and ACHORD's settings, AC_SETB a track
+AC_SETB   = 24                    | (src/achord/achord.c: AC_SET, each + 1)
 L34_NBUF  = 4                     | kit buffers remembered (kit_memcpy)
 L34_ST    = 648                   | in the kit's storage record (below)
 L34_MAGIC = 0x4C463334            | "LF34"
@@ -829,6 +833,15 @@ lsr_lx:
     clrl    %a1@+
     subql   #1,%d0
     bpls    lsr_lx
+    lea.l   %a0@(AC_OFF),%a1      | ACHORD's settings for the track: defaults
+    movel   %d2,%d0
+    mulu.w  #AC_SETB,%d0
+    adda.l  %d0,%a1
+    moveq   #AC_SETB/4-1,%d0
+lsr_ac:
+    clrl    %a1@+
+    subql   #1,%d0
+    bpls    lsr_ac
     mulu.w  #10,%d2
     adda.l  %d2,%a0
     lea.l   lfo2_dflt,%a1
@@ -1161,6 +1174,7 @@ lfo34_w:    .rept 12
             .long 0                   | the send effects: stock
             .space 48                 | MIDI CC: all OFF, bases 64
             .space 6*LX_ED            | LXR: no edits
+            .space 6*AC_SETB          | ACHORD: the defaults
 | LFO 3 and 4 of each pattern's kit: in the sample region (model_tg.s,
 | L34_KITS), not the blob, which they would fill; the boot clear (phase1.s)
 | zeroes them before anything reads them.
