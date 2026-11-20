@@ -518,9 +518,9 @@ class T8FullBuild(unittest.TestCase):
         B = 0x40000400
         at = lambda a, n=1: img[a - B:a - B + n]
         for a in (0x400147a5, 0x400148ab, 0x400148b3, 0x4005a79d, 0x400a25e1, 0x4010e5e6):
-            self.assertEqual(at(a), b'\x0d', hex(a))               # machines 0..13
+            self.assertEqual(at(a), b'\x0e', hex(a))               # machines 0..14
         for a in (0x4001bbd3, 0x4001bbe5, 0x4001bbf3):
-            self.assertEqual(at(a), b'\x38', hex(a))               # 14 longs
+            self.assertEqual(at(a), b'\x3c', hex(a))               # 15 longs
         mpm = symbols(os.path.join(BUILD, '_b.elf'))['mp_markers']
         self.assertEqual(at(0x400a26a2, 10),                         # the marker loop:
                          b'\x4e\xb9' + struct.pack('>I', mpm) + b'\x60\x00\x00\x48')
