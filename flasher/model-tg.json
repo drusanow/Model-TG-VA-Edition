@@ -1,7 +1,7 @@
 {
  "format": 1,
  "name": "Model-TG Plaits Edition",
- "version": "703327a-dirty",
+ "version": "469b548",
  "source": "https://github.com/drusanow/model-tg-va-edition",
  "license": "GPL-3.0-only as a whole (the LXR voices, src/lxr/, are GPL-3.0-only after the Erica Synths LXR-02 firmware); the rest MIT (c) TinyGregAudio and VA Edition contributors; tweaks MIT (c) drumkilla; source: https://github.com/drusanow/model-tg-va-edition",
  "device": "Model:Cycles",
