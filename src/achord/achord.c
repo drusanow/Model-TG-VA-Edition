@@ -99,6 +99,7 @@ typedef struct {
 	s32 key;                                /* what the chord was made from (-1: remake it) */
 	s32 root, pcs;                          /* the chord, for its name: its root (MIDI) and pitch classes */
 	s32 started;
+	s32 eco;                                /* rendering at 32 kHz (the CPU guard) */
 	s16 dl[2 * AC_DL];
 } AcV;
 
@@ -381,7 +382,7 @@ void ac_fill(s32 track, u32 step, s32 machine)
 {
 	AcV *v = &ac_v[track];
 	s32 *out = sampler_buf + 8;
-	s32 i, j, k, n, key, trig = dr_trig[track];
+	s32 i, j, k, n, key, eco, trig = dr_trig[track];
 	u32 fine;
 	(void)machine;
 	if (!step)
@@ -424,6 +425,18 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		v->att = 1;
 		v->env = v->env > 0 ? v->env : 0;
 	}
+	/* ---- the rate: 48 kHz, or 32 kHz when the CPU guard asks (guard.inc: gd_eco). eco_n (src/lxr/eco_rs.c, as
+	 * DX's) gives the samples to render, 32 or 21-22; eco_out makes them the block's 32 frames (linearly at 32 kHz, a
+	 * copy two samples late at 48 kHz), so a change of rate carries on from the same place in the sound. At 32 kHz the
+	 * increments are x 1.5, the filter's cutoffs come from ac_g32 and the chorus's times are two thirds as many
+	 * samples; the envelope, the drift and the triangles step once a block as always ---- */
+	eco = (gd_eco >> track) & 1;
+	/* (back to 48 kHz on the next trig: a saw's edges would show the resampling's change of spacing mid-note;
+	 * down to 32 kHz is clean) */
+	if (v->eco && !eco && !trig)
+		eco = 1;
+	v->eco = eco;
+	n = eco_n(track, eco);
 	/* ---- once a block: the strum, the drift, the increments, the envelope, the cutoff ---- */
 	{
 		s32 drift = setv(v->set, S_DRIFT);
@@ -441,6 +454,8 @@ void ac_fill(s32 track, u32 step, s32 machine)
 				v->drift[i] = -drift * 24;
 			c = spread[i] * drift * 16 / 5 + v->drift[i];  /* 1/16 cent */
 			v->inc[i] = mul16(mul16(note_inc(v->note[i]), fine), (u32)(65536 + c * 37 / 16));
+			if (eco)
+				v->inc[i] += v->inc[i] >> 1;
 			v->rinc[i] = (1u << 30) / ((v->inc[i] >> 8) | 1);
 		}
 	}
@@ -456,7 +471,7 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		s32 shape = v->dial[1] >> 8, g1, g2, gs, c, G, kq;
 		u32 pw, sinc;
 		s32 sub = setv(v->set, S_SUB), reso = setv(v->set, S_RESO), chorus = setv(v->set, S_CHORUS);
-		s32 fo[32], og;                         /* the filter's 32 samples (for the chorus); the output gain */
+		s32 fo[32], og;                         /* the block's samples, then its frames; the output gain */
 		/* the wave: saw + B/2 x (saw - saw half a cycle on): saw at 0, + square at 64, square at 96, then the
 		 * pulse narrowing and moving with a triangle (0.7 Hz) */
 		s32 A, B, pwm = 0;
@@ -482,7 +497,7 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		c = (v->dial[0] >> 8) * 2 + (s32)(((u32)v->env * (u32)(v->dial[2] >> 8)) >> 15) * 80 / 127
 		    + (v->root - 60);
 		c = c < 0 ? 0 : (c > 255 ? 255 : c);
-		G = ac_g[c];
+		G = eco ? ac_g32[c] : ac_g[c];
 		kq = reso * 1300 * (300 - c) / 300;     /* the resonance, less near the top (stable) */
 		og = 10240 + ((10240 * kq) >> 14);      /* x 2.5 to 16 bits, and some of the level resonance takes, back */
 		if (chorus)
@@ -491,25 +506,25 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		/* the voices, one at a time into the block's two sums (the saws, and the saws half a cycle on) */
 		{
 			s32 s1[32], s2[32];
-			for (i = 0; i < 32; i++)
+			for (i = 0; i < n; i++)
 				s1[i] = 0;
 			if (g2)
-				for (i = 0; i < 32; i++)
+				for (i = 0; i < n; i++)
 					s2[i] = 0;
 			for (j = 0; j < v->nv; j++) {
 				u32 p = v->ph[j], inc = v->inc[j], r = v->rinc[j];
 				if (!g2)                        /* saws */
-					for (i = 0; i < 32; i++) {
+					for (i = 0; i < n; i++) {
 						p += inc;
 						s1[i] += saw(p, inc, r);
 					}
 				else if (!g1)                   /* pulses */
-					for (i = 0; i < 32; i++) {
+					for (i = 0; i < n; i++) {
 						p += inc;
 						s2[i] += sqr(p, pw, inc, r);
 					}
 				else                            /* both, on the same phase */
-					for (i = 0; i < 32; i++) {
+					for (i = 0; i < n; i++) {
 						p += inc;
 						s1[i] += saw(p, inc, r);
 						s2[i] += sqr(p, pw, inc, r);
@@ -520,7 +535,7 @@ void ac_fill(s32 track, u32 step, s32 machine)
 			{
 				s32 f1 = v->f1, f2 = v->f2, f3 = v->f3, f4 = v->f4, fy = v->fy;
 				u32 sp = v->sph;
-				for (i = 0; i < 32; i++) {
+				for (i = 0; i < n; i++) {
 					s32 x, y;
 					x = (s1[i] * g1 + s2[i] * g2) >> 12;
 					sp += sinc;
@@ -539,12 +554,7 @@ void ac_fill(s32 track, u32 step, s32 machine)
 					x = y + f4;
 					f4 = x + y;
 					fy = x;
-					if (chorus)
-						fo[i] = x;
-					else {                      /* out: 16 bits, limited, each sample twice */
-						y = ac_limit((x * og) >> 12) << 15;
-						out[2 * i] = out[2 * i + 1] = y;
-					}
+					fo[i] = chorus ? x : (x * og) >> 12;
 				}
 				v->f1 = f1;
 				v->f2 = f2;
@@ -564,20 +574,73 @@ void ac_fill(s32 track, u32 step, s32 machine)
 			tri = (s32)(v->lfo >> 16) - 32768;
 			tri = (tri < 0 ? -tri : tri) - 16384;
 			d = (154 << 8) + ((tri * depth[chorus - 1]) >> 6);          /* Q8 samples back */
+			if (eco)
+				d = d * 2 / 3;                  /* (as many milliseconds at 32 kHz) */
 			fr = d & 255;
 			rd = AC_DL - (d >> 8);              /* (the read's distance past the write, in the doubled line) */
-			for (i = 0; i < 32; i++) {          /* (the line holds half: no clipping) */
+			for (i = 0; i < n; i++) {          /* (the line holds half: no clipping) */
 				s16 *q = dl + w + rd;
 				s32 a = q[0], b = q[-1], x = fo[i], y;
 				dl[w] = dl[w + AC_DL] = (s16)(x >> 1);
 				y = x + 2 * (a + (((b - a) * fr) >> 8));
-				y = ac_limit((y * og) >> 12) << 15;
-				out[2 * i] = out[2 * i + 1] = y;
+				fo[i] = (y * og) >> 12;
 				w = (w + 1) & (AC_DL - 1);
 			}
 			v->dw = w;
 		}
+		/* the samples -> the block's 32 frames, 16 bits, limited, each twice: in one pass at either rate (eco_rs.c's
+		 * resampling, its state shared with DX's, as a track plays one machine at a time); the block or two that
+		 * realign at 48 kHz go through eco_out itself */
+		{
+			EcoRs *r = &eco_rs_[track];
+			s32 *o = out;
+			if (r->step == 65536 && r->t == 65536 && n == 32) {     /* 48 kHz: the samples, two late */
+				s32 h2 = r->h[2], h3 = r->h[3];
+				o[0] = o[1] = ac_limit(h2) << 15;
+				o[2] = o[3] = ac_limit(h3) << 15;
+				for (i = 0; i < 30; i++) {
+					s32 y = ac_limit(fo[i]) << 15;
+					o[4 + 2 * i] = o[5 + 2 * i] = y;
+				}
+				r->h[0] = fo[28];
+				r->h[1] = fo[29];
+				r->h[2] = fo[30];
+				r->h[3] = fo[31];
+			} else if (r->step < 65536) {   /* 32 kHz: linearly between the samples */
+				s32 xb[36], *x = xb + 3;
+				u32 t = r->t, st = r->step;
+				xb[0] = r->h[0];
+				xb[1] = r->h[1];
+				xb[2] = r->h[2];
+				xb[3] = r->h[3];
+				for (i = 0; i < n; i++)
+					x[1 + i] = fo[i];
+				for (i = 0; i < 32; i++, t += st) {
+					const s32 *q = x - 2 + (t >> 16);
+					s32 x0 = q[0], y;
+					y = ac_limit(x0 + (((q[1] - x0) * (s32)((t & 0xffff) >> 8)) >> 8)) << 15;
+					o[2 * i] = o[2 * i + 1] = y;
+				}
+				r->t = t - ((u32)n << 16);
+				r->h[0] = x[n - 3];
+				r->h[1] = x[n - 2];
+				r->h[2] = x[n - 1];
+				r->h[3] = x[n];
+			} else {
+				eco_out(track, fo, n);
+				for (i = 0; i < 32; i++) {
+					s32 y = ac_limit(fo[i]) << 15;
+					o[2 * i] = o[2 * i + 1] = y;
+				}
+			}
+		}
 	}
+}
+
+/* ac_eco(track) -> 1 while the track renders at 32 kHz (the tests) */
+s32 ac_eco(s32 track)
+{
+	return ac_v[track].eco;
 }
 
 /* ac_notes(track, out) -> how many voices; their notes (MIDI, where they are going) into out (the tests) */

@@ -486,7 +486,6 @@ class T7Static(unittest.TestCase):
                            ('gen_sfx_tables.py', ['src/sfx_tables.inc']),
                            ('gen_dx_tables.py', ['src/dx_tables.inc']),
                            ('gen_dx_algo_gfx.py', ['src/dx_algo_gfx.inc']),
-                           ('gen_lxr.py', ['src/lxr/lxr_tables.h', 'src/lxr/lxr_gen.s']),
                            ('gen_lxr_icons.py', ['src/va_icons/lxr_icon_A_48x33.bin',
                                                  'src/va_icons/lxr_icon_B_34x34.bin']),
                            ('gen_achord_icons.py', ['src/va_icons/ac_icon_A_48x33.bin',
@@ -501,6 +500,12 @@ class T7Static(unittest.TestCase):
             subprocess.run([sys.executable, os.path.join(REPO, 'tools', tool)],
                            check=True, capture_output=True)
             self.assertEqual(old, [open(os.path.join(REPO, o), 'rb').read() for o in outs], tool)
+        # LXR's and ACHORD's: their --check (gen_lxr.py compiles lxr_gen.s with m68k-linux-gnu-gcc 13.3 when it is
+        # there, else checks its tables alone - CI has the assembler, not that compiler)
+        for tool in ('gen_lxr.py', 'gen_achord.py'):
+            r = subprocess.run([sys.executable, os.path.join(REPO, 'tools', tool), '--check'],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, tool + ': ' + r.stdout + r.stderr)
 
 
 @unittest.skipUnless(os.environ.get('MODEL_CYCLES_STOCK'), "set MODEL_CYCLES_STOCK for full-build checks")

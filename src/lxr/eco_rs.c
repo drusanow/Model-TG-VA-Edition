@@ -61,13 +61,17 @@ void eco_out(s32 track, s32 *buf, s32 n)
 	if (r->step == 65536 && r->t == 65536) {
 		for (i = 0; i < 32; i++)
 			buf[i] = x[i - 1];
-	} else if (r->step < 65536) {           /* 32 kHz: linear (the guard's lower rate: cheaper than the 4 points) */
-		u32 t = r->t;
-		for (i = 0; i < 32; i++, t += r->step) {
-			s32 k = (s32)(t >> 16) - 2, fr = (s32)(t & 0xffff) >> 8;
-			s32 x0 = x[k];
-			buf[i] = x0 + (((x[k + 1] - x0) * fr) >> 8);
-		}
+	} else if (r->step < 65536) {           /* 32 kHz: linear (the guard's lower rate: cheaper than the 4 points;
+		                                     * the last frame's place is under n - 2 samples on: no clamp) */
+		u32 t = r->t, st = r->step;
+		const s32 *xm = x - 2;
+		s32 *o = buf, *e = buf + 32;
+		do {
+			const s32 *q = xm + (t >> 16);
+			s32 x0 = q[0];
+			*o++ = x0 + (((q[1] - x0) * (s32)((t & 0xffff) >> 8)) >> 8);
+			t += st;
+		} while (o < e);
 		r->t = t - ((u32)n << 16);
 	} else {
 		u32 t = r->t;

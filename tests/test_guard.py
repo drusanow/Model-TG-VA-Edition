@@ -104,6 +104,12 @@ class TChoose(Base):
         self.assertEqual(self.mask(), 1 << 1)
         self.assertEqual(self.e.r32(self.s['gd_count']), 1)
 
+    def test_achord_slows_too(self):
+        self.sounding(2, 14, 300)                     # ACHORD
+        self.sounding(3, PLAITS, 900)
+        self.hot()
+        self.assertEqual((self.eco(), self.mask()), (1 << 2, 0))
+
     def test_the_oldest_new_note_ends(self):
         self.sounding(0, 3, 900)                      # a stock machine: never
         self.sounding(1, 6, 800)                      # the Sampler: never

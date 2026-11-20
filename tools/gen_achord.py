@@ -7,6 +7,7 @@
   ac_ratio   2^(k/12), Q16, k = -48..48: the exact step of each note, for the fine tuning
   ac_g       the ladder's one-pole coefficient G = g / (1 + g), g = tan(pi f / 48000), Q15, for 256 cutoffs
              from 20 Hz to 18 kHz, evenly in pitch
+  ac_g32     the same cutoffs at 32 kHz (the CPU guard's lower rate), held under 14.4 kHz
   ac_dec     the filter envelope's decay a block (Q16 of what is left), for ENV DECAY 0..10: 30 ms to 4 s
 Rerun after changing them; --check verifies the file is up to date.
 """
@@ -36,13 +37,18 @@ def tables():
         f = 20 * (18000 / 20) ** (i / 255)
         t = math.tan(math.pi * f / FS)
         g.append(round(32768 * t / (1 + t)))
+    g32 = []
+    for i in range(256):
+        f = min(20 * (18000 / 20) ** (i / 255), 14400)
+        t = math.tan(math.pi * f / 32000)
+        g32.append(round(32768 * t / (1 + t)))
     dec = []
     for i in range(11):
         tau = 0.03 * (4.0 / 0.03) ** (i / 10)          # seconds to 1/e
         dec.append(round(65536 * (1 - math.exp(-(32 / FS) / tau))))
     return ''.join([HEAD, '/* the tables of ACHORD: see tools/gen_achord.py */\n',
                     table('u32', 'ac_inc12', inc12, 6), table('u32', 'ac_semi', semi), table('u32', 'ac_ratio', ratio),
-                    table('s16', 'ac_g', g, 16), table('u16', 'ac_dec', dec, 11)])
+                    table('s16', 'ac_g', g, 16), table('s16', 'ac_g32', g32, 16), table('u16', 'ac_dec', dec, 11)])
 
 
 def main():

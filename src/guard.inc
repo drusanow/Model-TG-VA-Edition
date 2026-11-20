@@ -7,7 +7,7 @@
 | starved. After GD_HOT such blocks in a row (one alone is a few notes
 | starting together, not an overload) the guard acts, one step at most every
 | GD_COOL blocks, so the load is measured again before the next:
-|   1. a DX or LXR track goes to 32 kHz (gd_eco): of those sounding, the one
+|   1. a DX, LXR or ACHORD track goes to 32 kHz (gd_eco): of those sounding, the one
 |      that costs the most (prof_trk). It renders two thirds of the samples,
 |      made up to 48 kHz by resampling (dx.inc, eco_rs.c; lxr.c), with no
 |      click: its top end goes to ~14-16 kHz, its pitch and lengths stay. It
@@ -188,7 +188,7 @@ gb_out:
     lea.l   %sp@(20),%sp
     rts
 
-| gb_slow(d4 = a track) -> d0 = 1 if it can run at 32 kHz (DX, LXR). Clobbers
+| gb_slow(d4 = a track) -> d0 = 1 if it can run at 32 kHz (DX, LXR, ACHORD). Clobbers
 | a0.
 gb_slow:
     lea.l   trk_mach,%a0
@@ -196,6 +196,8 @@ gb_slow:
     cmpil   #DX_MACH,%d0
     beqs    1f
     cmpil   #LX_MACH,%d0
+    beqs    1f
+    cmpil   #AC_MACH,%d0
     beqs    1f
     moveq   #0,%d0
     rts

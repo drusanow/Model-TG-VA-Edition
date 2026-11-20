@@ -593,8 +593,9 @@ in or out of a progression.
 Default sound: saw, a little sub, chorus I, a soft filter envelope, voices
 leading. Cost: 5,700 instructions a block for the default triad with chorus,
 up to 7,900 with four notes, saw and square and the chorus (a stock voice:
-~7,600). The CPU Guard may end one of its notes under heavy load, as any new
-machine's. Details: [ACHORD.md](ACHORD.md).
+~7,600). Under heavy load the CPU Guard first drops it to 32 kHz (15-18%
+cheaper, a little less top end, no click), and only then may end one of its
+notes, as any new machine's. Details: [ACHORD.md](ACHORD.md).
 
 ## Additions for every machine
 
@@ -699,15 +700,16 @@ sounding at once, with a heavy send effect, can fill it.
   taking over 90% of their time (a few in a row: one busy block alone, when
   several notes start together, is not an overload), the guard steps in, one
   step every 8 ms:
-  1. **first, a DX or LXR track drops to 32 kHz** - the one costing the most.
-     It keeps playing, at the same pitch and length; only its top end goes
-     (above about 14-16 kHz), and the change is seamless, without a click.
-     That saves about 28% of an LXR track and 14% of a DX track. It goes back
-     to full rate when it falls silent, or one track a second once the load
-     has stayed low.
-  2. **only when no DX or LXR track is left to slow**, it ends one note
+  1. **first, a DX, LXR or ACHORD track drops to 32 kHz** - the one costing
+     the most. It keeps playing, at the same pitch and length; only its top
+     end goes (above about 14-16 kHz), and the change is seamless, without a
+     click. That saves about 28% of an LXR track, 15-18% of an ACHORD track
+     and 14% of a DX track. It goes back to full rate when it falls silent,
+     or one track a second once the load has stayed low (an ACHORD track
+     waits for its next trig to go back, so a held chord stays smooth).
+  2. **only when no DX, LXR or ACHORD track is left to slow**, it ends one note
      early: of the new machines' notes still sounding (VA, the VA drums,
-     PLAITS, DX, LXR), the one that started longest ago, never one under
+     PLAITS, DX, LXR, ACHORD), the one that started longest ago, never one under
      16 ms old. It fades out over 10 ms, and its track then costs nothing
      until its next trig, which plays as always.
 

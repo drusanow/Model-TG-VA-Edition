@@ -352,6 +352,70 @@ class TCost(unittest.TestCase):
         self.assertLess(worst, 8500)
 
 
+class TRate32(unittest.TestCase):
+    """the CPU guard's 32 kHz: the same notes and level, no click either way, cheaper"""
+    def play(self, eco, blocks=900, switch=None, **kw):
+        e = emu()
+        e.w32(e.sym['gd_eco'], 1 if eco else 0)
+        tr = Track(e, **kw).set(VOICE=1, DRIFT=0)
+        if switch is None:
+            return tr.play(blocks, note=57)
+        a = tr.play(switch, note=57)
+        e.w32(e.sym['gd_eco'], 0 if eco else 1)
+        return np.concatenate([a, tr.play(blocks - switch, note=57, trig=False)])
+
+    def test_same_notes_and_level(self):
+        for shape, chorus in ((0, 0), (64, 1), (127, 3)):
+            a = self.play(0, shape=shape, color=100).astype(float)
+            b = self.play(1, shape=shape, color=100).astype(float)
+            tr = lambda x: x[9600:]
+            pa = sorted(round(midi(f)) % 12 for f in peaks(tr(a), 150, 500, 3))
+            pb = sorted(round(midi(f)) % 12 for f in peaks(tr(b), 150, 500, 3))
+            self.assertEqual(pa, pb, (shape, chorus))
+            ra, rb = np.sqrt(np.mean(tr(a) ** 2)), np.sqrt(np.mean(tr(b) ** 2))
+            self.assertLess(abs(20 * np.log10(rb / ra)), 1.0, (shape, chorus))
+
+    def test_no_click_either_way(self):
+        """down to 32 kHz at once; back to 48 kHz on the next trig (checked: it waits)"""
+        for shape in (0, 127):
+            for eco in (0,):
+                x = self.play(eco, blocks=400, switch=150, shape=shape, color=100)
+                at = 150 * 32
+                near = np.max(np.abs(np.diff(x[at - 64:at + 64])))
+                ref = max(np.max(np.abs(np.diff(x[at - 4800:at - 64]))), np.max(np.abs(np.diff(x[at + 64:at + 4800]))))
+                self.assertLess(near / ref, 1.5, (shape, eco))
+
+    def test_back_to_48k_on_the_next_trig(self):
+        e = emu()
+        e.w32(e.sym['gd_eco'], 1)
+        tr = Track(e).set(VOICE=1)
+        tr.play(20)
+        e.run('ac_eco', stack=[0])
+        self.assertEqual(e.d(0), 1)
+        e.w32(e.sym['gd_eco'], 0)                  # the guard lets it go...
+        tr.play(20, trig=False)
+        e.run('ac_eco', stack=[0])
+        self.assertEqual(e.d(0), 1)                # ...it holds 32 kHz until a trig
+        tr.play(2)
+        e.run('ac_eco', stack=[0])
+        self.assertEqual(e.d(0), 0)
+
+    def test_cheaper(self):
+        for shape, chorus in ((0, 1), (64, 3)):
+            cost = []
+            for eco in (0, 1):
+                e = emu()
+                e.w32(e.sym['gd_eco'], eco)
+                tr = Track(e, shape=shape, contour=free(14)).set(CHORUS=chorus)
+                tr.params()
+                e.w8(e.sym['dr_trig'], 1)
+                e.count_instructions('ac_fill', RET, stack=[0, STEP1, AC])
+                cost.append(max(e.count_instructions('ac_fill', RET, stack=[0, STEP1, AC]) for _ in range(4)))
+            if os.environ.get('VA_TEST_VERBOSE'):
+                print('\n  ACHORD shape %d chorus %d: %d at 48 kHz, %d at 32 kHz' % (shape, chorus, *cost))
+            self.assertLess(cost[1], 0.88 * cost[0], (shape, chorus))
+
+
 class TMenu(unittest.TestCase):
     def setUp(self):
         self.e = e = emu()

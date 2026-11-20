@@ -98,6 +98,18 @@ renders one voice at a time into the block's sums (fewer registers), the
 filter keeps its state in registers, the output stage is folded into the
 filter's or the chorus's loop.
 
+## Under load: 32 kHz
+
+When the CPU guard picks it (`gd_eco`, guard.inc), the track renders at 32
+kHz: 21 or 22 samples a block (`eco_n`, eco_rs.c, the resampling state DX
+uses), the increments x 1.5, the filter's cutoffs from `ac_g32` (held under
+14.4 kHz), the chorus's times two thirds as many samples; its envelope, drift
+and triangles step once a block as always. The samples are made up to the
+block's 32 frames linearly in the same pass as the output stage (at 48 kHz:
+the samples two late, so a change of rate carries on in time). It goes down
+at once, cleanly, and back up at its next trig. ~6,600 -> ~5,600 instructions
+for the default sound, ~8,300 -> ~6,800 for the heaviest.
+
 ## Tests
 
 `tests/test_achord.py`: every FREE type on its root; the key's chords under
