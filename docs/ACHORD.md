@@ -23,7 +23,12 @@ after them.
   compare a sample to know whether it is near the jump), Q14. Shape sets A
   and B: saw at 0, saw and square equally at 64, square at 96, then pw moves
   with a triangle (PWM RATE: 0.15 to 3.7 Hz, 0.7 at 3), up to +-40 % of the
-  cycle at 127. Two loops: saws alone, or both saws.
+  cycle at 127. The saws are rendered without testing every sample for the
+  jump: each group of four (OSC 1's, OSC 2's) runs its naive ramps in one
+  loop (`grp_ramp`, one load and store of the sum a sample), then `osc_fix`
+  adds the polyBLEP residual only at the samples around each jump (found by
+  division: a few a block at most) - the same values as `saw()` a sample at a
+  time, at about half the cost.
 - **OSC 2.** Each voice's second oscillator, OSC2 INT away (unison, +7, +12,
   -12, +19, +24 semitones); Color sets the detune, OSC 1 down and OSC 2 up
   by up to 20 cents each; OSC 2 takes half its voice's drift. Sweep balances them: OSC 1 x (127 - Sweep),
@@ -93,10 +98,10 @@ set 9 by `mi_fmtswap`).
 ## CPU
 
 `tests/test_achord.py` (`VA_TEST_VERBOSE=1`), instructions a block: OSC 1
-alone, saws, chorus I ~6,300; both oscillators on saws 7,900 (a triad) to
-9,100 (four voices and a bass); both on square or PWM with chorus I+II up to
-~13,000 (a stock voice ~7,600, LXR 7,900-9,150): the heaviest machine, eight
-band-limited oscillators. An idle track costs nothing (the amp stage's idle
+alone, saws, chorus I ~5,700; both oscillators on saws 6,700 (a triad) to
+7,000 (four voices and a bass); both on square or PWM with chorus I+II up to
+~9,400 (a stock voice ~7,600, LXR 7,900-9,150; before the grouped saws:
+7,900, 9,100 and 13,000). An idle track costs nothing (the amp stage's idle
 skip).
 
 ## Under load: 32 kHz
@@ -107,8 +112,9 @@ uses), the increments x 1.5, the chorus's times two thirds as many samples; its 
 and triangles step once a block as always. The samples are made up to the
 block's 32 frames linearly in the same pass as the output stage (at 48 kHz:
 the samples two late, so a change of rate carries on in time). It goes down
-at once, cleanly, and back up at its next trig. ~6,900 -> ~5,900 instructions
-with one oscillator, ~8,900 -> ~7,300 with saw + square and chorus I+II.
+at once, cleanly, and back up at its next trig. ~5,900 -> ~5,300 instructions
+with one oscillator (less saved now the oscillators are cheap: the rest is
+the block's own work).
 
 ## Tests
 

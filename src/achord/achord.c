@@ -380,11 +380,63 @@ static inline s32 ac_limit(s32 y)               /* 16-bit, softly limited toward
 	return neg ? -u : u;
 }
 
+/* Band-limited saws, a few times cheaper than saw() a sample at a time with the same values: the naive ramps of four
+ * oscillators at once (grp_ramp: one load and store of each sum a sample), then osc_fix, the polyBLEP residual only
+ * where an oscillator's jump falls - the sample after it, and the one before (here, or at the end of the block when
+ * the jump comes on the next block's first sample). A jump is a few samples a block at most. */
+/* grp_ramp(a, b, ph, inc, n, pw): a[i] += the four ramps (phase >> 17) after each step; b (if not 0) the same pw
+ * back (the pulse's second saw). Phases are not stored back. */
+static void grp_ramp(s32 *a, s32 *b, const u32 *ph, const u32 *inc, s32 n, u32 pw)
+{
+	u32 q0 = ph[0], q1 = ph[1], q2 = ph[2], q3 = ph[3];
+	u32 i0 = inc[0], i1 = inc[1], i2 = inc[2], i3 = inc[3];
+	s32 i;
+	if (!b)
+		for (i = 0; i < n; i++) {
+			q0 += i0;
+			q1 += i1;
+			q2 += i2;
+			q3 += i3;
+			a[i] += (s32)((q0 >> 17) + (q1 >> 17) + (q2 >> 17) + (q3 >> 17));
+		}
+	else
+		for (i = 0; i < n; i++) {
+			q0 += i0;
+			q1 += i1;
+			q2 += i2;
+			q3 += i3;
+			a[i] += (s32)((q0 >> 17) + (q1 >> 17) + (q2 >> 17) + (q3 >> 17));
+			b[i] += (s32)(((q0 - pw) >> 17) + ((q1 - pw) >> 17) + ((q2 - pw) >> 17) + ((q3 - pw) >> 17));
+		}
+}
+
+/* osc_fix(a, p, inc, r, n): the residuals of the saw whose phase was p before the block */
+static void osc_fix(s32 *a, u32 p, u32 inc, u32 r, s32 n)
+{
+	u32 d = -p, q = p + (u32)n * inc;
+	s32 m = d ? (s32)((d - 1) / inc) : 0;   /* the sample m is the first past the jump */
+	while (m < n) {
+		u32 pm = p + (u32)(m + 1) * inc, pb = pm - inc;
+		s32 x = (s32)(((pm >> 8) * r) >> 16);
+		a[m] -= 2 * x - ((x * x) >> 14) - 16384;
+		if (m > 0) {
+			x = (s32)((((u32)-pb >> 8) * r) >> 16);
+			a[m - 1] -= ((x * x) >> 14) - 2 * x + 16384;
+		}
+		d = -pm;
+		m += 1 + (s32)((d - 1) / inc);
+	}
+	if ((u32)-q < inc) {                    /* the jump on the next block's first sample: the one before it, here */
+		s32 x = (s32)((((u32)-q >> 8) * r) >> 16);
+		a[n - 1] -= ((x * x) >> 14) - 2 * x + 16384;
+	}
+}
+
 void ac_fill(s32 track, u32 step, s32 machine)
 {
 	AcV *v = &ac_v[track];
 	s32 *out = sampler_buf + 8;
-	s32 i, j, k, n, key, eco, trig = dr_trig[track];
+	s32 i, k, n, key, eco, trig = dr_trig[track];
 	u32 fine;
 	(void)machine;
 	if (!step)
@@ -513,35 +565,44 @@ void ac_fill(s32 track, u32 step, s32 machine)
 			/* the oscillators, one at a time into four sums: OSC 1's saws and its saws pw on, OSC 2's */
 			s32 s1[32], s2[32], t1[32], t2[32];
 			s32 o0 = nosc < 0 ? 4 : 0, o1 = nosc < 0 ? 8 : nosc;
-			for (i = 0; i < n; i++)
-				s1[i] = t1[i] = 0;
-			if (B)
+			/* each oscillator's group (OSC 1, OSC 2) at once: the sums start at minus their DC (16384 a
+			 * sounding saw; a silent voice's ramp stands still: its value) */
+			s32 g, c, cb;
+			for (g = o0 >> 2; g < (o1 >> 2); g++) {
+				s32 *a = g ? t1 : s1, *b = B ? (g ? t2 : s2) : 0;
+				u32 ph[4], in[4];
+				c = cb = 0;
+				for (k = 0; k < 4; k++) {
+					ph[k] = v->ph[4 * g + k];
+					in[k] = k < v->nv ? v->inc[4 * g + k] : 0;
+					if (k < v->nv) {
+						c -= 16384;
+						cb -= 16384;
+					} else {
+						c -= (s32)(ph[k] >> 17);
+						cb -= (s32)((ph[k] - pw) >> 17);
+					}
+				}
 				for (i = 0; i < n; i++)
-					s2[i] = t2[i] = 0;
-			for (k = o0; k < o1; k++) {
-				u32 p, inc, r;
-				s32 *a1, *a2;
-				j = k & 3;
-				if (j >= v->nv)
-					continue;
-				p = v->ph[k];
-				inc = v->inc[k];
-				r = v->rinc[k];
-				a1 = k < 4 ? s1 : t1;
-				a2 = k < 4 ? s2 : t2;
-				if (!B)                         /* saws */
-					for (i = 0; i < n; i++) {
-						p += inc;
-						a1[i] += saw(p, inc, r);
-					}
-				else                            /* and the saw pw on: their difference is the pulse */
-					for (i = 0; i < n; i++) {
-						p += inc;
-						a1[i] += saw(p, inc, r);
-						a2[i] += saw(p - pw, inc, r);
-					}
-				v->ph[k] = p;
+					a[i] = c;
+				if (b)
+					for (i = 0; i < n; i++)
+						b[i] = cb;
+				grp_ramp(a, b, ph, in, n, pw);
+				for (k = 0; k < v->nv; k++) {
+					u32 r = v->rinc[4 * g + k];
+					osc_fix(a, ph[k], in[k], r, n);
+					if (b)
+						osc_fix(b, ph[k] - pw, in[k], r, n);
+					v->ph[4 * g + k] = ph[k] + (u32)n * in[k];
+				}
 			}
+			if (o0)                             /* (OSC 1 silent) */
+				for (i = 0; i < n; i++)
+					s1[i] = s2[i] = 0;
+			if (o1 == 4)                        /* (OSC 2 silent) */
+				for (i = 0; i < n; i++)
+					t1[i] = t2[i] = 0;
 			/* the mix, the sub (band-limited), DRIVE (a soft clip), GRIT (fewer bits, a sample held) */
 			{
 				u32 sp = v->sph;

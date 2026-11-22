@@ -599,10 +599,10 @@ Default sound: detuned saws (a touch of square), both oscillators, a little
 sub and drive, chorus I, voices leading. For a big techno chord: Shape 0,
 Sweep 64, Color around 60, OSC2 INT +1 OCT, a little DRIVE, and the track's
 Filter with an LFO on it. For IDM grit: +5TH, more DRIVE and some GRIT. Cost:
-about 6,300 instructions a block with OSC 1 alone, 7,900-9,100 with both
-oscillators on saws, up to about 13,000 with both on square or PWM and chorus
-I+II (a stock voice: ~7,600) - the heaviest machine, so the CPU Guard may
-drop it to 32 kHz when many tracks play. Under heavy load the CPU Guard first drops it to 32 kHz (15-18%
+about 5,700 instructions a block with OSC 1 alone, 6,700-7,000 with both
+oscillators on saws, up to about 9,400 with both on square or PWM and chorus
+I+II (a stock voice: ~7,600). Saws are the cheapest; square and PWM cost the
+most. Under heavy load the CPU Guard first drops it to 32 kHz (15-18%
 cheaper, a little less top end, no click), and only then may end one of its
 notes, as any new machine's. Details: [ACHORD.md](ACHORD.md).
 

@@ -383,7 +383,7 @@ class TCost(unittest.TestCase):
                 worst = max(worst, n)
         if os.environ.get('VA_TEST_VERBOSE'):
             print('\n  ac_fill instructions a block (worst):', worst)
-        self.assertLess(worst, 13500)
+        self.assertLess(worst, 10000)
 
 
 class TRate32(unittest.TestCase):
@@ -447,7 +447,7 @@ class TRate32(unittest.TestCase):
                 cost.append(max(e.count_instructions('ac_fill', RET, stack=[0, STEP1, AC]) for _ in range(4)))
             if os.environ.get('VA_TEST_VERBOSE'):
                 print('\n  ACHORD shape %d chorus %d: %d at 48 kHz, %d at 32 kHz' % (shape, chorus, *cost))
-            self.assertLess(cost[1], 0.88 * cost[0], (shape, chorus))
+            self.assertLess(cost[1], 0.93 * cost[0], (shape, chorus))
 
 
 class TMenu(unittest.TestCase):

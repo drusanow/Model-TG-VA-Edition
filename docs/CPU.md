@@ -83,8 +83,8 @@ GD_COOL (12) blocks, so the load is measured again first:
    larger than in the second around it). Back at 48 kHz the frames run up to
    1.6% faster for a block or two until they fall on the samples again.
    Costs (Unicorn): LXR 7,600-8,900 -> 5,500-6,300 instructions a block
-   (-28%), DX ~7,300 -> ~6,400 (-14%), ACHORD ~6,900 -> ~5,900 and ~8,900 ->
-   ~7,300 (-15 to -18%: much of its work is the block's own). A track returns
+   (-28%), DX ~7,300 -> ~6,400 (-14%), ACHORD ~5,900 -> ~5,300 and ~7,000 ->
+   ~6,100 (-10 to -13%: much of its work is the block's own). A track returns
    to 48 kHz when it falls silent or is no longer DX, LXR or ACHORD, and one
    track every GD_CALM (1,500 blocks, 1 s) of load under GD_LO (70%) - an
    ACHORD track at its next trig (`ac_fill`: going back mid-note, the waves'
