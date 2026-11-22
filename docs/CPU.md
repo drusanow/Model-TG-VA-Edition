@@ -72,8 +72,7 @@ GD_COOL (12) blocks, so the load is measured again first:
    envelopes', the transient's and the decimator's steps x 44140 / 32000);
    DX renders 21 or 22 samples a block instead of 32 (`eco_n`, the
    increments x 1.5; its envelopes, LFO and pitch EG step once a block as
-   always); ACHORD renders 21 or 22 too (the increments x 1.5, so its voices
-   read smaller wavetables with harmonics under 12 kHz, the chorus's times
+   always); ACHORD renders 21 or 22 too (the increments x 1.5, the chorus's times
    two thirds as many samples), its interpolation folded into its output
    stage. All are made up to 48 kHz by linear interpolation (the
    cheapest: for DX much of what 32 kHz saves would go into a 4-point
@@ -84,8 +83,8 @@ GD_COOL (12) blocks, so the load is measured again first:
    larger than in the second around it). Back at 48 kHz the frames run up to
    1.6% faster for a block or two until they fall on the samples again.
    Costs (Unicorn): LXR 7,600-8,900 -> 5,500-6,300 instructions a block
-   (-28%), DX ~7,300 -> ~6,400 (-14%), ACHORD ~6,500 -> ~5,600 and ~8,200 ->
-   ~6,800 (-15 to -18%: much of its work is the block's own). A track returns
+   (-28%), DX ~7,300 -> ~6,400 (-14%), ACHORD ~6,900 -> ~5,900 and ~8,900 ->
+   ~7,300 (-15 to -18%: much of its work is the block's own). A track returns
    to 48 kHz when it falls silent or is no longer DX, LXR or ACHORD, and one
    track every GD_CALM (1,500 blocks, 1 s) of load under GD_LO (70%) - an
    ACHORD track at its next trig (`ac_fill`: going back mid-note, the waves'

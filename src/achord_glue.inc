@@ -125,12 +125,12 @@ ac_swap:
     .long 4144, s_ach, s_acc, s_achs, 0x40129ac2, 0x4012996f, 0x401299d9
     .long -1,0,0,0,0,0,0
 s_acc:   .asciz "ACHORD"
-s_acb:   .asciz "Warp"
-s_acbs:  .asciz "WARP"
+s_acb:   .asciz "Detune"
+s_acbs:  .asciz "DETN"
 s_acw:   .asciz "Wave"
 s_acws:  .asciz "WAVE"
-s_acf:   .asciz "Move"
-s_acfs:  .asciz "MOVE"
+s_acf:   .asciz "Osc 2"
+s_acfs:  .asciz "OSC2"
 s_ach:   .asciz "Chord"
 s_achs:  .asciz "CHRD"
     .align 2

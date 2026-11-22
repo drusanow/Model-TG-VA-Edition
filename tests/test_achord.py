@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Host tests for ACHORD (machine 14, src/achord/achord.c; glue src/achord_glue.inc): the chords it builds - FREE
 types, keys and scales, SNAP and DEGREES, progressions and their advance, USER steps - their voicing (AUTO voice
-leading, CLOSE, OPEN, DROP 2, WIDE, the bass), the strum, the sound (the notes in the spectrum, the wavetables -
-built from their spectra, band-limited at each size - the wave, the warp, the envelope, DRIVE, GRIT, the chorus, level,
-bounds), the settings page, the settings saved with the pattern, the page's labels and Contour's
+leading, CLOSE, OPEN, DROP 2, WIDE, the bass), the strum, the sound (the notes in the spectrum, band-limited high notes,
+Shape, OSC 2's detune, interval and level, PWM RATE, DRIVE, GRIT, the chorus, level, bounds), the settings page, the settings saved with the pattern, the page's labels and Contour's
 names, the plumbing, and the cost. The firmware's own code runs (Unicorn, tests/va_emu.py).
 
     python3 -m unittest tests.test_achord -v
@@ -23,31 +22,22 @@ OUT = SCRATCH + 0x62000
 STEP1 = 0x10000                                   # note 60
 FS = 48000
 S = dict(KEY=0, SCALE=1, NOTES=2, PROG=3, ADV=4, U0=5, VOICE=13, BASS=14, STRUM=15, SUB=16, CHORUS=17, DRIFT=18,
-         TABLE=19, DECAY=20, DRIVE=21, GRIT=22)
+         INT=19, PWM=20, DRIVE=21, GRIT=22)
 SCALES = ['FREE', 'MAJOR', 'MINOR', 'DORIAN', 'MIXOLYD', 'HARM MIN', 'PHRYGIAN', 'LYDIAN']
 FREE = ['MAJ', 'MIN', '7', 'MAJ7', 'MIN7', 'M7B5', 'DIM', 'DIM7', 'AUG', 'SUS2', 'SUS4', '6', 'MIN6', 'ADD9', '9', 'MIN9']
 FREE_IV = [{0, 4, 7}, {0, 3, 7}, {0, 4, 7, 10}, {0, 4, 7, 11}, {0, 3, 7, 10}, {0, 3, 6, 10}, {0, 3, 6}, {0, 3, 6, 9},
            {0, 4, 8}, {0, 2, 7}, {0, 5, 7}, {0, 4, 7, 9}, {0, 3, 7, 9}, {0, 4, 7, 2}, {0, 4, 10, 2}, {0, 3, 10, 2}]
 KEYT = ['TRIAD', '7TH', '9TH', 'ADD9', 'SUS2', 'SUS4', '6TH', 'POWER']
 EMU = None
-WT = None                                         # the wavetables, built once (ac_wt_build), then put back
-WT_BYTES = 32 * 501 * 2
 
 
-def emu(build=True):
-    global EMU, WT
+def emu():
+    global EMU
     if EMU is None:
         EMU = Emu()
     else:
         EMU.reset()
     EMU.uc.mem_write(SET, bytes(32))
-    if build:
-        if WT is None:
-            EMU.run('ac_wt_build', limit=400_000_000)
-            WT = (bytes(EMU.uc.mem_read(EMU.sym['ac_wt'], WT_BYTES)), EMU.r32(EMU.sym['ac_wt_job']))
-        else:
-            EMU.uc.mem_write(EMU.sym['ac_wt'], WT[0])
-            EMU.w32(EMU.sym['ac_wt_job'], WT[1])
     return EMU
 
 
@@ -69,7 +59,7 @@ def ksize(i):
 
 class Track:
     """one ACHORD track in the emulator: its dials, its settings, its blocks"""
-    def __init__(self, e, t=0, color=0, shape=32, sweep=0, contour=free(0)):
+    def __init__(self, e, t=0, color=0, shape=32, sweep=0, contour=free(0)):  # (sweep 0: OSC 1 alone)
         self.e, self.t = e, t
         self.d = [color << 8, shape << 8, sweep << 8, contour]
 
@@ -306,80 +296,46 @@ class TSound(unittest.TestCase):
             tr = Track(e, color=rnd.randrange(128), shape=rnd.randrange(128), sweep=rnd.randrange(128),
                        contour=rnd.randrange(128) << 8)
             for k, top in (('KEY', 11), ('SCALE', 7), ('PROG', 17), ('VOICE', 4), ('BASS', 2), ('SUB', 10),
-                           ('CHORUS', 3), ('DRIFT', 10), ('TABLE', 3), ('DECAY', 10), ('STRUM', 10),
+                           ('CHORUS', 3), ('DRIFT', 10), ('INT', 5), ('PWM', 10), ('STRUM', 10),
                            ('DRIVE', 10), ('GRIT', 10)):
                 tr.set(**{k: rnd.randrange(top + 1)})
             x = tr.play(30, note=rnd.randrange(24, 100))
             self.assertLessEqual(np.max(np.abs(x)), 32767)
 
-    def test_wavetables_from_their_spectra(self):
-        """every wave at every size: the sum of its harmonics (64 >> size of them), as gen_achord.py drew them"""
-        e = emu()
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools'))
-        import gen_achord
-        txt = gen_achord.spec_table()
-        rows = [[int(v) for v in ln.strip().strip('{},').split(',')] for ln in txt.splitlines()[1:-1]]
-        sin = [s16(e.r16(SRAM_SIN + 4 * i)) for i in range(256)]
-        offs = [0, 257, 386, 451, 484]
-        for w in (0, 5, 9, 15, 20, 31):
-            sp = rows[w]
-            for l in range(5):
-                n, hn = 256 >> l, 64 >> l
-                got = [s16(e.r16(e.sym['ac_wt'] + 2 * (w * 501 + offs[l] + i))) for i in range(n + 1)]
-                for i in range(0, n + 1, 7):
-                    acc = sum((sp[2 * h] * sin[(i * (h + 1) << l) & 255] + sp[2 * h + 1] * sin[((i * (h + 1) << l) + 64) & 255])
-                              >> 15 for h in range(hn))
-                    self.assertEqual(got[i], max(-32767, min(32767, acc)), (w, l, i))
-                self.assertEqual(got[n], got[0])                   # (the wrap)
-
-    def test_built_a_piece_a_block_in_silence(self):
-        e = emu(build=False)
-        tr = Track(e)
-        x = tr.play(20)
-        self.assertEqual(np.max(np.abs(x)), 0)
-        self.assertEqual(e.r32(e.sym['ac_wt_job']), 20)
-        e.w8(e.sym['dr_trig'] + 2, 1)
-        Track(e, t=2).play(3, trig=False)                           # another track waits its turn
-        self.assertEqual(e.r32(e.sym['ac_wt_job']), 20)
-
     def test_band_limited(self):
         """high notes read smaller waves: little above 20 kHz's mirror (aliases under the notes' harmonics)"""
-        for bank, shape in ((0, 70), (1, 127), (3, 127)):
-            x = Track(emu(), shape=shape).set(CHORUS=0, TABLE=bank, VOICE=1, DRIFT=0).play(300, note=96)[4800:]
+        for bank, shape in ((0, 0), (1, 64), (2, 120)):
+            x = Track(emu(), shape=shape).set(CHORUS=0, VOICE=1, DRIFT=0).play(300, note=96)[4800:]
             s = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2
             f = np.fft.rfftfreq(len(x), 1 / FS)
             harm = np.zeros(len(f), bool)
             for f0 in [440 * 2 ** ((m - 69) / 12) for m in (96, 100, 103)]:
                 for k in range(1, 40):                         # (k / 2: the sub, an octave under the lowest)
                     harm |= np.abs(f - k * f0 / 2) < 15
-            self.assertLess(s[~harm & (f > 50)].sum() / s.sum(), 0.012, bank)
+            self.assertLess(s[~harm & (f > 50)].sum() / s.sum(), 0.02, bank)   # (polyBLEP at C7)
 
-    def test_wave_warp_and_banks_change_it(self):
+    def test_shape_and_osc2_change_it(self):
         base = Track(emu(), shape=0).set(CHORUS=0).play(100)
-        for kw, sets in ((dict(shape=100), {}), (dict(shape=0, color=90), {}), (dict(shape=0), dict(TABLE=1)),
-                         (dict(shape=0), dict(TABLE=3))):
+        for kw, sets in ((dict(shape=100), {}), (dict(sweep=64, color=60), {}), (dict(sweep=64), dict(INT=2))):
             other = Track(emu(), **kw).set(CHORUS=0, **sets).play(100)
             self.assertGreater(np.std(other - base), 500, (kw, sets))
 
-    def test_warp_brightens(self):
-        def hi(color):
-            x = Track(emu(), color=color, shape=0).set(CHORUS=0, SUB=0, DRIVE=0).play(200)[4800:]
-            s = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2
-            f = np.fft.rfftfreq(len(x), 1 / FS)
-            return s[f > 1000].sum() / s.sum()
-        self.assertLess(hi(0), 0.001)                              # sines
-        self.assertGreater(hi(32), 0.0002)                         # the warp makes harmonics
-        self.assertGreater(hi(64), 0.003)
-        self.assertGreater(hi(100), 5 * hi(32))
+    def test_osc2_interval_and_detune(self):
+        """OSC 2 alone (Sweep 127) an octave up: the chord's notes an octave up; detuned: OSC 1 and 2 apart"""
+        x = Track(emu(), sweep=127, shape=0).set(CHORUS=0, SUB=0, VOICE=1, DRIFT=0, INT=2).play(400)[4800:]
+        self.assertEqual(sorted(round(midi(f)) for f in peaks(x, 400, 1000, 3)), [72, 76, 79])
+        def root(sweep, color):                    # C4 of OSC 1 or OSC 2 alone
+            x = Track(emu(), sweep=sweep, color=color, shape=0).set(CHORUS=0, SUB=0, VOICE=1, DRIFT=0).play(600)[4800:]
+            return peaks(x, 240, 280, 1)[0]
+        c = lambda a, b: 1200 * np.log2(a / b)
+        self.assertAlmostEqual(c(root(127, 127), root(127, 0)), 20, delta=2)   # OSC 2 20 cents up
+        self.assertAlmostEqual(c(root(0, 127), root(0, 0)), -20, delta=2)      # OSC 1 20 down
 
-    def test_envelope_moves_the_wave(self):
-        x = Track(emu(), shape=0, sweep=127).set(CHORUS=0, SUB=0, DRIVE=0, DECAY=1).play(600)
-
-        def hi(y):                                  # sine (the end) -> pulse (the start)
-            s = np.abs(np.fft.rfft(y * np.hanning(len(y)))) ** 2
-            return s[np.fft.rfftfreq(len(y), 1 / FS) > 1000].sum() / s.sum()
-        self.assertGreater(hi(x[480:2400]), 0.1)
-        self.assertLess(hi(x[-4800:]), 0.01)
+    def test_osc2_level(self):
+        a = Track(emu(), sweep=0).set(CHORUS=0, SUB=0, DRIVE=0).play(200)[4800:]
+        b = Track(emu(), sweep=64, color=50).set(CHORUS=0, SUB=0, DRIVE=0).play(200)[4800:]
+        rms = lambda y: np.sqrt(np.mean(y ** 2))
+        self.assertGreater(rms(b), 1.2 * rms(a))                   # both: louder, thicker
 
     def test_drive_and_grit(self):
         clean = Track(emu(), shape=0).set(CHORUS=0, DRIVE=0).play(100)[1600:]
@@ -416,10 +372,10 @@ class TSound(unittest.TestCase):
 class TCost(unittest.TestCase):
     def test_cpu(self):
         worst = 0
-        for shape, color in ((0, 0), (68, 0), (68, 120), (127, 60)):
+        for shape, sweep in ((0, 0), (0, 64), (64, 64), (127, 64)):
             for chorus in (0, 3):
                 e = emu()
-                tr = Track(e, shape=shape, color=color, contour=free(14)).set(CHORUS=chorus, BASS=1, SUB=8, GRIT=2)
+                tr = Track(e, shape=shape, color=40, sweep=sweep, contour=free(14)).set(CHORUS=chorus, BASS=1, SUB=8, GRIT=2)
                 tr.params()
                 e.w8(e.sym['dr_trig'], 1)
                 e.count_instructions('ac_fill', RET, stack=[0, STEP1, AC])
@@ -427,7 +383,7 @@ class TCost(unittest.TestCase):
                 worst = max(worst, n)
         if os.environ.get('VA_TEST_VERBOSE'):
             print('\n  ac_fill instructions a block (worst):', worst)
-        self.assertLess(worst, 10500)
+        self.assertLess(worst, 13500)
 
 
 class TRate32(unittest.TestCase):
@@ -535,7 +491,7 @@ class TMenu(unittest.TestCase):
             t = self.draw()
             names.append(t[-2] if r < 23 else t[-1])
         self.assertEqual(names[-1], 'PUT BACK DEFAULTS')
-        for n in ('ENV DECAY', 'TABLE', 'DRIVE', 'GRIT'):
+        for n in ('OSC2 INT', 'PWM RATE', 'DRIVE', 'GRIT'):
             self.assertIn(n, names)
         self.turn(1, -100)
         self.turn(5, 7)
@@ -676,7 +632,7 @@ class TPage(unittest.TestCase):
         e.run('apply_names', regs={D[1]: 9})
         rd = lambda a: bytes(e.uc.mem_read(a, 16)).split(b'\0')[0].decode()
         names = [rd(e.r32(0x4010dce0 + off + 44)) for off in (2576, 3472, 4088, 4144)]
-        self.assertEqual(names, ['Warp', 'Wave', 'Move', 'Chord'])
+        self.assertEqual(names, ['Detune', 'Wave', 'Osc 2', 'Chord'])
 
     def test_contour_names(self):
         e = emu()

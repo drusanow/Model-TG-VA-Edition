@@ -7,20 +7,15 @@
  * Built with src/lxr/lxr.c into src/lxr/lxr_gen.s (tools/gen_lxr.py), which includes this file at its end; it uses
  * nothing of lxr.c's but its types and the OVL section macro. Its own tables: tools/gen_achord.py.
  *
- * THE SOUND: four voices, each reading a wavetable - four banks of eight single-cycle waves (ANALOG: sine to narrow
- * pulse; SYNC: a hard-synced saw, its slave from 1x to 8x; DIGITAL: a saw with a resonant peak climbing its harmonics;
- * FM: two-operator spectra, the index rising), Shape scanning the bank and the envelope moving it on each trig - their
- * phase warped (phase distortion: the cycle's first half squeezed), with a square sub an octave under the lowest
- * voice, DRIVE (a soft clip pushed harder) and GRIT (fewer bits, held samples), then a bucket-brigade-style chorus.
- * No filter of its own: the track's Filter and Resonance (Model-TG's, as every machine's), which the LFOs can move.
- * Each voice drifts a little, and each sits a few cents off the others.
- * The waves are band-limited: each is kept at five sizes (256 samples, 64 harmonics, down to 16 samples and 4), built
- * once from its spectrum (ac_spec, tools/gen_achord.py) with the OS's own sine into RAM above the overlay (ac_wt,
- * model_tg.s), a little each block the first time an ACHORD track plays (about 0.4 s of silence after a boot); a
- * voice reads the largest whose harmonics stay under 18 kHz (at the warp's steepest slope).
- *   Color   WARP  the phase warp: 0 the plain wave, up to the first half of the cycle ten times as fast
- *   Shape   WAVE  where in the bank (eight waves, crossfaded)
- *   Sweep   MOVE  how far the envelope (ENV DECAY) moves the wave on each trig
+ * THE SOUND (paraphonic, as the VA machine made a chord): four voices, each two oscillators - a saw and a pulse on
+ * one phase (the pulse: a second saw pw on, subtracted), band-limited (polyBLEP) - OSC 2 detuned against OSC 1
+ * and set an interval away (OSC2 INT); a square sub an octave under the lowest voice; DRIVE (a soft clip pushed
+ * harder) and GRIT (fewer bits, held samples); a bucket-brigade-style chorus. No filter of its own: the track's Filter
+ * and Resonance (Model-TG's, as every machine's), which the LFOs can move. Each voice drifts a little, and each sits a
+ * few cents off the others.
+ *   Color   DETN  OSC 2 against OSC 1: 0 in tune, up to 40 cents apart (each half of it, either way)
+ *   Shape   WAVE  saw, saw + square, square, then the pulse narrowing and moving (PWM, at PWM RATE)
+ *   Sweep   OSC2  OSC 2's level: 0 OSC 1 alone, 64 both alike, 127 OSC 2 alone
  *   Contour CHRD  the chord: its type (FREE: MAJ, MIN, 7 ...) or, in a key, its size (TRIAD, 7TH, 9TH ...)
  * Pitch and the keyboard give the note; the track's amp stage (Attack, Decay) shapes the level, as every machine's.
  *
@@ -30,8 +25,8 @@
  * chord on it; DEGREES: each semitone up is the next chord of the key, so the pads play I, ii, iii ...); PROG (off,
  * sixteen progressions, or USER, the eight steps below it) and ADVANCE (a chord a trig, or a bar, two or four, with
  * the pattern); VOICING (AUTO: each chord's notes moved as little as they can from the last, as a player would;
- * CLOSE, OPEN, DROP 2, WIDE); BASS (the root an octave or two below); STRUM; SUB; CHORUS; DRIFT; TABLE (the bank);
- * ENV DECAY; DRIVE; GRIT.
+ * CLOSE, OPEN, DROP 2, WIDE); BASS (the root an octave or two below); STRUM; SUB; CHORUS; DRIFT; OSC2 INT;
+ * PWM RATE; DRIVE; GRIT.
  *
  * Contract: ac_params(track, trackData, settings) once a block, then ac_fill(track, step, machine), which writes 64
  * values at sampler_buf+32 (96 kHz, each 48 kHz sample twice, a sample << 15) and reads and clears dr_trig[track].
@@ -41,12 +36,12 @@ typedef signed char s8;
 
 #define AC_SET 24                               /* a track's settings: each stored + 1, 0 = the default */
 enum { S_KEY, S_SCALE, S_NOTES, S_PROG, S_ADV, S_U0, S_U7 = S_U0 + 7, S_VOICE, S_BASS, S_STRUM, S_SUB, S_CHORUS,
-       S_DRIFT, S_TABLE, S_DECAY, S_DRIVE, S_GRIT, N_S };
+       S_DRIFT, S_INT, S_PWM, S_DRIVE, S_GRIT, N_S };
 /* each setting's largest value and its default */
 static const u8 s_max[N_S] __attribute__((section(".lxr_ro"), aligned(4))) = {
-	11, 7, 1, 17, 3, 7, 7, 7, 7, 7, 7, 7, 7, 4, 2, 10, 10, 3, 10, 3, 10, 10, 10};
+	11, 7, 1, 17, 3, 7, 7, 7, 7, 7, 7, 7, 7, 4, 2, 10, 10, 3, 10, 5, 10, 10, 10};
 static const u8 s_def[N_S] __attribute__((section(".lxr_ro"), aligned(4))) = {
-	0, 0, 0, 0, 0, 0, 4, 5, 3, 7, 7, 7, 7, 0, 0, 0, 4, 1, 3, 0, 5, 3, 0};
+	0, 0, 0, 0, 0, 0, 4, 5, 3, 7, 7, 7, 7, 0, 0, 0, 4, 1, 3, 0, 3, 3, 0};
 
 static inline s32 setv(const u8 *set, s32 i)
 {
@@ -91,11 +86,11 @@ static s32 adv_wrap(s32 p, s32 len);
 /* ---- the voice ---------------------------------------------------------------------------------------------- */
 #define AC_DL 256                               /* the chorus's line: 5.3 ms, kept twice (reads never wrap) */
 typedef struct {
-	u32 ph[4], inc[4], rinc[4];             /* the voices' phases, increments, 2^30 / (inc >> 8) */
+	u32 ph[8], inc[8], rinc[8];             /* the oscillators' phases, increments, 2^30 / (inc >> 8): OSC 1 of
+						 * each voice, then OSC 2 */
 	s32 note[4], tgt[4], wait[4];           /* their notes (MIDI), the notes they go to, blocks until they do */
 	s32 nv;                                 /* voices sounding */
 	u32 sph;                                /* the sub-oscillator's phase */
-	s32 env, att;                           /* the wave's envelope, Q16; attacking */
 	s32 gh, gn;                             /* GRIT: the sample held, samples until the next */
 	s32 drift[4];                           /* each voice's drift, 1/16 cent */
 	u32 seed, lfo, pwm;                     /* the drift's noise; the chorus's and the PWM's triangles */
@@ -385,47 +380,6 @@ static inline s32 ac_limit(s32 y)               /* 16-bit, softly limited toward
 	return neg ? -u : u;
 }
 
-/* ---- the wavetables: 32 waves (four banks of eight), each at five sizes, built from ac_spec into ac_wt ----------- */
-#define AC_WAVE 501                             /* a wave's samples: 256 + 128 + 64 + 32 + 16, each size + 1 (wrap) */
-static const u16 ac_loff[5] __attribute__((section(".lxr_ro"), aligned(4))) = {0, 257, 386, 451, 484};
-extern s16 ac_wt[];                             /* 32 x AC_WAVE, in RAM above the overlay (model_tg.s) */
-static s32 ac_wt_job OVL;                       /* the next piece to build (AC_JOBS: all built) */
-static s32 ac_wt_own OVL, ac_wt_idle OVL;       /* the track building them (one piece a block), calls since */
-#define AC_PIECES 20                            /* a wave's pieces of up to 32 samples: 9 + 5 + 3 + 2 + 1 */
-#define AC_JOBS (32 * AC_PIECES)
-static const u8 ac_piece[AC_PIECES][2] __attribute__((section(".lxr_ro"), aligned(4))) = {
-	{0, 0}, {0, 32}, {0, 64}, {0, 96}, {0, 128}, {0, 160}, {0, 192}, {0, 224}, {0, 255},
-	{1, 0}, {1, 32}, {1, 64}, {1, 96}, {1, 128}, {2, 0}, {2, 32}, {2, 64}, {3, 0}, {3, 32}, {4, 0}};
-
-/* one piece: up to 32 samples of one size of one wave, each the sum of its harmonics (64 >> size of them) */
-static void ac_wt_piece(s32 job)
-{
-	s32 w = job / AC_PIECES, l = ac_piece[job % AC_PIECES][0], i0 = ac_piece[job % AC_PIECES][1];
-	s32 len = 256 >> l, i, h, hn = 64 >> l, end;
-	const s16 *sp = ac_spec[w];
-	s16 *t = ac_wt + w * AC_WAVE + ac_loff[l];
-	end = i0 + 32;
-	if (i0 == 255)                          /* (the last piece of the largest: 255 and the wrap) */
-		end = 257;
-	if (end > len + 1)
-		end = len + 1;
-	for (i = i0; i < end; i++) {
-		s32 acc = 0;
-		u32 st = (u32)i << l, k = st;
-		for (h = 0; h < hn; h++, k += st)   /* sin and cos of harmonic h + 1 at sample i: index k, k + 64 */
-			acc += (sp[2 * h] * LX_SIN[2 * (k & 255)] + sp[2 * h + 1] * LX_SIN[2 * ((k + 64) & 255)]) >> 15;
-		t[i] = (s16)(acc > 32767 ? 32767 : (acc < -32767 ? -32767 : acc));
-	}
-}
-
-/* ac_wt_build() -> 1 once every wave is there (the tests build them all at once) */
-s32 ac_wt_build(void)
-{
-	while (ac_wt_job < AC_JOBS)
-		ac_wt_piece(ac_wt_job++);
-	return 1;
-}
-
 void ac_fill(s32 track, u32 step, s32 machine)
 {
 	AcV *v = &ac_v[track];
@@ -433,18 +387,6 @@ void ac_fill(s32 track, u32 step, s32 machine)
 	s32 i, j, k, n, key, eco, trig = dr_trig[track];
 	u32 fine;
 	(void)machine;
-	if (ac_wt_job < AC_JOBS) {              /* the waves are not all built yet: silence, and one track builds a
-						 * piece a block (another takes over if it stops) */
-		if (!ac_wt_own || ac_wt_own == track + 1 || ++ac_wt_idle > 8) {
-			ac_wt_own = track + 1;
-			ac_wt_idle = 0;
-			ac_wt_piece(ac_wt_job++);
-		}
-		dr_trig[track] = 0;
-		for (i = 0; i < 64; i++)
-			out[i] = 0;
-		return;
-	}
 	if (!step)
 		step = 0x10000;
 	dr_trig[track] = 0;
@@ -474,22 +416,18 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		}
 		if (!v->started) {
 			v->seed = 0x9e3779b9u * (u32)(track + 1);
-			for (i = 0; i < 4; i++)
+			for (i = 0; i < 8; i++)
 				v->ph[i] = ac_rnd(&v->seed);
 		}
 		v->nv = nv;
 		v->key = key;
 		v->started = 1;
 	}
-	if (trig) {
-		v->att = 1;
-		v->env = v->env > 0 ? v->env : 0;
-	}
 	/* ---- the rate: 48 kHz, or 32 kHz when the CPU guard asks (guard.inc: gd_eco). eco_n (src/lxr/eco_rs.c, as
 	 * DX's) gives the samples to render, 32 or 21-22; eco_out makes them the block's 32 frames (linearly at 32 kHz, a
 	 * copy two samples late at 48 kHz), so a change of rate carries on from the same place in the sound. At 32 kHz the
-	 * increments are x 1.5 (so the voices read smaller waves: the harmonics stay under 12 kHz) and the chorus's
-	 * times are two thirds as many samples; the envelope, the drift and the triangles step once a block as always ---- */
+	 * increments are x 1.5 and the chorus's times are two
+	 * thirds as many samples; the drift and the triangles step once a block as always ---- */
 	eco = (gd_eco >> track) & 1;
 	/* (back to 48 kHz on the next trig: a saw's edges would show the resampling's change of spacing mid-note;
 	 * down to 32 kHz is clean) */
@@ -497,10 +435,12 @@ void ac_fill(s32 track, u32 step, s32 machine)
 		eco = 1;
 	v->eco = eco;
 	n = eco_n(track, eco);
-	/* ---- once a block: the strum, the drift, the increments, the envelope, the cutoff ---- */
+	/* ---- once a block: the strum, the drift, the increments (OSC 2: the interval, the detune) ---- */
 	{
-		s32 drift = setv(v->set, S_DRIFT);
+		s32 drift = setv(v->set, S_DRIFT), det = (v->dial[0] >> 8) * 320 / 127;   /* the detune, 1/16 cent */
 		static const s8 spread[4] = {-3, 2, -1, 4};
+		static const s8 ints[6] = {0, 7, 12, -12, 19, 24};
+		s32 iv2 = ints[setv(v->set, S_INT)];
 		for (i = 0; i < v->nv; i++) {
 			s32 c;
 			if (v->wait[i] > 0)
@@ -513,108 +453,101 @@ void ac_fill(s32 track, u32 step, s32 machine)
 			if (v->drift[i] < -drift * 24)
 				v->drift[i] = -drift * 24;
 			c = spread[i] * drift * 16 / 5 + v->drift[i];  /* 1/16 cent */
-			v->inc[i] = mul16(mul16(note_inc(v->note[i]), fine), (u32)(65536 + c * 37 / 16));
-			if (eco)
+			{
+				s32 nt2 = v->note[i] + iv2;
+				nt2 = nt2 < 0 ? 0 : (nt2 > 127 ? 127 : nt2);
+				v->inc[i] = mul16(mul16(note_inc(v->note[i]), fine), (u32)(65536 + (c - det) * 37 / 16));
+				v->inc[4 + i] = mul16(mul16(note_inc(nt2), fine), (u32)(65536 + (c + det - v->drift[i] / 2) * 37 / 16));
+			}
+			if (eco) {
 				v->inc[i] += v->inc[i] >> 1;
+				v->inc[4 + i] += v->inc[4 + i] >> 1;
+			}
 			v->rinc[i] = (1u << 30) / ((v->inc[i] >> 8) | 1);
+			v->rinc[4 + i] = (1u << 30) / ((v->inc[4 + i] >> 8) | 1);
 		}
 	}
-	if (v->att) {                           /* ~2 ms up, then ENV DECAY down */
-		v->env += 21845;
-		if (v->env >= 65535) {
-			v->env = 65535;
-			v->att = 0;
-		}
-	} else
-		v->env -= (s32)(((u32)v->env * ac_dec[setv(v->set, S_DECAY)]) >> 16);
 	{
+		s32 shape = v->dial[1] >> 8, mix = v->dial[2] >> 8;
 		s32 sub = setv(v->set, S_SUB), chorus = setv(v->set, S_CHORUS), drive = setv(v->set, S_DRIVE);
-		s32 grit = setv(v->set, S_GRIT), bank = setv(v->set, S_TABLE);
-		s32 fo[32], og, gs, dg, pos, mf, warp = v->dial[0] >> 8;
-		u32 sinc, srinc, kp = 0, s1w = 0, s2w = 0;
-		const s16 *w0;
-		/* the wave: Shape, and the envelope by Sweep, in the bank (Q8: 0..7 waves) */
-		pos = (v->dial[1] >> 8) * 1792 / 127 + (s32)(((u32)v->env * (u32)(v->dial[2] >> 8)) >> 16) * 1792 / 127;
-		pos = pos > 1792 ? 1792 : pos;
-		w0 = ac_wt + (bank * 8 + (pos >> 8)) * AC_WAVE;
-		mf = (pos >> 8) < 7 ? (pos & 255) << 7 : 0;  /* Q15: towards the next wave */
-		/* the warp: the cycle's first k at slope 0.5 / k, the rest at 0.5 / (1 - k); k from 0.5 down to 0.05 */
-		if (warp) {
-			u32 k = 32768 - (u32)warp * 29491 / 127;      /* Q16 */
-			kp = k << 16;
-			s1w = (32768u << 16) / k;                    /* Q16 */
-			s2w = (32768u << 16) / (65536 - k);
+		s32 grit = setv(v->set, S_GRIT), prate = setv(v->set, S_PWM);
+		s32 fo[32], og, gs, dg, A, B, pwm = 0, g1, g2, h1, h2, nosc;
+		u32 pw, sinc, srinc;
+		/* the wave: saw + B/2 x (saw - saw half a cycle on): saw at 0, + square at 64, square at 96, then the
+		 * pulse narrowing and moving with a triangle (PWM RATE: 0.15 to 3.7 Hz) */
+		if (shape <= 64) {
+			A = 4096;
+			B = shape * 64;
+		} else {
+			A = shape >= 96 ? 0 : (96 - shape) * 128;
+			B = 4096;
+			if (shape > 96)
+				pwm = (shape - 96) * 4;     /* 0..124: how far the width moves */
 		}
-		gs = sub * 1500;                        /* the sub: at 10, half full scale */
+		v->pwm += 215040 + (u32)prate * 286720;  /* (0.7 Hz at 3) */
+		{
+			s32 tri = (s32)(v->pwm >> 16) - 32768;
+			tri = (tri < 0 ? -tri : tri) - 16384;   /* -16384..16384 */
+			pw = 0x80000000u + (u32)(tri * pwm * 837);   /* up to +-40% of a cycle */
+		}
+		/* the levels (Q12, four voices into one, Q14 waves): OSC 1 by 127 - Sweep, OSC 2 by Sweep, both whole at 64;
+		 * A x saw + B x pulse = (A + B/2) x saw - B/2 x the saw pw on (the pulse, less its DC) */
+		{
+			s32 l1 = mix <= 64 ? 4096 : (127 - mix) * 65, l2 = mix >= 64 ? 4096 : mix * 64;
+			g1 = ((A + (B >> 1)) * l1) >> 14;
+			g2 = (B * l1) >> 15;
+			h1 = ((A + (B >> 1)) * l2) >> 14;
+			h2 = (B * l2) >> 15;
+		}
+		nosc = mix ? 8 : 4;                     /* (OSC 2 silent: not rendered) */
+		if (mix >= 127)
+			nosc = -8;                          /* (OSC 1 silent: OSC 2 alone) */
+		gs = sub * 820;                         /* the sub: at 10, half full scale */
 		dg = 2048 + drive * 700;                /* DRIVE: x 0.5 (clean) to x 2.2 into the soft clip (Q12) */
-		og = 7373;                              /* x 1.8 to 16 bits (the limiter takes the peaks) */
+		og = 9830;                              /* x 2.4 to 16 bits (the limiter takes the peaks) */
 		if (chorus)
 			og = og * 3 >> 2;                   /* (the chorus adds its line to the dry sound) */
 		sinc = (v->nv ? v->inc[0] : 0) >> 1;
 		srinc = (1u << 30) / ((sinc >> 8) | 1);
 		{
-			s32 sm[32];
+			/* the oscillators, one at a time into four sums: OSC 1's saws and its saws pw on, OSC 2's */
+			s32 s1[32], s2[32], t1[32], t2[32];
+			s32 o0 = nosc < 0 ? 4 : 0, o1 = nosc < 0 ? 8 : nosc;
 			for (i = 0; i < n; i++)
-				sm[i] = 0;
-			for (j = 0; j < v->nv; j++) {
-				u32 p = v->ph[j], inc = v->inc[j], sh, m = warp ? s1w >> 8 : 256;
-				const s16 *t0, *t1;
-				s32 l = 0;
-				/* the largest wave whose top harmonic (x the warp's steepest slope, m / 256) stays under 0.375 fs */
-				while (l < 4 && inc > ((25165824u << l) / m) << 8)
-					l++;
-				t0 = w0 + ac_loff[l];
-				t1 = t0 + AC_WAVE;
-				sh = 24 + l;
-				/* (four loops: with or without the warp, one wave or two) */
-#define AC_RD(T, q, x) { u32 ix_ = (q) >> sh; s32 a_ = (T)[ix_]; \
-		x = a_ + ((((T)[ix_ + 1] - a_) * (s32)(((q) >> (sh - 15)) & 0x7fff)) >> 15); }
-#define AC_WARP(q) ((q) < kp ? ((q) >> 16) * s1w : 0x80000000u + (((q) - kp) >> 16) * s2w)
-				if (!warp && !mf)
+				s1[i] = t1[i] = 0;
+			if (B)
+				for (i = 0; i < n; i++)
+					s2[i] = t2[i] = 0;
+			for (k = o0; k < o1; k++) {
+				u32 p, inc, r;
+				s32 *a1, *a2;
+				j = k & 3;
+				if (j >= v->nv)
+					continue;
+				p = v->ph[k];
+				inc = v->inc[k];
+				r = v->rinc[k];
+				a1 = k < 4 ? s1 : t1;
+				a2 = k < 4 ? s2 : t2;
+				if (!B)                         /* saws */
 					for (i = 0; i < n; i++) {
-						s32 x;
 						p += inc;
-						AC_RD(t0, p, x);
-						sm[i] += x;
+						a1[i] += saw(p, inc, r);
 					}
-				else if (!warp)
+				else                            /* and the saw pw on: their difference is the pulse */
 					for (i = 0; i < n; i++) {
-						s32 x, y;
 						p += inc;
-						AC_RD(t0, p, x);
-						AC_RD(t1, p, y);
-						sm[i] += x + (((y - x) * mf) >> 15);
+						a1[i] += saw(p, inc, r);
+						a2[i] += saw(p - pw, inc, r);
 					}
-				else if (!mf)
-					for (i = 0; i < n; i++) {
-						s32 x;
-						u32 q;
-						p += inc;
-						q = AC_WARP(p);
-						AC_RD(t0, q, x);
-						sm[i] += x;
-					}
-				else
-					for (i = 0; i < n; i++) {
-						s32 x, y;
-						u32 q;
-						p += inc;
-						q = AC_WARP(p);
-						AC_RD(t0, q, x);
-						AC_RD(t1, q, y);
-						sm[i] += x + (((y - x) * mf) >> 15);
-					}
-#undef AC_RD
-#undef AC_WARP
-				v->ph[j] = p;
+				v->ph[k] = p;
 			}
-			/* the mix, the sub (a band-limited square, Q14 x gs / 16384), DRIVE (a soft clip), GRIT (fewer bits, a
-			 * sample held) */
+			/* the mix, the sub (band-limited), DRIVE (a soft clip), GRIT (fewer bits, a sample held) */
 			{
 				u32 sp = v->sph;
 				s32 gh = v->gh, gn = v->gn, hold = 1 + (grit >> 1), mask = ~((1 << (grit + 2)) - 1);
 				for (i = 0; i < n; i++) {
-					s32 x = sm[i] >> 2;
+					s32 x = (s1[i] * g1 - s2[i] * g2 + t1[i] * h1 - t2[i] * h2) >> 12;
 					sp += sinc;
 					if (gs)
 						x += (sqr(sp, 0x80000000u, sinc, srinc) * gs) >> 14;
@@ -777,7 +710,7 @@ static const char *const n_deg[8] __attribute__((section(".lxr_ro"), aligned(4))
 static const char *const n_voice[5] __attribute__((section(".lxr_ro"), aligned(4))) = {"AUTO", "CLOSE", "OPEN", "DROP 2", "WIDE"};
 static const char *const n_bass[3] __attribute__((section(".lxr_ro"), aligned(4))) = {"OFF", "-1 OCT", "-2 OCT"};
 static const char *const n_chorus[4] __attribute__((section(".lxr_ro"), aligned(4))) = {"OFF", "I", "II", "I+II"};
-static const char *const n_table[4] __attribute__((section(".lxr_ro"), aligned(4))) = {"ANALOG", "SYNC", "DIGITAL", "FM"};
+static const char *const n_int[6] __attribute__((section(".lxr_ro"), aligned(4))) = {"UNISON", "+5TH", "+1 OCT", "-1 OCT", "+OCT+5TH", "+2 OCT"};
 static const AcRow ac_rows[] __attribute__((section(".lxr_ro"), aligned(4))) = {
 	{S_KEY, 11, "KEY", note_names}, {S_SCALE, 7, "SCALE", n_scale}, {S_NOTES, 1, "NOTES", n_notes},
 	{S_PROG, 17, "PROG", prog_names}, {S_ADV, 3, "ADVANCE", n_adv},
@@ -786,7 +719,7 @@ static const AcRow ac_rows[] __attribute__((section(".lxr_ro"), aligned(4))) = {
 	{S_U0 + 6, 7, "USER 7", n_deg}, {S_U0 + 7, 7, "USER 8", n_deg},
 	{S_VOICE, 4, "VOICING", n_voice}, {S_BASS, 2, "BASS", n_bass}, {S_STRUM, 10, "STRUM", 0},
 	{S_SUB, 10, "SUB", 0}, {S_CHORUS, 3, "CHORUS", n_chorus}, {S_DRIFT, 10, "DRIFT", 0},
-	{S_TABLE, 3, "TABLE", n_table}, {S_DECAY, 10, "ENV DECAY", 0}, {S_DRIVE, 10, "DRIVE", 0}, {S_GRIT, 10, "GRIT", 0}};
+	{S_INT, 5, "OSC2 INT", n_int}, {S_PWM, 10, "PWM RATE", 0}, {S_DRIVE, 10, "DRIVE", 0}, {S_GRIT, 10, "GRIT", 0}};
 #define AC_ROWS ((s32)(sizeof ac_rows / sizeof ac_rows[0]))
 
 static s32 am_row OVL, am_top OVL, am_edit OVL;

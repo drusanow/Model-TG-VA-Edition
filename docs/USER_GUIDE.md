@@ -532,31 +532,25 @@ Values are the LXR's own, 0 to 127 (FINE: -64 to +63). What it does:
 
 ## ACHORD
 
-*Plaits Edition only.* The fifteenth machine: a wavetable chord machine for
-leads, stabs and pads with some edge - IDM, techno - with keys and
-progressions you set once and then just play. Pick it like any machine (it
-comes after LXR).
+*Plaits Edition only.* The fifteenth machine: a big, analogue-style chord
+machine - like the VA machine playing chords - for thick techno and IDM
+chords, with keys and progressions you set once and then just play. Pick it
+like any machine (it comes after LXR).
 
-**The sound.** Up to four notes at once, each reading a wavetable from one of
-four banks (TABLE), drifting a little and set a few cents apart; a square
-sub-oscillator an octave under the lowest note; a warp that bends each wave's
-cycle for a harder, more synced edge; DRIVE and GRIT; and a chorus in the
-style of the classic polysynths. ACHORD has **no filter of its own**: use the
-track's **Filter** and **Resonance** (on every machine), and move them with
-the LFOs. The track's Attack and Decay shape the level as on every machine.
-
-| bank (TABLE) | its eight waves, Shape from left to right |
-|---|---|
-| **ANALOG** | sine, triangle, a warm saw, saw, saw + square, square, a 25 % pulse, a 10 % pulse |
-| **SYNC** | a hard-synced saw, the sync sweeping higher: the classic sync lead |
-| **DIGITAL** | a saw with a resonant peak climbing its harmonics: hollow to glassy, like an early digital wavetable synth |
-| **FM** | two-operator FM, getting brighter and more metallic |
+**The sound.** Up to four notes at once, each with **two oscillators** (saw,
+saw + square, square or a moving pulse, all band-limited): OSC 2 detuned
+against OSC 1 and, if you like, an interval away (a fifth, an octave). The
+notes drift a little and sit a few cents apart; a square sub-oscillator sits
+an octave under the lowest note; then DRIVE, GRIT and a chorus in the style of
+the classic polysynths. ACHORD has **no filter of its own**: use the track's
+**Filter** and **Resonance** (on every machine), and move them with the LFOs.
+The track's Attack and Decay shape the level as on every machine.
 
 | knob | does |
 |---|---|
-| **Color** (WARP) | bends the wave's cycle (phase distortion): 0 the plain wave, up to a sharp, buzzy edge |
-| **Shape** (WAVE) | where in the bank, crossfading smoothly from wave to wave |
-| **Sweep** (MOVE) | how far each trig's envelope sweeps the wave up the bank (ENV DECAY sets how long) |
+| **Color** (DETN) | OSC 2 against OSC 1: 0 in tune, up to 40 cents apart - the thicker, wider the chord |
+| **Shape** (WAVE) | saw (0), saw + square (64), square (96), then a moving, narrowing pulse (PWM) up to 127 |
+| **Sweep** (OSC2) | the oscillators' balance: 0 OSC 1 alone, 64 both equally (the thick sound), 127 OSC 2 alone |
 | **Contour** (CHRD) | the chord: with SCALE at FREE its type - MAJ, MIN, 7, MAJ7, MIN7, M7B5, DIM, DIM7, AUG, SUS2, SUS4, 6, MIN6, ADD9, 9, MIN9; in a key its size - TRIAD, 7TH, 9TH, ADD9, SUS2, SUS4, 6TH, POWER |
 
 **Pitch** and the keyboard choose the note.
@@ -584,8 +578,8 @@ and progression on each track.
 | **SUB** | 0 .. 10 | the sub-oscillator's level |
 | **CHORUS** | OFF, I, II, I+II | the chorus: I slow and wide, II faster, I+II a quick shimmer |
 | **DRIFT** | 0 .. 10 | how far the notes wander and sit apart (0: in tune) |
-| **TABLE** | ANALOG, SYNC, DIGITAL, FM | the wavetable bank |
-| **ENV DECAY** | 0 .. 10 | how long the wave envelope (Sweep) takes to fall back (30 ms to 4 s) |
+| **OSC2 INT** | UNISON, +5TH, +1 OCT, -1 OCT, +OCT+5TH, +2 OCT | where OSC 2 sits against OSC 1 |
+| **PWM RATE** | 0 .. 10 | how fast the pulse moves when Shape is past 96 (0.15 to 3.7 Hz) |
 | **DRIVE** | 0 .. 10 | 0 clean; up from there the sound is pushed into a soft clip, thicker and grittier |
 | **GRIT** | 0 .. 10 | lo-fi: fewer bits and a lower sample rate, from a little dust to crunchy digital |
 
@@ -601,14 +595,14 @@ chord of the key, a quick way to play progressions live.
 Contour still picks how rich the chords are (triads, 7ths, 9ths, sus, 6ths),
 in or out of a progression.
 
-Default sound: ANALOG between triangle and saw, swept a little by each trig,
-a little sub and drive, chorus I, voices leading. For a techno stab try SYNC
-or DIGITAL, Sweep up, a short ENV DECAY and the track's Filter with an LFO on
-it; for an IDM lead, FM with some WARP and GRIT. The first time an ACHORD
-track plays after the Cycles starts it is silent for about half a second
-while it builds its wavetables. Cost: about 6,500 instructions a block for
-the default triad with chorus, up to about 10,000 with four notes, the warp,
-a crossfade between waves and the chorus (a stock voice: ~7,600). Under heavy load the CPU Guard first drops it to 32 kHz (15-18%
+Default sound: detuned saws (a touch of square), both oscillators, a little
+sub and drive, chorus I, voices leading. For a big techno chord: Shape 0,
+Sweep 64, Color around 60, OSC2 INT +1 OCT, a little DRIVE, and the track's
+Filter with an LFO on it. For IDM grit: +5TH, more DRIVE and some GRIT. Cost:
+about 6,300 instructions a block with OSC 1 alone, 7,900-9,100 with both
+oscillators on saws, up to about 13,000 with both on square or PWM and chorus
+I+II (a stock voice: ~7,600) - the heaviest machine, so the CPU Guard may
+drop it to 32 kHz when many tracks play. Under heavy load the CPU Guard first drops it to 32 kHz (15-18%
 cheaper, a little less top end, no click), and only then may end one of its
 notes, as any new machine's. Details: [ACHORD.md](ACHORD.md).
 
